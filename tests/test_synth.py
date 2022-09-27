@@ -1,6 +1,6 @@
 from comb import program_to_comb
 from comb.comb import QSym
-from comb.modules import Base
+from comb.modules import BitVectorModule
 from comb.synth import SynthQuery, verify
 import pytest
 import hwtypes as ht
@@ -52,7 +52,7 @@ def test_add(p, ops, num_sols):
 
     op_list = []
     for op in ops:
-        op_list.append(Base().comb_from_sym(op))
+        op_list.append(BitVectorModule().comb_from_sym(op))
 
     sq = SynthQuery(comb, op_list, loc_type_int=False)
     combs = sq.gen_all_sols(logic=None, maxloops=1000, permutations=True, verbose=False)

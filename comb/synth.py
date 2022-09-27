@@ -6,8 +6,8 @@ from pysmt.fnode import FNode
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .comb import Comb, CombFun, Stmt, QSym, Var, BVConst
-from .modules import BV as mds_BV
+from .comb import Comb, CombFun, Assign, QSym, Var, BVConst
+from .modules import BVType as mds_BV
 import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
@@ -389,7 +389,7 @@ class SynthQuery:
             lhss = [name_from_loc(loc) for loc in out_lvars]
             op = self.op_list[i]
             args = [name_from_loc(loc,src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
-            stmts.append(Stmt(lhss, op.name, args))
+            stmts.append(Assign(lhss, op.name, args))
         outputs = [Var(name_from_loc(output_lvars[i]),v.type) for i, v in enumerate(self.spec.outputs)]
         name = QSym('solved', 'v0')
         comb = CombFun(name, inputs, outputs, stmts)

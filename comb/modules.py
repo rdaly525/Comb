@@ -1,20 +1,38 @@
-from .comb import Module, QSym, Prim, Var
+from .comb import Module, QSym, Prim, Var, Nat, NatType
 import hwtypes as ht
 
 
-class BV:
-    def __init__(self, N: int):
-        assert isinstance(N, int)
-        assert N > 0
-        self.N = N
-        self.name = QSym('bv', 'bv', (N,))
+class ParamModule(Module):
+    # Types
+    name = 'p'
 
-    def free_var(self, name):
-        return ht.SMTBitVector[self.N](prefix=name)
+    def type_from_sym(self, qsym: QSym):
+        assert qsym.ns == self.name
+        if qsym.name == "Nat":
+            return NatType
+        else:
+            raise ValueError(f"{qsym} not found")
+
+    def comb_from_sym(self, qsym: QSym):
+        assert qsym.ns == self.name
+        raise NotImplementedError()
+
+#class BV_N:
+#    def __init__(self, N: Nat):
+#        self.N = N
+
+class BVType:
+    name = QSym('bv', 'bv')
+    param_types = (NatType,)
+
+    def __init__(self, N: Nat):
+        self.N = N
+
+    def free_var(self, N: int, name):
+        return ht.SMTBitVector[N](prefix=name)
 
 class Bool:
     name = QSym('bv', 'bool')
-
     def free_var(self, name):
         return ht.SMTBit(prefix=name)
 
@@ -41,7 +59,7 @@ class BVUnary(Prim):
         bv_t = QSym('bv','bv',(N,))
         self.inputs = (Var('i0', bv_t),)
         self.outputs = (Var('o0',bv_t),)
-        bv_t = Base().type_from_sym(bv_t)
+        bv_t = BitVectorModule().type_from_sym(bv_t)
         self.sym_table = dict(
             i0=bv_t,
             o0=bv_t,
@@ -52,6 +70,15 @@ class BVUnary(Prim):
         return (self.op(a),)
 
 
+class BVAdd(Prim):
+    param_types = [NatType]
+
+    def input_types(self, N):
+        return [BVType(N), BVType(N)]
+
+    def output_types(self, N):
+        return [BVType(N)]
+
 class BVBinary(Prim):
     def __init__(self, N, op):
         self.N = N
@@ -61,7 +88,7 @@ class BVBinary(Prim):
         bv_t = QSym('bv','bv',(N,))
         self.inputs = (Var('i0', bv_t), Var('i1', bv_t))
         self.outputs = (Var('o0',bv_t),)
-        bv_t = Base().type_from_sym(bv_t)
+        bv_t = BitVectorModule().type_from_sym(bv_t)
         self.sym_table = dict(
             i0=bv_t,
             i1=bv_t,
@@ -72,23 +99,26 @@ class BVBinary(Prim):
     def eval(self, a, b):
         return (self.op(a, b),)
 
-class Base(Module):
+class BitVectorModule(Module):
     # Types
     name = 'bv'
 
     def type_from_sym(self, qsym: QSym):
         assert qsym.ns == self.name
         if qsym.name == "bv":
-            return BV(*qsym.genargs)
+            return BVType
         elif qsym.name == "bool":
-            return Bool()
+            return Bool
         else:
             raise ValueError(f"{qsym} not found")
 
     def comb_from_sym(self, qsym: QSym):
         assert qsym.ns == self.name
-        if qsym.name in _binops:
-            return BVBinary(*qsym.genargs, qsym.name)
-        elif qsym.name in _unary_ops:
-            return BVUnary(*qsym.genargs, qsym.name)
+        if qsym.name == "add":
+            return BVAdd()
+        #if qsym.name in _binops:
+        #    return BVBinary(*qsym.genargs, qsym.name)
+        #elif qsym.name in _unary_ops:
+        #    return BVUnary(*qsym.genargs, qsym.name)
         raise NotImplementedError()
+

@@ -1,6 +1,6 @@
 from comb import program_to_comb, discover, discover_up_to_N
 from comb.comb import QSym
-from comb.modules import Base
+from comb.modules import BitVectorModule
 from comb.synth import SynthQuery, verify
 import pytest
 import hwtypes as ht

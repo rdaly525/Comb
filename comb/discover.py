@@ -1,5 +1,5 @@
 from .comb import QSym, Comb
-from .modules import Base
+from .modules import BitVectorModule
 from .synth import SynthQuery, verify, flat
 import typing as tp
 import itertools as it
@@ -19,7 +19,7 @@ def discover(spec: Comb, N: int, op_names: tp.List[QSym], const_list = ()):
 
     op_list = []
     for op in op_names:
-        op_list.append(Base().comb_from_sym(op))
+        op_list.append(BitVectorModule().comb_from_sym(op))
 
     all_combs = []
     all_indices = flat([[i for _ in range(N)] for i in range(len(op_list))])
