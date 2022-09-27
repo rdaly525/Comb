@@ -1,4 +1,5 @@
 import abc
+import collections
 import re
 from dataclasses import dataclass
 import typing as tp
@@ -116,6 +117,8 @@ class Assign(Stmt):
     def __str__(self):
         return f"{_list_to_str(self.lhss)} = {self.call}"
 
+class ParamAssign(Assign): pass
+
 class Comb:
 
     def partial_eval(self, *params) -> 'Comb':
@@ -208,7 +211,7 @@ class CombFun(Comb):
         #    raise TypeError("Params, then Ins, then Outs")
         self.resolve_qualified_symbols()
         self.type_inference()
-        #self.type_check()
+        self.type_check()
 
     #Makes sure all the QSym symbols exist (ops and types)
     def resolve_qualified_symbols(self):
@@ -242,6 +245,7 @@ class CombFun(Comb):
     #Get the types (possibly parameterized) of all symbols
     # This will:
     #   Do a parameter type check
+    #       Both type check param assignments and parameters of value assignments
     #   Checks that all the symbols are defined before used and outputs assigned
     #   Verify param inputs on calls trace from params
     #   Verify that args trace from inputs
@@ -261,8 +265,14 @@ class CombFun(Comb):
                     raise TypeError(f"{pv} used before defined")
 
         outputs = {}
-        for stmt in self.stmts:
+        param_decls = {}
+        param_assigns = {}
+        in_decls = {}
+        out_decls = {}
+        value_assigns = {}
+        for i, stmt in enumerate(self.stmts):
             if isinstance(stmt, ParamDecl):
+                param_decls[i] = stmt
                 name = stmt.var.name
                 t_name = stmt.var.type.name
                 t_params = stmt.var.type.params
@@ -280,16 +290,24 @@ class CombFun(Comb):
                 if name in self.v_sym_table:
                     raise TypeError(f"Redefinition of {name}")
                 if isinstance(stmt, OutDecl):
+                    out_decls[i] = stmt
                     outputs[name] = t_cls(*t_params)
                 else:
+                    in_decls[i] = stmt
                     self.v_sym_table[name] = t_cls(*t_params)
             elif isinstance(stmt, Assign):
                 comb = self.qsym_to_comb[stmt.call.name]
                 if len(comb.input_types(*stmt.call.params)) != len(stmt.call.args):
                     raise TypeError("Mismatch in number of args")
-                for arg in stmt.call.args:
-                    if isinstance(arg, str) and arg not in self.v_sym_table:
-                        raise ValueError(f"{arg} used before defined")
+
+                #Determine if this is a param_call or an arg call
+                p_call = all(isinstance(arg, str) and arg in self.p_sym_table for arg in stmt.args)
+                if p_call:
+                    param_assigns[i] = stmt
+                    #Type check the arguments
+                else:
+                    if not all(isinstance(arg, str) and arg in self.v_sym_table for arg in stmt.args):
+                        raise ValueError(f"{stmt} has arg used before defined")
                 param_check(comb.param_types, stmt.call.params)
                 output_types = comb.output_types(*stmt.call.params)
                 if len(stmt.lhss) != len(output_types):
@@ -304,50 +322,22 @@ class CombFun(Comb):
             if oname not in self.v_sym_table:
                 raise TypeError(f"Output {oname} never assigned")
 
+    #Gather all the args and add to a list of things they need to equal
     def type_check(self):
-        raise NotImplementedError()
-        op_in_types = [op_in.type for op_in in op.inputs]
-        op_out_types = [op_out.type for op_out in op.outputs]
-
-        t_cls = self.qsym_to_type[t_name]
-        self.v_sym_table[name] = t_cls()
-
-        #I can assume
-        for pvar in self.params:
-            assert isinstance(pvar, Var)
-            self.p_sym_table[pvar.name] = self.qsym_to_type[pvar.type]
-
-        for ivar in self.inputs:
-            assert isinstance(ivar, Var)
-            self.sym_table[ivar.name] = self.resolve_type(ivar.type)
+        from .modules import BVType
+        tc = collections.defaultdict(list)
+        consts = []
+        for sym, t in self.v_sym_table.items():
+            tc[sym].append(t)
         for stmt in self.stmts:
-            op = self.ext_ops[stmt.op]
-            op_in_types = [op_in.type for op_in in op.inputs]
-            op_out_types = [op_out.type for op_out in op.outputs]
-
-            #Verify same number of args
-            if len(op_in_types) != len(stmt.args):
-                raise ValueError("TC: type mismatch")
-            for expected_type, arg in zip(op_in_types, stmt.args):
-                if isinstance(arg, BVConst):
-                    if expected_type != arg.qsym:
-                        raise ValueError(f"TC: {arg} inconsistent BV type")
-                else:
-                    assert isinstance(arg, str), str(arg)
-                    if arg not in self.sym_table:
-                        raise ValueError(f"TC: {arg} used before defined")
-                    if expected_type != self.sym_table[arg].name:
-                        raise ValueError(f"TC: {arg}: ({expected_type}!={self.sym_table[arg].name}) inconsistent types")
-            #Verify same number of outputs
-            if len(op_out_types) != len(stmt.lhss):
-                raise ValueError("TC: Wrong number of outputs")
-            for lhs, t in zip(stmt.lhss, op_out_types):
-                assert not isinstance(lhs, BVConst)
-                self.sym_table[lhs] = self.resolve_type(t)
-
-        # Verify outputs are consistent
-        for ovar in self.outputs:
-            if ovar.name not in self.sym_table:
-                raise ValueError(f"output {ovar.name} never assigned!")
-            if ovar.type != self.sym_table[ovar.name].name:
-                raise ValueError(f"{ovar.type} != {self.sym_table[ovar.name].name} inconsistent types")
+            if isinstance(stmt, Assign):
+                input_types = self.qsym_to_comb[stmt.call.name].input_types(*stmt.call.params)
+                assert len(stmt.call.args) == len(input_types)
+                for arg, t in zip(stmt.call.args, input_types):
+                    if isinstance(arg, BVConst):
+                        consts.append([t,BVType(arg.width)])
+                    else:
+                        tc[arg].append(t)
+        print(tc)
+        print(consts)
+        assert 0

@@ -36,9 +36,12 @@ inc_p = '''
 Comb test.inc
 Param N: p.Nat
 In a: bv.bv[N]
-Out o: bv.bv[N]
+Out o: bv.bv[foo]
 o = bv.add[N](a, [N]'h1)
+
 '''
+
+Exist(X) ~((X+X == 2X) & (X+1 > 1))
 
 
 @pytest.mark.parametrize("p", [
