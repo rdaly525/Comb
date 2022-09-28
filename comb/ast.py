@@ -1,56 +1,21 @@
 import abc
 import collections
-import re
 from dataclasses import dataclass
 import typing as tp
 import hwtypes as ht
 
-#class ParamType:
-#    pass
-#
-#class Nat(ParamType): pass
-
-
-class Param:
-    pass
-
-class NatType:
-    param_types = ()
-
-class Nat(Param):
-    def __init__(self, value):
-        if isinstance(value, int) and value > 0:
-            pass
-        elif isinstance(value, str):
-            pass
-        else:
-            raise ValueError("Bad Value")
-        self.value = value
-
-    def __str__(self):
-        return str(self.value)
-
-    def __eq__(self, other):
-        return self.value == other.value
-
-@dataclass
-class BVConst:
-    width: Nat
-    val: int
-
-    def __str__(self):
-        if isinstance(self.width.value, int):
-            return f"{self.width}\'h{hex(self.val)[2:]}"
-        return f"[{self.width}]\'h{hex(self.val)[2:]}"
-
 
 @dataclass
 class QSym:
-    ns: str
+    module: str
     name: str
 
+    def __post_init__(self):
+        assert isinstance(self.module, str)
+        assert isinstance(self.name, str)
+
     def __str__(self):
-        return f"{self.ns}.{self.name}"
+        return f"{self.module}.{self.name}"
 
     def __hash__(self):
         return hash(str(self))
@@ -58,36 +23,68 @@ class QSym:
     def __eq__(self, other):
         return str(self) == str(other)
 
-
-#Software Module
-class Module:
+@dataclass
+class Sym:
     name: str
 
-    @abc.abstractmethod
-    def type_from_sym(self, qsym: QSym) -> 'Type':
-        ...
+class NatType:
+    name = QSym('p', 'Nat')
+    param_types = ()
 
-    @abc.abstractmethod
-    def comb_from_sym(self, qsym: QSym) -> 'CombFun':
-        ...
-
-def _list_to_str(l):
-    return ", ".join(str(l_) for l_ in l)
-
-@dataclass
-class Call:
-    name : QSym
-    params : tp.Tuple[Param]
-    args : tp.Tuple[str]
+class NatValue:
+    def __init__(self, val):
+        assert isinstance(val, (int, Sym))
+        self.value = val
 
     def __str__(self):
-        return f"{self.name}[{_list_to_str(self.params)}]({_list_to_str(self.args)})"
+        return str(self.value)
 
+    def __eq__(self, other):
+        return self.value == other.value
+
+class BVType:
+    name = QSym('bv', 'bv')
+    param_types = (NatType(),)
+
+    def __init__(self, N: NatValue):
+        assert isinstance(N, NatValue)
+        self.N = N
+
+    #def free_var(self, N: int, name):
+    #    return ht.SMTBitVector[N](prefix=name)
+
+class ParamExpr:
+    def __init__(self, val):
+        assert isinstance(val, (Sym, NatValue))
+        self.value = val
+
+class Expr:
+    def __init__(self, val):
+        assert isinstance(val, (Sym, NatValue, BVValue))
+        self.value = val
 
 @dataclass
-class Type:
+class BVValue:
+    width: ParamExpr
+    val: int
+
+    def __post_init__(self):
+        assert isinstance(self.width, ParamExpr)
+        assert isinstance(self.val, int)
+
+    def __str__(self):
+        if isinstance(self.width.value, int):
+            return f"{self.width}\'h{hex(self.val)[2:]}"
+        return f"[{self.width}]\'h{hex(self.val)[2:]}"
+
+@dataclass
+class ASTType:
     name : QSym
-    params : tp.Tuple[Param]
+    params : tp.Tuple[ParamExpr]
+
+    def __post_init__(self):
+        assert isinstance(self.name, QSym)
+        assert all(isinstance(p, ParamExpr) for p in self.params)
 
     def __str__(self):
         if len(self.params)==0:
@@ -96,19 +93,57 @@ class Type:
 
 
 @dataclass
-class Var:
+class ASTVarDecl:
     name: str
-    type: Type
+    type: ASTType
+
+@dataclass
+class Decl:
+    name: str
+    type: ASTType
+
+class ParamDecl(Decl):
+    def __str__(self):
+        return f"Param {self.var}"
+
+class InDecl(Decl):
+    def __str__(self):
+        return f"In {self.var}"
+
+class OutDecl(Decl):
+    def __str__(self):
+        return f"Out {self.var}"
+
+
+
+def _list_to_str(l):
+    return ", ".join(str(l_) for l_ in l)
+
+@dataclass
+class ASTCallExpr:
+    name : QSym
+    params : tp.Tuple[ParamExpr]
+    args : tp.Tuple[Expr]
+
+    def __post_init__(self):
+        assert isinstance(self.name, QSym)
+        assert all(isinstance(p, ParamExpr) for p in self.params)
+        assert all(isinstance(a, Expr) for a in self.args), str(self.args)
 
     def __str__(self):
-        return f"{self.name} : {self.type}"
+        return f"{self.name}[{_list_to_str(self.params)}]({_list_to_str(self.args)})"
+
 
 class Stmt: pass
 
 @dataclass
-class Assign(Stmt):
-    lhss: tp.Tuple[str]
-    call: Call
+class ASTAssignStmt(Stmt):
+    lhss: tp.Tuple[Sym]
+    call: ASTCallExpr
+
+    def __post_init__(self):
+        assert all(isinstance(lhs, Sym) for lhs in self.lhss)
+        assert isinstance(self.call, ASTCallExpr)
 
     @property
     def args(self):
@@ -117,7 +152,13 @@ class Assign(Stmt):
     def __str__(self):
         return f"{_list_to_str(self.lhss)} = {self.call}"
 
-class ParamAssign(Assign): pass
+@dataclass
+class ASTDeclStmt(Stmt):
+    decl: Decl
+
+    def __post_init__(self):
+        assert isinstance(self.decl, Decl)
+
 
 class Comb:
 
@@ -137,32 +178,13 @@ class Comb:
         return [self.sym_table[ivar.name].free_var(f"{prefix}__{ivar.name}") for ivar in self.outputs]
 
 
+
 class Prim(Comb):
     commutative = False
 
-
 @dataclass
-class Decl(Stmt):
-    var: Var
-
-class ParamDecl(Decl):
-    def __str__(self):
-        return f"Param {self.var}"
-
-class InDecl(Decl):
-    def __str__(self):
-        return f"In {self.var}"
-
-class OutDecl(Decl):
-    def __str__(self):
-        return f"Out {self.var}"
-
-@dataclass
-class CombFun(Comb):
+class ASTCombProgram(Comb):
     name: QSym
-    #params: tp.Tuple[Var]
-    #inputs: tp.Tuple[Var]
-    #outputs: tp.Tuple[Var]
     stmts: tp.Tuple[Stmt]
 
     @property
@@ -186,7 +208,7 @@ class CombFun(Comb):
         assert len(args) == len(self.inputs)
         val_table = {var.name:arg for arg, var in zip(args, self.inputs)}
         def get_val(arg):
-            if isinstance(arg, BVConst):
+            if isinstance(arg, BVValue):
                 return ht.SMTBitVector[arg.width](arg.val)
             else:
                 return val_table[arg]
@@ -200,18 +222,20 @@ class CombFun(Comb):
         return tuple(val_table[var.name] for var in self.outputs)
 
     def __post_init__(self):
-        self.params = [d.var for d in self.stmts if isinstance(d, ParamDecl)]
-        self.inputs = [d.var for d in self.stmts if isinstance(d, InDecl)]
-        self.outputs = [d.var for d in self.stmts if isinstance(d, OutDecl)]
+        pass
+        #raise NotImplementedError()
+        #self.params = [d.var for d in self.stmts if isinstance(d, ParamDecl)]
+        #self.inputs = [d.var for d in self.stmts if isinstance(d, InDecl)]
+        #self.outputs = [d.var for d in self.stmts if isinstance(d, OutDecl)]
 
-        #p_valid = all(isinstance(d, ParamDecl) for d in self.decls[:len(self.params)])
-        #i_valid = all(isinstance(d, InDecl) for d in self.decls[len(self.params):-len(self.outputs)])
-        #o_valid = all(isinstance(d, OutDecl) for d in self.decls[-len(self.outputs):])
-        #if not (p_valid and i_valid and o_valid):
-        #    raise TypeError("Params, then Ins, then Outs")
-        self.resolve_qualified_symbols()
-        self.type_inference()
-        self.type_check()
+        ##p_valid = all(isinstance(d, ParamDecl) for d in self.decls[:len(self.params)])
+        ##i_valid = all(isinstance(d, InDecl) for d in self.decls[len(self.params):-len(self.outputs)])
+        ##o_valid = all(isinstance(d, OutDecl) for d in self.decls[-len(self.outputs):])
+        ##if not (p_valid and i_valid and o_valid):
+        ##    raise TypeError("Params, then Ins, then Outs")
+        #self.resolve_qualified_symbols()
+        #self.type_inference()
+        #self.type_check()
 
     #Makes sure all the QSym symbols exist (ops and types)
     def resolve_qualified_symbols(self):
@@ -220,14 +244,14 @@ class CombFun(Comb):
         self.modules = {'bv':BitVectorModule(), 'p':ParamModule()}
 
         def resolve_comb(qsym):
-            if qsym.ns not in self.modules:
-                raise ValueError("Missing module ", qsym.ns)
-            return self.modules[qsym.ns].comb_from_sym(qsym)
+            if qsym.module not in self.modules:
+                raise ValueError("Missing module ", qsym.module)
+            return self.modules[qsym.module].comb_from_sym(qsym)
 
         def resolve_type(qsym):
-            if qsym.ns not in self.modules:
-                raise ValueError("Missing module ", qsym.ns)
-            return self.modules[qsym.ns].type_from_sym(qsym)
+            if qsym.module not in self.modules:
+                raise ValueError("Missing module ", qsym.module)
+            return self.modules[qsym.module].type_from_sym(qsym)
 
         #Resolve Ops
         self.qsym_to_comb = {}
@@ -259,7 +283,7 @@ class CombFun(Comb):
             if len(param_types) != len(param_values):
                 raise ValueError("Mismatch in params")
             for pt, pv in zip(param_types, param_values):
-                if isinstance(pv, Nat) and pt is not NatType:
+                if isinstance(pv, NatValue) and pt is not NatType:
                     raise TypeError(f"{pv} is not of type {pt}")
                 if isinstance(pv.value, str) and pv.value not in self.p_sym_table:
                     raise TypeError(f"{pv} used before defined")
@@ -334,10 +358,24 @@ class CombFun(Comb):
                 input_types = self.qsym_to_comb[stmt.call.name].input_types(*stmt.call.params)
                 assert len(stmt.call.args) == len(input_types)
                 for arg, t in zip(stmt.call.args, input_types):
-                    if isinstance(arg, BVConst):
+                    if isinstance(arg, BVValue):
                         consts.append([t,BVType(arg.width)])
                     else:
                         tc[arg].append(t)
         print(tc)
         print(consts)
         assert 0
+
+
+#Software Module
+class Module:
+    name: str
+
+    @abc.abstractmethod
+    def type_from_sym(self, qsym: QSym) -> 'ASTType':
+        ...
+
+    @abc.abstractmethod
+    def comb_from_sym(self, qsym: QSym) -> 'ASTCombProgram':
+        ...
+

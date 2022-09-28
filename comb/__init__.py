@@ -1,2 +1,4 @@
 from .lexer import program_to_comb
-from .discover import discover, discover_up_to_N
+
+#TODO add this back
+#from .discover import discover, discover_up_to_N

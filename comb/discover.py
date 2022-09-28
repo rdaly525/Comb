@@ -1,4 +1,4 @@
-from .comb import QSym, Comb
+from .ast import QSym, Comb
 from .modules import BitVectorModule
 from .synth import SynthQuery, verify, flat
 import typing as tp

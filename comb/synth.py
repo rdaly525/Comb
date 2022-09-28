@@ -6,7 +6,7 @@ from pysmt.fnode import FNode
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .comb import Comb, CombFun, Assign, QSym, Var, BVConst
+from .ast import Comb, ASTCombProgram, Assign, QSym, ASTVarDecl, BVValue
 from .modules import BVType as mds_BV
 import typing as tp
 import pysmt.shortcuts as smt
@@ -39,7 +39,7 @@ def flat(l):
 
 @dataclass
 class SynthQuery:
-    spec: CombFun
+    spec: ASTCombProgram
     op_list: tp.List[Comb]
     const_list: tp.Tuple[int] = ()
     unique_comm: bool = True
@@ -370,7 +370,7 @@ class SynthQuery:
                 i, j = src
                 type = self.spec.resolve_type(self.op_list[i].inputs[j].type)
                 if isinstance(type, mds_BV):
-                    return BVConst(type.N, hard_consts[loc-len(inputs)])
+                    return BVValue(type.N, hard_consts[loc - len(inputs)])
                 else:
                     raise NotImplementedError()
             else:
@@ -390,9 +390,9 @@ class SynthQuery:
             op = self.op_list[i]
             args = [name_from_loc(loc,src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
             stmts.append(Assign(lhss, op.name, args))
-        outputs = [Var(name_from_loc(output_lvars[i]),v.type) for i, v in enumerate(self.spec.outputs)]
+        outputs = [ASTVarDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
         name = QSym('solved', 'v0')
-        comb = CombFun(name, inputs, outputs, stmts)
+        comb = ASTCombProgram(name, inputs, outputs, stmts)
         comb.resolve_qualified_symbols(self.spec.module_list)
         return comb
 

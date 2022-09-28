@@ -1,5 +1,5 @@
 from comb import program_to_comb
-from comb.comb import QSym
+from comb.ast import QSym
 from comb.modules import BitVectorModule
 from comb.synth import SynthQuery, verify
 import pytest

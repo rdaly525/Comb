@@ -1,7 +1,7 @@
 import ply.lex as lex
 import ply.yacc as yacc
 import typing as tp
-from .comb import *
+from .ast import *
 
 '''
 sym    : VARID
@@ -117,129 +117,117 @@ lexer = lex.lex()
 #YACC
 start = 'comb'
 
-
 def p_sym_0(p):
     'sym : VARID'
-    p[0] = p[1]
+    p[0] = Sym(p[1])
 
-def p_param_0(p):
-    'param : NUMBER'
-    p[0] = Nat(p[1])
-
-def p_param_1(p):
-    'param : sym'
-    p[0] = Nat(p[1])
-
-def p_params_0(p):
-    'params : param'
+def p_syms_0(p):
+    'syms : sym'
     p[0] = [p[1]]
 
-def p_params_1(p):
-    'params : params COMMA param'
-    p[0] = p[1] + [p[3]]
+def p_syms_1(p):
+    'syms : syms COMMA sym'
+    p[0] = [*p[1], p[2]]
 
 def p_qsym_0(p):
     'qsym : NSID'
     p[0] = QSym(*p[1])
 
+def p_nat_0(p):
+    'nat : NUMBER'
+    p[0] = NatValue(p[1])
+
+def p_pexpr_0(p):
+    'pexpr : nat'
+    p[0] = ParamExpr(p[1])
+
+def p_pexpr_0(p):
+    'pexpr : sym'
+    p[0] = ParamExpr(p[1])
+
+def p_pexprs_0(p):
+    'pexprs : pexpr'
+    p[0] = [p[1]]
+
+def p_pexprs_1(p):
+    'pexprs : pexprs COMMA pexpr'
+    p[0] = [*p[1], p[3]]
+
+def p_bvwidth_0(p):
+    'bvwidth : nat'
+    p[0] = ParamExpr(p[1])
+
+def p_bvwidth_1(p):
+    'bvwidth : LSQB pexpr RSQB'
+    p[0] = p[2]
+
+def p_bvvalue_0(p):
+    'bvvalue : bvwidth BVCONST'
+    p[0] = BVValue(p[1], p[2])
+
+def p_const_0(p):
+    'const : bvvalue'
+    p[0] = p[1]
+
+def p_const_1(p):
+    'const : nat'
+    p[0] = p[1]
+
+def p_expr_0(p):
+    'expr : sym'
+    p[0] = Expr(p[1])
+
+def p_expr_1(p):
+    'expr : const'
+    p[0] = Expr(p[1])
+
+def p_exprs_0(p):
+    'exprs : expr'
+    p[0] = [p[1]]
+
+def p_exprs_1(p):
+    'exprs : exprs COMMA expr'
+    p[0] = [*p[1], p[3]]
 
 def p_qsym_p_0(p):
     'qsym_p : qsym'
     p[0] = [p[1], []]
 
 def p_qsym_p_1(p):
-    'qsym_p : qsym LSQB params RSQB'
+    'qsym_p : qsym LSQB pexprs RSQB'
     p[0] = [p[1], p[3]]
 
 def p_type_0(p):
     'type : qsym_p'
-    p[0] = Type(*p[1])
+    p[0] = ASTType(*p[1])
 
 def p_decl_r_0(p):
     'decl_r : sym COLON type'
-    p[0] = Var(p[1], p[3])
-
-def p_param_d_0(p):
-    'param_d : PARAM decl_r'
-    p[0] = p[2]
-
-# input ::= input <varid> : <type>
-def p_input_d_0(p):
-    'input_d : INPUT decl_r'
-    p[0] = p[2]
-
-# output ::= output <varid> : <type>
-def p_output_d_0(p):
-    'output_d : OUTPUT decl_r'
-    p[0] = p[2]
+    p[0] = [p[1], p[3]]
 
 def p_decl_0(p):
-    'decl : param_d'
-    p[0] = ParamDecl(p[1])
+    'decl : PARAM decl_r'
+    p[0] = ParamDecl(*p[2])
 
 def p_decl_1(p):
-    'decl : input_d'
-    p[0] = InDecl(p[1])
+    'decl : INPUT decl_r'
+    p[0] = InDecl(*p[2])
 
 def p_decl_2(p):
-    'decl : output_d'
-    p[0] = OutDecl(p[1])
+    'decl : OUTPUT decl_r'
+    p[0] = OutDecl(*p[2])
 
-def p_decls_0(p):
-    'decls : decl'
-    p[0] = [p[1]]
-
-def p_decls_1(p):
-    'decls : decls decl'
-    p[0] = p[1] + [p[2]]
-
-def p_bvwidth_0(p):
-    'bvwidth : NUMBER'
-    p[0] = Nat(p[1])
-
-def p_bvwidth_1(p):
-    'bvwidth : LSQB param RSQB'
-    p[0] = p[2]
-
-def p_bvconst_0(p):
-    'bvconst : bvwidth BVCONST'
-    p[0] = BVConst(p[1], p[2])
-
-def p_const_0(p):
-    'const : bvconst'
-    p[0] = p[1]
-
-def p_const_1(p):
-    'const : NUMBER'
-    p[0] = int(p[1])
-
-def p_arg_0(p):
-    'arg : sym'
-    p[0] = p[1]
-
-def p_arg_1(p):
-    'arg : const'
-    p[0] = p[1]
-
-def p_args_0(p):
-    'args : arg'
-    p[0] = [p[1]]
-
-def p_args_1(p):
-    'args : args COMMA arg'
-    p[0] = p[1] + [p[3]]
-
-def p_call_0(p):
-    'call : qsym_p LPAREN args RPAREN'
-    p[0] = Call(*p[1], p[3])
+def p_callexpr_0(p):
+    'callexpr : qsym_p LPAREN exprs RPAREN'
+    p[0] = ASTCallExpr(*p[1], p[3])
 
 def p_stmt_0(p):
     'stmt : decl'
-    p[0] = p[1]
+    p[0] = ASTDeclStmt(p[1])
 
 def p_stmt_1(p):
-    'stmt : args ASSIGN call'
-    p[0] = Assign(p[1], p[3])
+    'stmt : syms ASSIGN callexpr'
+    p[0] = ASTAssignStmt(p[1], p[3])
 
 def p_stmts_0(p):
     'stmts : stmt'
@@ -247,12 +235,12 @@ def p_stmts_0(p):
 
 def p_stmts_1(p):
     'stmts : stmts stmt'
-    p[0] = p[1] + [p[2]]
+    p[0] = [*p[1], p[2]]
 
 # comb ::= <comb> <nsid> <stmts>
 def p_comb_0(p):
     'comb : COMB qsym stmts'
-    p[0] = CombFun(p[2], p[3])
+    p[0] = ASTCombProgram(p[2], p[3])
 
 # Error rule for syntax errors
 def p_error(p):
@@ -262,11 +250,9 @@ def p_error(p):
 parser = yacc.yacc()
 
 
-def program_to_comb(program: str, debug=False, type_check=False) -> CombFun:
+def program_to_comb(program: str, debug=False) -> ASTCombProgram:
     comb = parser.parse(program, lexer=lexer, debug=debug)
     if comb is None:
         raise ValueError("Syntax Error!")
-    if type_check:
-        comb.type_check()
     return comb
 
