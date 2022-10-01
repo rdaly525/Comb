@@ -1,29 +1,14 @@
 import typing as tp
 from .ast import Comb, ParamTerm, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
-    IntType, InDecl, Type, OutDecl, BVValue, ASTCallExpr
+    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr
 from dataclasses import dataclass
 
 def _list_to_str(l):
     return ", ".join(str(l_) for l_ in l)
 
 
-def type_check_params(call, pargs, sym_table):
-    ptypes = call.param_types
-    if len(pargs) != len(ptypes):
-        raise ValueError(f"{call.name} bad param values")
-    for parg, ptype in zip(pargs, ptypes):
-        if isinstance(parg, Sym):
-            if parg not in sym_table:
-                raise ValueError(f"{parg} used before declared")
-            T = sym_table[parg]
-        else:
-            T = parg.type
-        if ptype != T:
-            raise ValueError(f"Parameter {parg} does not typecheck")
-
-
 @dataclass
-class CallExpr:
+class CallExpr(_CallExpr):
     comb: Comb
     pargs : tp.Tuple[ParamTerm]
     args : tp.Tuple[Expr]
@@ -51,19 +36,16 @@ class CombPrimitive(Comb):
 
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program
-In order to resolve the Comb programs I need to perform type inference at least on the parameters
+Turns "bv.add" to the object representing that add
 
+In order to resolve the Comb programs I need to perform type inference at least on the parameters
 
 Type Inference creates types for the current Comb (All other ones already have types)
 Type Checking invokes SMT solver
-
-Problem: I cannot define functions that *return* parameters. 
-Sol 1:
-    Relax typing rules for parameter inputs
-    #More complex eval (almost surely turns into a dependently typed langauge) Maybe not...
-    #Simple looking language
-    #Distinction between a parameter and a normal arg is now sketch
 '''
+
+def _flat(l):
+    return [l__ for l_ in l for l__ in l_]
 
 
 @dataclass
@@ -74,7 +56,7 @@ class CombProgram(Comb):
     def __post_init__(self):
         assert all(isinstance(stmt, (AssignStmt, DeclStmt)) for stmt in self.stmts)
         #Generate the type signature
-        #self.type_inference()
+        self.type_inference()
 
         #Envokes solver
         self.type_check()
@@ -93,55 +75,81 @@ class CombProgram(Comb):
     def type_inference(self):
         #str -> type
         self.sym_table = {}
+        def check_sym(sym: Sym):
+            if sym not in self.sym_table:
+                raise ValueError(f"{sym} used before declared")
+            return self.sym_table[sym]
+
         def check_type(T: Type):
             if isinstance(T, TypeCall):
-                pval = T.N.value
-                if isinstance(pval, Sym):
-                    if pval not in self.sym_table:
-                        raise ValueError(f"{pval} used before declared")
-                    if not isinstance(self.sym_table[pval], IntType):
-                        raise NotImplementedError(f"All Params ({pval}) must be type Int")
+                if len(T.pargs) != len(T.type.param_types):
+                    raise ValueError(f"{T}: wrong param arity")
+                Ts = _flat(check_expr(parg) for parg in T.pargs)
+                for argT, pT in zip(Ts, T.type.param_types):
+                    if isinstance(pT, TypeCall):
+                        raise NotImplementedError()
+                    if argT != pT:
+                        raise ValueError(f"TC ERROR: {T} param types")
+
+
+        def check_expr(expr: Expr):
+            expr = expr.value
+            if isinstance(expr, IntValue):
+                return [expr.type]
+            elif isinstance(expr, Sym):
+                T = check_sym(expr)
+                return [T]
+            elif isinstance(expr, CallExpr):
+                if len(expr.pargs) != len(expr.comb.param_types):
+                    raise ValueError(f"{expr}: wrong param arity")
+                Ts = _flat(check_expr(parg) for parg in expr.pargs)
+                for argT, pT in zip(Ts, expr.comb.param_types):
+                    if isinstance(pT, TypeCall):
+                        raise NotImplementedError()
+                    if argT != pT:
+                        raise ValueError(f"TC ERROR: {expr} param types")
+
+                itypes, otypes = expr.comb.get_type(expr.pargs)
+                arity = sum(len(check_expr(arg)) for arg in expr.args)
+                if len(itypes) != arity:
+                    raise ValueError(f"{expr}: wrong input arity")
+                return otypes
+            else:
+                raise NotImplementedError(f"{expr} {type(expr)}")
+
+
         outputs = {}
         for stmt in self.stmts:
-            #if isinstance(stmt, (ParamDecl, InDecl, OutDecl)):
             if isinstance(stmt, DeclStmt):
                 decl = stmt.decl
                 T = decl.type
-                if isinstance(T, TypeCall):
-                    type_check_params(T.type, T.pargs, self.sym_table)
+                check_type(T)
                 if isinstance(decl, OutDecl):
+                    if decl.sym in outputs:
+                        raise ValueError(f"{decl.sym}: Redefined")
                     outputs[decl.sym] = T
                 else:
+                    if decl.sym in self.sym_table:
+                        raise ValueError(f"{decl.sym}: Redefined")
                     self.sym_table[decl.sym] = T
             elif isinstance(stmt, AssignStmt):
-
-                type_check_params(call.comb, call.pargs, self.sym_table)
-                itypes, otypes = call.comb.get_type(*call.pargs)
-                if len(itypes) != len(stmt.call.args):
-                    raise TypeError("Mismatch in number of args")
-                for arg in stmt.call.args:
-                    if isinstance(arg.value, Sym) and arg.value not in self.sym_table:
-                        raise TypeError(f"{arg.value} used before defined")
-
-
-                if len(otypes) != len(stmt.lhss):
-                    raise TypeError("Mismatch in number of args")
-
-                for lhs, otype in zip(stmt.lhss, otypes):
+                Ts = _flat(check_expr(rhs) for rhs in stmt.rhss)
+                if len(Ts) != len(stmt.lhss):
+                    raise ValueError(f"{stmt}: Wrong assignment arity")
+                for lhs, T in zip(stmt.lhss, Ts):
                     if lhs in self.sym_table:
-                        raise TypeError(f"Redefinition of {lhs}")
-                    self.sym_table[lhs] = otype
+                        raise ValueError(f"{decl.sym}: Redefined")
+                    self.sym_table[lhs] = T
             else:
-                x = 1+2
-                print(x)
                 raise NotImplementedError(stmt)
 
         for sym in outputs:
             if sym not in self.sym_table:
-                raise TypeError(f"{sym} never assigned!")
-
+                raise TypeError(f"Out {sym}: never assigned!")
 
     def type_check(self):
+        #Type check param_values
+            #Can get away with declared
         pass
 
 Modules = {}
@@ -160,7 +168,7 @@ def resolve_expr(expr: Expr):
         acexpr = expr.value
         call_comb = resolve_qsym(acexpr.qsym)
         new_args = [resolve_expr(arg) for arg in acexpr.args]
-        return CallExpr(call_comb, acexpr.pargs, new_args)
+        return Expr(CallExpr(call_comb, acexpr.pargs, new_args))
     return expr
 
 

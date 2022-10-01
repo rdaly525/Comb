@@ -61,7 +61,7 @@ p_inc2 = '''
 Comb test.p_inc2
 Param N: Int 
 In a: BV[N]
-Out o: BV[foo]
+Out o: BV[N]
 o = bv.add[N](a, [N]'h[N])
 '''
 
@@ -79,10 +79,13 @@ def test_round_trip(p):
     print(p)
     comb = parse_comb(p, debug=False)
     p1 = comb.serialize()
-    print(p1)
     comb1 = parse_comb(p1)
     p2 = comb1.serialize()
     assert p1 == p2
+
+    for k, v in comb.sym_table.items():
+        print(f"    {k} : {v}")
+
 
 @pytest.mark.parametrize("p", [
     add,

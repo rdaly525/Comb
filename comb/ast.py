@@ -43,7 +43,7 @@ class ParamTerm:
 
 class Expr:
     def __init__(self, val):
-        assert isinstance(val, (Sym, IntValue, ASTCallExpr))
+        assert isinstance(val, (Sym, IntValue, _CallExpr))
         self.value = val
 
     def __str__(self):
@@ -57,15 +57,27 @@ class IntType(Type):
     def __str__(self):
         return "Int"
 
+    def __eq__(self, other):
+        return IntType is type(other)
+
 class BoolType(Type):
     def __str__(self):
         return "Bool"
 
+    def __eq__(self, other):
+        return BoolType is type(other)
+
+
 class BVType(Type):
-    param_types = [IntType]
+    param_types = [IntType()]
 
     def __str__(self):
         return "BV"
+
+    def __eq__(self, other):
+        return BVType is type(other)
+
+
 
 @dataclass
 class TypeCall:
@@ -82,7 +94,7 @@ class TypeCall:
 
 
 class IntValue:
-    type = IntType
+    type = IntType()
     def __init__(self, val):
         assert isinstance(val, int)
         self.value = val
@@ -93,22 +105,22 @@ class IntValue:
     def __eq__(self, other):
         return self.value == other.value
 
-@dataclass
-class BVValue:
-    width: int
-    val: int
-
-    def __post_init__(self):
-        assert isinstance(self.width, int)
-        assert isinstance(self.val, int)
-
-    def __str__(self):
-        return f"[{self.width}]\'h{hex(self.val)[2:]}"
-
-    @property
-    def type(self):
-        raise NotImplementedError()
-        return TypeCall[self.width]
+#@dataclass
+#class BVValue:
+#    width: int
+#    val: int
+#
+#    def __post_init__(self):
+#        assert isinstance(self.width, int)
+#        assert isinstance(self.val, int)
+#
+#    def __str__(self):
+#        return f"[{self.width}]\'h{hex(self.val)[2:]}"
+#
+#    @property
+#    def type(self):
+#        raise NotImplementedError()
+#        return TypeCall[self.width]
 
 
 #@dataclass
@@ -152,8 +164,10 @@ class OutDecl(Decl):
         return f"Out {self.sym} : {self.type}"
 
 
+class _CallExpr: pass
+
 @dataclass
-class ASTCallExpr:
+class ASTCallExpr(_CallExpr):
     qsym : QSym
     pargs : tp.Tuple[ParamTerm]
     args : tp.Tuple[Expr]
@@ -173,6 +187,8 @@ class ASTAssignStmt(Stmt):
     def __post_init__(self):
         assert all(isinstance(lhs, Sym) for lhs in self.lhss)
         assert all(isinstance(rhs, Expr) for rhs in self.rhss)
+        if len(self.lhss) != len(self.rhss):
+            raise TypeError("Assigns must have same arity left and right")
 
 
 
@@ -188,24 +204,25 @@ class DeclStmt(Stmt):
 
 class Comb:
 
+    param_types = None
 
     def get_type(self, *pvals):
         pass
 
-    def partial_eval(self, *params) -> 'Comb':
-        pass
+    #def partial_eval(self, *params) -> 'Comb':
+    #    pass
 
-    def io(self, *params):
-        pass
+    #def io(self, *params):
+    #    pass
 
-    def eval(self, *args):
-        pass
+    #def eval(self, *args):
+    #    pass
 
-    def input_free_vars(self, *params, prefix=""):
-        return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.inputs]
+    #def input_free_vars(self, *params, prefix=""):
+    #    return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.inputs]
 
-    def output_free_vars(self, prefix=""):
-        return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.outputs]
+    #def output_free_vars(self, prefix=""):
+    #    return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.outputs]
 
 
 @dataclass

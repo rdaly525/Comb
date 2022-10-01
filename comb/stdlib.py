@@ -13,24 +13,24 @@ class IntModule(Module):
 
 class BVConst(CombPrimitive):
     name = QSym('bv','const')
-    param_types = [IntType]
+    param_types = [IntType()]
 
     def get_type(self, N: ParamTerm):
         BVCall = TypeCall(BVType(), N)
-        return [IntType], [BVCall]
+        return [IntType()], [BVCall]
 
 class BVConst(CombPrimitive):
     name = QSym('bv', 'const')
-    param_types = [IntType]
+    param_types = [IntType()]
 
     def get_type(self, N: ParamTerm):
         BVCall = TypeCall(BVType(), N)
-        return [IntType], [BVCall]
+        return [IntType()], [BVCall]
 
 
 class BVAdd(CombPrimitive):
     name = QSym('bv','add')
-    param_types = [IntType]
+    param_types = [IntType()]
 
     def get_type(self, N: ParamTerm):
         BVCall = TypeCall(BVType(), N)
