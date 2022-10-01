@@ -86,13 +86,14 @@ o = bv.add[N2](a, [N2]'h[N2])
 p_inc2N2 = '''
 Comb test.p_inc2N2
 Param N: Int 
-N2 = i.mul(N, 2)
-NpN = i.add(N, N)
-In a: BV[N2]
-Out o: BV[NpN]
-o = bv.add[NpN](a, [N2]'h[1])
+In a: BV[2*N]
+Out o: BV[N+N+N]
+o = bv.add[N+N](a, [2*N]'h[1])
 '''
-
+#TODO HERE:
+# Type checking is mostly working
+# I need parenthesis in my mini expression langauge
+# Something is wonky with the Output
 @pytest.mark.parametrize("p", [
     iadd,
     add,

@@ -108,13 +108,14 @@ class ParamDecl(DeclStmt):
     def __post_init__(self):
         assert isinstance(self.sym, Sym)
         if not isinstance(self.type, IntType):
-            raise NotImplementedError("Params must be Ints")
+            raise NotImplementedError("Params currently must be Ints")
 
     def __str__(self):
         return f"Param {self.sym} : {self.type}"
 
 @dataclass
 class InDecl(DeclStmt):
+
     def __str__(self):
         return f"In {self.sym} : {self.type}"
 

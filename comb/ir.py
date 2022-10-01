@@ -1,7 +1,9 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
-    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr
+    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType
 from dataclasses import dataclass
+from hwtypes import smt_utils as fc
+import pysmt.shortcuts as smt
 
 def _list_to_str(l):
     return ", ".join(str(l_) for l_ in l)
@@ -68,7 +70,7 @@ class CombProgram(Comb):
         self.type_inference()
 
         #invokes solver
-        #self.type_check()
+        self.type_check()
 
     @property
     def param_types(self):
@@ -81,24 +83,22 @@ class CombProgram(Comb):
     def symbolic_params(self):
         return {stmt.sym.name:stmt.type.free_var(stmt.sym.name) for stmt in self.stmts if isinstance(stmt, ParamDecl)}
 
-    def param_eval(self, **params):
-        pvals = {**params}
+    def sym_eval(self, **vals):
+        vals = {**vals}
         def do_sym(sym: Sym):
-            return pvals.get(sym.name, None)
+            return [vals.get(sym.name, None)]
         def do_expr(expr: Expr):
             if isinstance(expr, Sym):
                 return do_sym(expr)
             elif isinstance(expr, IntValue):
-                return expr.get_smt()
+                return [expr.get_smt()]
             else:
-                print(expr)
                 assert isinstance(expr, CallExpr)
                 if len(expr.pargs) > 0:
                     return None
-                arg_vals = [do_expr(arg) for arg in expr.args]
+                arg_vals = _flat([do_expr(arg) for arg in expr.args])
                 if None in arg_vals:
                     return None
-                arg_vals = _flat(arg_vals)
                 return expr.comb.eval(*arg_vals)
 
         for stmt in self.stmts:
@@ -107,8 +107,8 @@ class CombProgram(Comb):
                 if None in rhs_vals:
                     continue
                 for lhs, rhs_val in zip(stmt.lhss, rhs_vals):
-                    pvals[lhs.name] = rhs_val
-        return pvals
+                    vals[lhs.name] = rhs_val
+        return vals
 
     def serialize(self):
         lines = []
@@ -192,11 +192,76 @@ class CombProgram(Comb):
                 raise TypeError(f"Out {sym}: never assigned!")
 
     def type_check(self):
-        pvals = self.symbolic_params()
-        pvals = self.param_eval(**pvals)
-        print(pvals)
-        pass
+        vals = self.symbolic_params()
+        vals = self.sym_eval(**vals)
 
+
+        def eval_sym(sym: Sym):
+            assert sym.name in vals
+            return [vals[sym.name]]
+        def eval_expr(expr: Expr):
+            if isinstance(expr, Sym):
+                return eval_sym(expr)
+            elif isinstance(expr, IntValue):
+                return [expr.get_smt()]
+            else:
+                assert isinstance(expr, CallExpr)
+                assert len(expr.pargs) == 0
+                arg_vals = _flat([eval_expr(arg) for arg in expr.args])
+                ret = expr.comb.eval(*arg_vals)
+                if not isinstance(ret, (list, tuple)):
+                    ret = [ret]
+                return ret
+
+        tc_conds = []
+        # I need to type check statment inputs
+        def check_types(T0: Type, T1: Type):
+            if type(T0) is not type(T1):
+                return False
+            if isinstance(T0, IntType) and isinstance(T1, IntType):
+                return True
+            if isinstance(T0, BoolType) and isinstance(T1, BoolType):
+                return True
+            assert isinstance(T0, TypeCall) and isinstance(T1, TypeCall)
+            if type(T0.type) != type(T1.type):
+                return False
+            if len(T0.pargs) != len(T1.pargs):
+                return False
+            for p0, p1 in zip(T0.pargs, T1.pargs):
+                for e0, e1 in zip(eval_expr(p0), eval_expr(p1)):
+                    tc_conds.append(e0==e1)
+
+            return True
+
+        def get_type(expr: Expr):
+            if isinstance(expr, Sym):
+                return [self.sym_table[expr]]
+            elif isinstance(expr, IntValue):
+                return [IntType()]
+            elif isinstance(expr, CallExpr):
+                exp_Ts, out_Ts = expr.comb.get_type(*expr.pargs)
+                arg_Ts = _flat(get_type(arg) for arg in expr.args)
+                for eT, aT in zip(exp_Ts, arg_Ts):
+                    if not check_types(eT, aT):
+                        raise TypeError(f"ERROR TC: {eT} != {aT}")
+                return out_Ts
+
+        for stmt in self.stmts:
+            if isinstance(stmt, AssignStmt):
+                [get_type(rhs) for rhs in stmt.rhss]
+
+            if isinstance(stmt, OutDecl):
+                check_types(get_type(stmt.sym), stmt.type)
+
+        f = fc.And(tc_conds)
+
+        not_formula = ~(f.to_hwtypes())
+        with smt.Solver(name='z3') as solver:
+            solver.add_assertion(not_formula.value)
+            res = solver.solve()
+            if res is False:
+                return
+            raise TypeError(f"TC: Type check failed: \n{f.serialize()}")
 Modules = {}
 #from .modules import BitVectorModule, ParamModule
 #
@@ -212,8 +277,9 @@ def resolve_expr(expr: Expr):
     if isinstance(expr, ASTCallExpr):
         acexpr = expr
         call_comb = resolve_qsym(acexpr.qsym)
+        new_pargs = [resolve_expr(arg) for arg in acexpr.pargs]
         new_args = [resolve_expr(arg) for arg in acexpr.args]
-        return CallExpr(call_comb, acexpr.pargs, new_args)
+        return CallExpr(call_comb, new_pargs, new_args)
     return expr
 
 def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
@@ -222,6 +288,10 @@ def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
     for astmt in acomb.stmts:
         if isinstance(astmt, DeclStmt):
             stmt = astmt
+            if isinstance(astmt.type, TypeCall):
+                new_pargs = [resolve_expr(parg) for parg in astmt.type.pargs]
+                new_T = TypeCall(astmt.type.type, new_pargs)
+                stmt = type(astmt)(astmt.sym, new_T)
         elif isinstance(astmt, ASTAssignStmt):
             new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
             stmt = AssignStmt(astmt.lhss, new_exprs)

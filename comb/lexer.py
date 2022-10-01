@@ -54,6 +54,8 @@ tokens = (
     'QHVAL',
     'QDVAL',
     'QBVAL',
+    'PLUS',
+    'MUL',
 )
 
 # Regular termession rules for simple tokens
@@ -68,6 +70,8 @@ t_QHDB = '\'h|\'d|\'b'
 t_QHVAL = '\'h[a-f0-9]+'
 t_QDVAL = '\'d[0-9]+'
 t_QBVAL = '\'b[01]+'
+t_PLUS = '\+'
+t_MUL = '\*'
 
 _reserved = dict(
     Comb="COMB",
@@ -176,6 +180,14 @@ def p_expr_1(p):
 def p_expr_2(p):
     'expr : callexpr'
     p[0] = p[1]
+
+def p_expr_3(p):
+    'expr : expr PLUS expr'
+    p[0] = ASTCallExpr(QSym("i", "add"), [], [p[1], p[3]])
+
+def p_expr_4(p):
+    'expr : expr MUL expr'
+    p[0] = ASTCallExpr(QSym("i", "mul"), [], [p[1], p[3]])
 
 def p_exprs_0(p):
     'exprs : expr'
