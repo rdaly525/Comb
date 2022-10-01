@@ -1,6 +1,6 @@
-from comb import program_to_comb, discover, discover_up_to_N
+from comb import parse_comb, discover, discover_up_to_N
 from comb.ast import QSym
-from comb.modules import BitVectorModule
+from comb.stdlib import BitVectorModule
 from comb.synth import SynthQuery, verify
 import pytest
 import hwtypes as ht
@@ -34,7 +34,7 @@ ops = [
     (pid, 8),
 ])
 def test_discover(p, N: int):
-    c1 = program_to_comb(p)
+    c1 = parse_comb(p)
     op_list = [QSym('bv', op, (4,)) for op in ops]
     N_, combs = discover_up_to_N(c1, N, op_list)
     for i, comb in enumerate(combs):

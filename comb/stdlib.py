@@ -1,59 +1,67 @@
 import hwtypes as ht
-from .ast import Module, QSym, NatType, Prim
+from .ast import Module, QSym, IntType, TypeCall, Type, ParamTerm, BVType
+from .ir import Modules, CombPrimitive
 
-
-class ParamModule(Module):
+class IntModule(Module):
     # Types
-    name = 'p'
-
-    def type_from_sym(self, qsym: QSym):
-        assert qsym.module == self.name
-        if qsym.name == "Nat":
-            return NatType
-        else:
-            raise ValueError(f"{qsym} not found")
+    name = 'i'
 
     def comb_from_sym(self, qsym: QSym):
         assert qsym.module == self.name
         raise NotImplementedError()
 
-#class BV_N:
-#    def __init__(self, N: Nat):
-#        self.N = N
+
+class BVConst(CombPrimitive):
+    name = QSym('bv','const')
+    param_types = [IntType]
+
+    def get_type(self, N: ParamTerm):
+        BVCall = TypeCall(BVType(), N)
+        return [IntType], [BVCall]
+
+class BVConst(CombPrimitive):
+    name = QSym('bv', 'const')
+    param_types = [IntType]
+
+    def get_type(self, N: ParamTerm):
+        BVCall = TypeCall(BVType(), N)
+        return [IntType], [BVCall]
 
 
-class BVAdd(Prim):
-    param_types = [NatType]
+class BVAdd(CombPrimitive):
+    name = QSym('bv','add')
+    param_types = [IntType]
 
-    def input_types(self, N):
-        return [BVType(N), BVType(N)]
+    def get_type(self, N: ParamTerm):
+        BVCall = TypeCall(BVType(), N)
+        return [BVCall, BVCall], [BVCall]
 
-    def output_types(self, N):
-        return [BVType(N)]
+    #def input_types(self, N: Type):
+    #    return [BVType(N), BVType(N)]
+
+    #def output_types(self, N):
+    #    return [BVType(N)]
+
 
 class BitVectorModule(Module):
     # Types
     name = 'bv'
 
-    def type_from_sym(self, qsym: QSym):
-        assert qsym.module == self.name
-        if qsym.name == "bv":
-            return BVType
-        elif qsym.name == "bool":
-            return Bool
-        else:
-            raise ValueError(f"{qsym} not found")
-
     def comb_from_sym(self, qsym: QSym):
         assert qsym.module == self.name
         if qsym.name == "add":
             return BVAdd()
+        elif qsym.name == "const":
+            return BVConst()
         #if qsym.name in _binops:
         #    return BVBinary(*qsym.genargs, qsym.name)
         #elif qsym.name in _unary_ops:
         #    return BVUnary(*qsym.genargs, qsym.name)
         raise NotImplementedError()
 
+
+Modules['bv'] = BitVectorModule()
+Modules['i'] = IntModule()
 
 #class Bool:
 #    name = QSym('bv', 'bool')

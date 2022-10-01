@@ -1,6 +1,6 @@
-from comb import program_to_comb
+from comb import parse_comb
 from comb.ast import QSym
-from comb.modules import BitVectorModule
+from comb.stdlib import BitVectorModule
 from comb.synth import SynthQuery, verify
 import pytest
 import hwtypes as ht
@@ -48,7 +48,7 @@ import itertools as it
     (padd4, tuple(it.repeat(QSym('bv', 'add', (16,)), 3)), 144),
 ])
 def test_add(p, ops, num_sols):
-    comb = program_to_comb(p)
+    comb = parse_comb(p)
 
     op_list = []
     for op in ops:
@@ -82,7 +82,7 @@ o = bv.mul[8](a, b_p_c)
 
 # A*(B+C) == A*B + A*C
 def test_dist():
-    c1 = program_to_comb(ab_p_ac)
-    c2 = program_to_comb(a_bpc)
+    c1 = parse_comb(ab_p_ac)
+    c2 = parse_comb(a_bpc)
     res = verify(c1, c2)
     assert res is None

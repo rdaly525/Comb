@@ -1,5 +1,5 @@
 from .ast import QSym, Comb
-from .modules import BitVectorModule
+from .stdlib import BitVectorModule
 from .synth import SynthQuery, verify, flat
 import typing as tp
 import itertools as it

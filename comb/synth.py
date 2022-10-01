@@ -6,8 +6,8 @@ from pysmt.fnode import FNode
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .ast import Comb, ASTCombProgram, Assign, QSym, ASTVarDecl, BVValue
-from .modules import BVType as mds_BV
+from .ast import Comb, ASTCombProgram, Assign, QSym, VarDecl, BVValue
+from .stdlib import TypeCall as mds_BV
 import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
@@ -364,7 +364,7 @@ class SynthQuery:
         output_lvars = [to_int(lvals[lvar.value]) for lvar in output_lvars]
         def name_from_loc(loc, src=None):
             if loc < len(inputs):
-                return inputs[loc].name
+                return inputs[loc].qsym
             elif loc < len(inputs) + len(hard_consts):
                 assert src is not None
                 i, j = src
@@ -390,7 +390,7 @@ class SynthQuery:
             op = self.op_list[i]
             args = [name_from_loc(loc,src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
             stmts.append(Assign(lhss, op.name, args))
-        outputs = [ASTVarDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
+        outputs = [VarDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
         name = QSym('solved', 'v0')
         comb = ASTCombProgram(name, inputs, outputs, stmts)
         comb.resolve_qualified_symbols(self.spec.module_list)
