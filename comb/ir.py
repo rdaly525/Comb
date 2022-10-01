@@ -1,5 +1,5 @@
 import typing as tp
-from .ast import Comb, ParamTerm, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
+from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
     IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr
 from dataclasses import dataclass
 
@@ -10,10 +10,19 @@ def _list_to_str(l):
 @dataclass
 class CallExpr(_CallExpr):
     comb: Comb
-    pargs : tp.Tuple[ParamTerm]
+    pargs : tp.Tuple[Expr]
     args : tp.Tuple[Expr]
+
+    def __post_init__(self):
+        assert isinstance(self.comb, Comb)
+        assert all(isinstance(p, Expr) for p in self.pargs)
+        assert all(isinstance(a, Expr) for a in self.args), str(self.args)
+
     def __str__(self):
-        return f"{self.comb.name}[{_list_to_str(self.pargs)}]({_list_to_str(self.args)})"
+        parg_str = f"[{_list_to_str(self.pargs)}]"
+        if len(self.pargs)==0:
+            parg_str = f""
+        return f"{self.comb.name}{parg_str}({_list_to_str(self.args)})"
 
 
 @dataclass
@@ -58,12 +67,48 @@ class CombProgram(Comb):
         #Generate the type signature
         self.type_inference()
 
-        #Envokes solver
-        self.type_check()
+        #invokes solver
+        #self.type_check()
 
     @property
     def param_types(self):
-        raise NotImplementedError()
+        return [stmt.type for stmt in self.stmts if isinstance(stmt, ParamDecl)]
+
+    def get_type(self, *pvals):
+        #I need to account for parameters that are not thje same
+        raise NotImplementedError("THIS IS HARD")
+
+    def symbolic_params(self):
+        return {stmt.sym.name:stmt.type.free_var(stmt.sym.name) for stmt in self.stmts if isinstance(stmt, ParamDecl)}
+
+    def param_eval(self, **params):
+        pvals = {**params}
+        def do_sym(sym: Sym):
+            return pvals.get(sym.name, None)
+        def do_expr(expr: Expr):
+            if isinstance(expr, Sym):
+                return do_sym(expr)
+            elif isinstance(expr, IntValue):
+                return expr.get_smt()
+            else:
+                print(expr)
+                assert isinstance(expr, CallExpr)
+                if len(expr.pargs) > 0:
+                    return None
+                arg_vals = [do_expr(arg) for arg in expr.args]
+                if None in arg_vals:
+                    return None
+                arg_vals = _flat(arg_vals)
+                return expr.comb.eval(*arg_vals)
+
+        for stmt in self.stmts:
+            if isinstance(stmt, AssignStmt):
+                rhs_vals = [do_expr(rhs) for rhs in stmt.rhss]
+                if None in rhs_vals:
+                    continue
+                for lhs, rhs_val in zip(stmt.lhss, rhs_vals):
+                    pvals[lhs.name] = rhs_val
+        return pvals
 
     def serialize(self):
         lines = []
@@ -93,7 +138,6 @@ class CombProgram(Comb):
 
 
         def check_expr(expr: Expr):
-            expr = expr.value
             if isinstance(expr, IntValue):
                 return [expr.type]
             elif isinstance(expr, Sym):
@@ -109,7 +153,7 @@ class CombProgram(Comb):
                     if argT != pT:
                         raise ValueError(f"TC ERROR: {expr} param types")
 
-                itypes, otypes = expr.comb.get_type(expr.pargs)
+                itypes, otypes = expr.comb.get_type(*expr.pargs)
                 arity = sum(len(check_expr(arg)) for arg in expr.args)
                 if len(itypes) != arity:
                     raise ValueError(f"{expr}: wrong input arity")
@@ -121,7 +165,7 @@ class CombProgram(Comb):
         outputs = {}
         for stmt in self.stmts:
             if isinstance(stmt, DeclStmt):
-                decl = stmt.decl
+                decl = stmt
                 T = decl.type
                 check_type(T)
                 if isinstance(decl, OutDecl):
@@ -148,8 +192,9 @@ class CombProgram(Comb):
                 raise TypeError(f"Out {sym}: never assigned!")
 
     def type_check(self):
-        #Type check param_values
-            #Can get away with declared
+        pvals = self.symbolic_params()
+        pvals = self.param_eval(**pvals)
+        print(pvals)
         pass
 
 Modules = {}
@@ -164,13 +209,12 @@ def resolve_qsym(qsym):
     return Modules[qsym.module].comb_from_sym(qsym)
 
 def resolve_expr(expr: Expr):
-    if isinstance(expr.value, ASTCallExpr):
-        acexpr = expr.value
+    if isinstance(expr, ASTCallExpr):
+        acexpr = expr
         call_comb = resolve_qsym(acexpr.qsym)
         new_args = [resolve_expr(arg) for arg in acexpr.args]
-        return Expr(CallExpr(call_comb, acexpr.pargs, new_args))
+        return CallExpr(call_comb, acexpr.pargs, new_args)
     return expr
-
 
 def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
     from . import stdlib
@@ -182,7 +226,7 @@ def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
             new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
             stmt = AssignStmt(astmt.lhss, new_exprs)
         else:
-            raise ValueError()
+            raise ValueError(f"{astmt}: {type(astmt)}")
         stmts.append(stmt)
     return CombProgram(acomb.name, stmts)
 

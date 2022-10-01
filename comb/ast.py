@@ -23,8 +23,10 @@ class QSym:
     def __eq__(self, other):
         return str(self) == str(other)
 
+class Expr: pass
+
 @dataclass
-class Sym:
+class Sym(Expr):
     name: str
 
     def __str__(self):
@@ -32,23 +34,6 @@ class Sym:
 
     def __hash__(self):
         return hash(self.name)
-
-class ParamTerm:
-    def __init__(self, val):
-        assert isinstance(val, (Sym, IntValue))
-        self.value = val
-
-    def __str__(self):
-        return str(self.value)
-
-class Expr:
-    def __init__(self, val):
-        assert isinstance(val, (Sym, IntValue, _CallExpr))
-        self.value = val
-
-    def __str__(self):
-        return str(self.value)
-
 
 class Type:
     param_types = []
@@ -59,6 +44,9 @@ class IntType(Type):
 
     def __eq__(self, other):
         return IntType is type(other)
+
+    def free_var(self, name: str):
+        return ht.SMTInt(prefix=name)
 
 class BoolType(Type):
     def __str__(self):
@@ -82,18 +70,18 @@ class BVType(Type):
 @dataclass
 class TypeCall:
     type: Type
-    pargs : tp.Tuple[ParamTerm]
+    pargs : tp.Tuple[Expr]
 
     def __post_init__(self):
         assert isinstance(self.type, Type)
-        assert all(isinstance(parg, ParamTerm) for parg in self.pargs)
+        assert all(isinstance(parg, Expr) for parg in self.pargs)
 
     def __str__(self):
         parg_str = ",".join(str(parg) for parg in self.pargs)
         return f"{self.type}[{parg_str}]"
 
 
-class IntValue:
+class IntValue(Expr):
     type = IntType()
     def __init__(self, val):
         assert isinstance(val, int)
@@ -105,46 +93,18 @@ class IntValue:
     def __eq__(self, other):
         return self.value == other.value
 
-#@dataclass
-#class BVValue:
-#    width: int
-#    val: int
-#
-#    def __post_init__(self):
-#        assert isinstance(self.width, int)
-#        assert isinstance(self.val, int)
-#
-#    def __str__(self):
-#        return f"[{self.width}]\'h{hex(self.val)[2:]}"
-#
-#    @property
-#    def type(self):
-#        raise NotImplementedError()
-#        return TypeCall[self.width]
+    def get_smt(self):
+        return ht.SMTInt(self.value)
 
-
-#@dataclass
-#class ASTType:
-#    name : QSym
-#    params : tp.Tuple[ParamTerm]
-#
-#    def __post_init__(self):
-#        assert isinstance(self.name, QSym)
-#        assert all(isinstance(p, ParamTerm) for p in self.params)
-#
-#    def __str__(self):
-#        if len(self.params)==0:
-#            return str(self.name)
-#        return f"{self.name}[{_list_to_str(self.params)}]"
-
+class Stmt: pass
 
 @dataclass
-class Decl:
+class DeclStmt(Stmt):
     sym: Sym
     type: Type
 
 @dataclass
-class ParamDecl(Decl):
+class ParamDecl(DeclStmt):
     def __post_init__(self):
         assert isinstance(self.sym, Sym)
         if not isinstance(self.type, IntType):
@@ -154,30 +114,28 @@ class ParamDecl(Decl):
         return f"Param {self.sym} : {self.type}"
 
 @dataclass
-class InDecl(Decl):
+class InDecl(DeclStmt):
     def __str__(self):
         return f"In {self.sym} : {self.type}"
 
 @dataclass
-class OutDecl(Decl):
+class OutDecl(DeclStmt):
     def __str__(self):
         return f"Out {self.sym} : {self.type}"
 
-
-class _CallExpr: pass
+class _CallExpr(Expr): pass
 
 @dataclass
 class ASTCallExpr(_CallExpr):
     qsym : QSym
-    pargs : tp.Tuple[ParamTerm]
+    pargs : tp.Tuple[Expr]
     args : tp.Tuple[Expr]
 
     def __post_init__(self):
         assert isinstance(self.qsym, QSym)
-        assert all(isinstance(p, ParamTerm) for p in self.pargs)
+        assert all(isinstance(p, Expr) for p in self.pargs)
         assert all(isinstance(a, Expr) for a in self.args), str(self.args)
 
-class Stmt: pass
 
 @dataclass
 class ASTAssignStmt(Stmt):
@@ -189,18 +147,6 @@ class ASTAssignStmt(Stmt):
         assert all(isinstance(rhs, Expr) for rhs in self.rhss)
         if len(self.lhss) != len(self.rhss):
             raise TypeError("Assigns must have same arity left and right")
-
-
-
-@dataclass
-class DeclStmt(Stmt):
-    decl: Decl
-
-    def __post_init__(self):
-        assert isinstance(self.decl, Decl)
-
-    def __str__(self):
-        return str(self.decl)
 
 class Comb:
 

@@ -1,30 +1,45 @@
 import hwtypes as ht
-from .ast import Module, QSym, IntType, TypeCall, Type, ParamTerm, BVType
+from .ast import Module, QSym, IntType, TypeCall, BVType, Expr
 from .ir import Modules, CombPrimitive
+
+class IntBinaryOp(CombPrimitive):
+    def get_type(self, *pargs):
+        assert len(pargs) == 0
+        return [IntType(), IntType()], [IntType()]
+
+class IntAdd(IntBinaryOp):
+    name = QSym("i","add")
+    def eval(self, i0, i1, pargs=[]):
+        assert len(pargs)==0
+        return i0 + i1
+
+class IntMul(IntBinaryOp):
+    name = QSym("i","mul")
+    def eval(self, i0, i1, pargs=[]):
+        assert len(pargs)==0
+        return i0 * i1
 
 class IntModule(Module):
     # Types
     name = 'i'
 
+    prim_map = dict(
+        add=IntAdd(),
+        mul=IntMul(),
+    )
     def comb_from_sym(self, qsym: QSym):
         assert qsym.module == self.name
-        raise NotImplementedError()
+        if qsym.name not in self.prim_map:
+            raise NotImplementedError()
+        return self.prim_map[qsym.name]
 
 
 class BVConst(CombPrimitive):
     name = QSym('bv','const')
     param_types = [IntType()]
 
-    def get_type(self, N: ParamTerm):
-        BVCall = TypeCall(BVType(), N)
-        return [IntType()], [BVCall]
-
-class BVConst(CombPrimitive):
-    name = QSym('bv', 'const')
-    param_types = [IntType()]
-
-    def get_type(self, N: ParamTerm):
-        BVCall = TypeCall(BVType(), N)
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
         return [IntType()], [BVCall]
 
 
@@ -32,8 +47,8 @@ class BVAdd(CombPrimitive):
     name = QSym('bv','add')
     param_types = [IntType()]
 
-    def get_type(self, N: ParamTerm):
-        BVCall = TypeCall(BVType(), N)
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
         return [BVCall, BVCall], [BVCall]
 
     #def input_types(self, N: Type):

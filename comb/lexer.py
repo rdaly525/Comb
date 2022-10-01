@@ -50,9 +50,7 @@ tokens = (
     'ASSIGN',
     'LSQB',
     'RSQB',
-    'QH',
-    'QD',
-    'QB',
+    'QHDB',
     'QHVAL',
     'QDVAL',
     'QBVAL',
@@ -66,9 +64,7 @@ t_LSQB  = r'\['
 t_RSQB  = r'\]'
 t_LPAREN  = r'\('
 t_RPAREN  = r'\)'
-t_QH = '\'h'
-t_QD = '\'d'
-t_QB = '\'b'
+t_QHDB = '\'h|\'d|\'b'
 t_QHVAL = '\'h[a-f0-9]+'
 t_QDVAL = '\'d[0-9]+'
 t_QBVAL = '\'b[01]+'
@@ -142,60 +138,44 @@ def p_int_0(p):
     'int : NUMBER'
     p[0] = IntValue(p[1])
 
-def p_pterm_0(p):
-    'pterm : int'
-    p[0] = ParamTerm(p[1])
-
-def p_pterm_1(p):
-    'pterm : sym'
-    p[0] = ParamTerm(p[1])
-
-def p_pterms_0(p):
-    'pterms : pterm'
-    p[0] = [p[1]]
-
-def p_pterms_1(p):
-    'pterms : pterms COMMA pterm'
-    p[0] = [*p[1], p[3]]
-
 def p_bvwidth_0(p):
     'bvwidth : int'
-    p[0] = ParamTerm(p[1])
+    p[0] = p[1]
 
 def p_bvwidth_1(p):
-    'bvwidth : LSQB pterm RSQB'
+    'bvwidth : LSQB expr RSQB'
     p[0] = p[2]
 
 def p_bvvalue_0(p):
     'bvvalue : bvwidth QHVAL'
-    val = Expr(IntValue(int(p[2][2:], 16)))
+    val = IntValue(int(p[2][2:], 16))
     p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
 
 def p_bvvalue_1(p):
     'bvvalue : bvwidth QDVAL'
-    val = Expr(IntValue(int(p[2][2:], 10)))
+    val = IntValue(int(p[2][2:], 10))
     p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
 
 def p_bvvalue_2(p):
     'bvvalue : bvwidth QBVAL'
-    val = Expr(IntValue(int(p[2][2:], 2)))
+    val = IntValue(int(p[2][2:], 2))
     p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
 
 def p_bvvalue_3(p):
-    'bvvalue : bvwidth QH LSQB pterm RSQB'
-    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [Expr(p[4].value)])
+    'bvvalue : bvwidth QHDB LSQB expr RSQB'
+    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [p[4]])
 
 def p_expr_0(p):
     'expr : sym'
-    p[0] = Expr(p[1])
+    p[0] = p[1]
 
 def p_expr_1(p):
     'expr : int'
-    p[0] = Expr(p[1])
+    p[0] = p[1]
 
 def p_expr_2(p):
     'expr : callexpr'
-    p[0] = Expr(p[1])
+    p[0] = p[1]
 
 def p_exprs_0(p):
     'exprs : expr'
@@ -214,31 +194,19 @@ def p_type_1(p):
     p[0] = BoolType()
 
 def p_type_2(p):
-    'type : BV LSQB pterms RSQB'
+    'type : BV LSQB exprs RSQB'
     p[0] = TypeCall(BVType(), p[3])
 
 def p_decl_r_0(p):
     'decl_r : sym COLON type'
     p[0] = [p[1], p[3]]
 
-def p_decl_0(p):
-    'decl : PARAM decl_r'
-    p[0] = ParamDecl(*p[2])
-
-def p_decl_1(p):
-    'decl : INPUT decl_r'
-    p[0] = InDecl(*p[2])
-
-def p_decl_2(p):
-    'decl : OUTPUT decl_r'
-    p[0] = OutDecl(*p[2])
-
 def p_qsym_p_0(p):
     'qsym_p : qsym'
     p[0] = [p[1], []]
 
 def p_qsym_p_1(p):
-    'qsym_p : qsym LSQB pterms RSQB'
+    'qsym_p : qsym LSQB exprs RSQB'
     p[0] = [p[1], p[3]]
 
 def p_callexpr_0(p):
@@ -250,10 +218,18 @@ def p_callexpr_1(p):
     p[0] = p[1]
 
 def p_stmt_0(p):
-    'stmt : decl'
-    p[0] = DeclStmt(p[1])
+    'stmt : PARAM decl_r'
+    p[0] = ParamDecl(*p[2])
 
 def p_stmt_1(p):
+    'stmt : INPUT decl_r'
+    p[0] = InDecl(*p[2])
+
+def p_stmt_2(p):
+    'stmt : OUTPUT decl_r'
+    p[0] = OutDecl(*p[2])
+
+def p_stmt_3(p):
     'stmt : syms ASSIGN exprs'
     p[0] = ASTAssignStmt(p[1], p[3])
 
@@ -272,18 +248,18 @@ def p_comb_0(p):
 
 # Error rule for syntax errors
 def p_error(p):
-    print("Syntax error in input!")
+    print(f"Syntax error in input!: {p}")
 
 # Build the parser
 parser = yacc.yacc()
 
 
-def parse_comb(program: str, debug=False) -> ASTCombProgram:
+def compile_comb(program: str, debug=False) -> ASTCombProgram:
     acomb = parser.parse(program, lexer=lexer, debug=debug)
     if acomb is None:
         raise ValueError("Syntax Error!!!")
     comb = symbol_resolution(acomb)
     if comb is None:
-        raise ValueError("Syntax Error!")
+        raise ValueError("Syntax Error!!")
     return comb
 
