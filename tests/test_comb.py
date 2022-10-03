@@ -86,25 +86,25 @@ o = bv.add[N2](a, [N2]'h[N2])
 p_inc2N2 = '''
 Comb test.p_inc2N2
 Param N: Int 
-In a: BV[2*N]
+In a: BV[3*N]
 Out o: BV[N+N+N]
-o = bv.add[N+N](a, [2*N]'h[1])
+o = bv.add[(2*N)+N](a, [3*N]'h[N])
 '''
 #TODO HERE:
 # Type checking is mostly working
 # I need parenthesis in my mini expression langauge
 # Something is wonky with the Output
 @pytest.mark.parametrize("p", [
-    iadd,
-    add,
-    add2,
-    inc1,
-    inc2,
-    inc3,
-    p_add,
-    p_inc1,
-    p_inc2,
-    p_inc2N,
+    #iadd,
+    #add,
+    #add2,
+    #inc1,
+    #inc2,
+    #inc3,
+    #p_add,
+    #p_inc1,
+    #p_inc2,
+    #p_inc2N,
     p_inc2N2,
 ])
 def test_round_trip(p):

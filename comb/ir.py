@@ -251,10 +251,10 @@ class CombProgram(Comb):
                 [get_type(rhs) for rhs in stmt.rhss]
 
             if isinstance(stmt, OutDecl):
-                check_types(get_type(stmt.sym), stmt.type)
+                check_types(get_type(stmt.sym)[0], stmt.type)
 
         f = fc.And(tc_conds)
-
+        print(f.serialize())
         not_formula = ~(f.to_hwtypes())
         with smt.Solver(name='z3') as solver:
             solver.add_assertion(not_formula.value)

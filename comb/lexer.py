@@ -189,6 +189,10 @@ def p_expr_4(p):
     'expr : expr MUL expr'
     p[0] = ASTCallExpr(QSym("i", "mul"), [], [p[1], p[3]])
 
+def p_expr_5(p):
+    'expr : LPAREN expr RPAREN'
+    p[0] = p[2]
+
 def p_exprs_0(p):
     'exprs : expr'
     p[0] = [p[1]]
