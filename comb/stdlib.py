@@ -44,12 +44,15 @@ class BVConst(CombPrimitive):
 
 
 class BVAdd(CombPrimitive):
-    name = QSym('bv','add')
+    name = QSym('bv', 'add')
     param_types = [IntType()]
 
     def get_type(self, N: Expr):
         BVCall = TypeCall(BVType(), [N])
         return [BVCall, BVCall], [BVCall]
+
+    def eval(self, i0, i1, pargs=[]):
+        return i0 + i1
 
     #def input_types(self, N: Type):
     #    return [BVType(N), BVType(N)]

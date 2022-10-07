@@ -15,8 +15,8 @@ setup(
     install_requires=[
         "hwtypes",
         "ply",
-        "more_itertools"
-        #"DagVisitor",
+        "more_itertools",
+        "DagVisitor",
         #"delegator.py"
     ],
     python_requires='>=3.8'

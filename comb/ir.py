@@ -1,13 +1,22 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
-    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType
+    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, Obj, Node, _list_to_str
 from dataclasses import dataclass
 from hwtypes import smt_utils as fc
 import pysmt.shortcuts as smt
+import functools
 
-def _list_to_str(l):
-    return ", ".join(str(l_) for l_ in l)
 
+
+def ret_list(f):
+    @functools.wraps(f)
+    def dec(*args, **kwargs):
+        ret = f(*args, **kwargs)
+        if not isinstance(ret, (list, tuple)):
+            return [ret]
+        else:
+            return list(ret)
+    return dec
 
 @dataclass
 class CallExpr(_CallExpr):
@@ -196,21 +205,22 @@ class CombProgram(Comb):
         vals = self.sym_eval(**vals)
 
 
+        @ret_list
         def eval_sym(sym: Sym):
             assert sym.name in vals
-            return [vals[sym.name]]
+            return vals[sym.name]
+
+        @ret_list
         def eval_expr(expr: Expr):
             if isinstance(expr, Sym):
                 return eval_sym(expr)
             elif isinstance(expr, IntValue):
-                return [expr.get_smt()]
+                return expr.get_smt()
             else:
                 assert isinstance(expr, CallExpr)
                 assert len(expr.pargs) == 0
                 arg_vals = _flat([eval_expr(arg) for arg in expr.args])
                 ret = expr.comb.eval(*arg_vals)
-                if not isinstance(ret, (list, tuple)):
-                    ret = [ret]
                 return ret
 
         tc_conds = []
@@ -233,11 +243,12 @@ class CombProgram(Comb):
 
             return True
 
+        @ret_list
         def get_type(expr: Expr):
             if isinstance(expr, Sym):
-                return [self.sym_table[expr]]
+                return self.sym_table[expr]
             elif isinstance(expr, IntValue):
-                return [IntType()]
+                return IntType()
             elif isinstance(expr, CallExpr):
                 exp_Ts, out_Ts = expr.comb.get_type(*expr.pargs)
                 arg_Ts = _flat(get_type(arg) for arg in expr.args)
@@ -253,20 +264,133 @@ class CombProgram(Comb):
             if isinstance(stmt, OutDecl):
                 check_types(get_type(stmt.sym)[0], stmt.type)
 
-        f = fc.And(tc_conds)
-        print(f.serialize())
-        not_formula = ~(f.to_hwtypes())
+        f_fc = fc.And(tc_conds)
+        f = f_fc.to_hwtypes()
+        if f.value.is_constant() and f.value.constant_value() is True:
+            return
+        print(f_fc.serialize())
         with smt.Solver(name='z3') as solver:
-            solver.add_assertion(not_formula.value)
+            solver.add_assertion((~f).value)
             res = solver.solve()
             if res is False:
                 return
             raise TypeError(f"TC: Type check failed: \n{f.serialize()}")
+
+    @property
+    def param_syms(self):
+        return [stmt.sym for stmt in self.stmts if isinstance(stmt, ParamDecl)]
+
+    @property
+    def in_syms(self):
+        return [stmt.sym for stmt in self.stmts if isinstance(stmt, InDecl)]
+
+    def partial_eval(self, *pargs):
+        vals = {}
+        for psym, pval in zip(self.param_syms, pargs):
+            vals[psym] = IntValue(pval)
+        stmts = []
+        def eval_expr(expr: Expr):
+            if isinstance(expr, Sym):
+                if expr in vals:
+                    return [vals[expr]]
+                return [expr]
+            elif isinstance(expr, IntValue):
+                return [expr]
+            elif isinstance(expr, CallExpr):
+                pvals = _flat(eval_expr(pexpr) for pexpr in expr.pargs)
+                call_args = _flat(eval_expr(aexpr) for aexpr in expr.args)
+                call_rets = _make_list(expr.comb.eval(*call_args, pargs=pvals))
+
+
+        def get_type(T: Type):
+            if isinstance(T, TypeCall):
+                pvals = [eval_expr(parg) for parg in T.pargs]
+                return TypeCall(T.type, pvals)
+            return T
+
+        for stmt in self.stmts:
+            if isinstance(stmt, ParamDecl):
+                pass
+            elif isinstance(stmt, InDecl):
+                InDecl(stmt.sym, get_type(stmt.type))
+
+            if isinstance(astmt, DeclStmt):
+                stmt = astmt
+                if isinstance(astmt.type, TypeCall):
+                    new_pargs = [resolve_expr(parg) for parg in astmt.type.pargs]
+                    new_T = TypeCall(astmt.type.type, new_pargs)
+                    stmt = type(astmt)(astmt.sym, new_T)
+            elif isinstance(astmt, ASTAssignStmt):
+                new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
+                stmt = AssignStmt(astmt.lhss, new_exprs)
+            else:
+                raise ValueError(f"{astmt}: {type(astmt)}")
+            stmts.append(stmt)
+        return CombProgram(acomb.name, stmts)
+
+    def eval(self, *args, pargs=[]):
+        vals = {}
+        for psym, pval in zip(self.param_syms, pargs):
+            vals[psym] = pval
+        for sym, val in zip(self.in_syms, args):
+            vals[sym] = val
+
+        for stmt in self.stmts:
+            pass
+
+
 Modules = {}
 #from .modules import BitVectorModule, ParamModule
 #
 #self.modules = {'bv': BitVectorModule(), 'p': ParamModule()}
+from DagVisitor import Visitor
 
+class SymRes(Visitor):
+
+    def run(self, node: Node):
+        assert isinstance(node, Node)
+        self._dag_cache = set()
+        self.new_node = {}
+        self.visit(node)
+        return self.new_node[node]
+
+    def generic_visit(self, node):
+        Visitor.generic_visit(self, node)
+        self.new_node[node] = node
+
+    def visit_QSym(self, qsym: QSym):
+        if qsym.module not in Modules:
+            raise ValueError("Missing module ", qsym.module)
+        self.new_node[qsym] = Modules[qsym.module].comb_from_sym(qsym)
+
+    def visit_ASTCallExpr(self, expr: ASTCallExpr):
+        Visitor.generic_visit(self, expr)
+        call_comb = self.new_node[expr.qsym]
+        new_pargs = [self.new_node[arg] for arg in expr.pargs]
+        new_args = [self.new_node[arg] for arg in expr.args]
+        new_expr = CallExpr(call_comb, new_pargs, new_args)
+        self.new_node[expr] = new_expr
+
+    def visit_TypeCall(self, node: TypeCall):
+        Visitor.generic_visit(self, node)
+        new_pargs = [self.new_node[parg] for parg in node.pargs]
+        new_T = TypeCall(self.new_node[node.type], new_pargs)
+        self.new_node[node] = new_T
+
+    def visit_ASTAssignStmt(self, node: ASTAssignStmt):
+        Visitor.generic_visit(self, node)
+        new_rhss = [self.new_node[rhs] for rhs in node.rhss]
+        new_lhss = [self.new_node[lhs] for lhs in node.lhss]
+        new_stmt = AssignStmt(new_lhss, new_rhss)
+        self.new_node[node] = new_stmt
+
+    def visit_ASTCombProgram(self, acomb: ASTCombProgram):
+        from . import stdlib
+        stmts = [self.new_node[stmt] for stmt in acomb.stmts]
+        return CombProgram(acomb.name, stmts)
+
+    def visit_Obj(self, obj: Obj):
+        return Obj([self.new_node[comb] for comb in obj])
 
 def resolve_qsym(qsym):
     if qsym.module not in Modules:
@@ -283,199 +407,27 @@ def resolve_expr(expr: Expr):
     return expr
 
 def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
-    from . import stdlib
-    stmts = []
-    for astmt in acomb.stmts:
-        if isinstance(astmt, DeclStmt):
-            stmt = astmt
-            if isinstance(astmt.type, TypeCall):
-                new_pargs = [resolve_expr(parg) for parg in astmt.type.pargs]
-                new_T = TypeCall(astmt.type.type, new_pargs)
-                stmt = type(astmt)(astmt.sym, new_T)
-        elif isinstance(astmt, ASTAssignStmt):
-            new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
-            stmt = AssignStmt(astmt.lhss, new_exprs)
-        else:
-            raise ValueError(f"{astmt}: {type(astmt)}")
-        stmts.append(stmt)
-    return CombProgram(acomb.name, stmts)
+    print(str(acomb))
+    return SymRes().run(acomb)
 
-
-class ANON:
-    @property
-    def has_params(self):
-        return len(self.params) > 0
-
-    #def param_types(self):
-    #    raise NotImplementedError()
-
-    #def create_symbolic_inputs(self):
-    #    return (self.sym_table[ivar.qsym].free_var(ivar.qsym) for ivar in self.inputs)
-
-    def serialize(self):
-        lines = []
-        lines.append(f"Comb {self.name}")
-        lines += [str(stmt) for stmt in self.stmts]
-        return "\n".join(lines)
-
-    #Only evaling for SMT
-    def eval(self, *args):
-        assert len(args) == len(self.inputs)
-        val_table = {var.qsym:arg for arg, var in zip(args, self.inputs)}
-        def get_val(arg):
-            if isinstance(arg, BVValue):
-                return ht.SMTBitVector[arg.width](arg.val)
-            else:
-                return val_table[arg]
-        for stmt in self.stmts:
-            args = [get_val(arg) for arg in stmt.args]
-            vals = self.ext_ops[stmt.op].eval(*args)
-            assert isinstance(vals, tuple)
-            assert len(vals) == len(stmt.lhss)
-            for val, sym in zip(vals, stmt.lhss):
-                val_table[sym] = val
-        return tuple(val_table[var.qsym] for var in self.outputs)
-
-    def __post_init__(self):
-        pass
-        #raise NotImplementedError()
-        #self.params = [d.var for d in self.stmts if isinstance(d, ParamDecl)]
-        #self.inputs = [d.var for d in self.stmts if isinstance(d, InDecl)]
-        #self.outputs = [d.var for d in self.stmts if isinstance(d, OutDecl)]
-
-        ##p_valid = all(isinstance(d, ParamDecl) for d in self.decls[:len(self.params)])
-        ##i_valid = all(isinstance(d, InDecl) for d in self.decls[len(self.params):-len(self.outputs)])
-        ##o_valid = all(isinstance(d, OutDecl) for d in self.decls[-len(self.outputs):])
-        ##if not (p_valid and i_valid and o_valid):
-        ##    raise TypeError("Params, then Ins, then Outs")
-        #self.resolve_qualified_symbols()
-        #self.type_inference()
-        #self.type_check()
-
-    #Makes sure all the QSym symbols exist (ops and types)
-    def resolve_qualified_symbols(self):
-        #Default Modules
-        from .stdlib import BitVectorModule, IntModule
-        self.modules = {'bv':BitVectorModule(), 'p':IntModule()}
-
-        def resolve_comb(qsym):
-            if qsym.module not in self.modules:
-                raise ValueError("Missing module ", qsym.module)
-            return self.modules[qsym.module].comb_from_sym(qsym)
-
-        def resolve_type(qsym):
-            if qsym.module not in self.modules:
-                raise ValueError("Missing module ", qsym.module)
-            return self.modules[qsym.module].type_from_sym(qsym)
-
-        #Resolve Ops
-        self.qsym_to_comb = {}
-        self.qsym_to_type = {}
-        for stmt in self.stmts:
-            if isinstance(stmt, Decl):
-                type_name: QSym = stmt.var.type.qsym
-                self.qsym_to_type[type_name] = resolve_type(type_name)
-            else:
-                assert isinstance(stmt, Assign)
-                comb_name = stmt.call.qsym
-                self.qsym_to_comb[comb_name] = resolve_comb(comb_name)
-
-
-    #Get the types (possibly parameterized) of all symbols
-    # This will:
-    #   Do a parameter type check
-    #       Both type check param assignments and parameters of value assignments
-    #   Checks that all the symbols are defined before used and outputs assigned
-    #   Verify param inputs on calls trace from params
-    #   Verify that args trace from inputs
-    def type_inference(self):
-        self.p_sym_table = {} #VARID -> Type
-        self.v_sym_table = {} #VARID -> Type
-
-        # Verify that the type params exist as a Constant or in p_sym_table
-        #TODO This is assuming that the param is a Nat
-        def param_check(param_types, param_values):
-            if len(param_types) != len(param_values):
-                raise ValueError("Mismatch in params")
-            for pt, pv in zip(param_types, param_values):
-                if isinstance(pv, IntValue) and pt is not IntType:
-                    raise TypeError(f"{pv} is not of type {pt}")
-                if isinstance(pv.value, str) and pv.value not in self.p_sym_table:
-                    raise TypeError(f"{pv} used before defined")
-
-        outputs = {}
-        param_decls = {}
-        param_assigns = {}
-        in_decls = {}
-        out_decls = {}
-        value_assigns = {}
-        for i, stmt in enumerate(self.stmts):
-            if isinstance(stmt, ParamDecl):
-                param_decls[i] = stmt
-                name = stmt.var.qsym
-                t_name = stmt.var.type.qsym
-                t_params = stmt.var.type.pargs
-                if len(t_params) > 0:
-                    raise NotImplementedError("Param types cannot be parametrized")
-                if name in self.p_sym_table:
-                    raise TypeError(f"Redefinition of {name}")
-                self.p_sym_table[name] = self.qsym_to_type[t_name]()
-            elif isinstance(stmt, (InDecl, OutDecl)):
-                name = stmt.var.qsym
-                t_name = stmt.var.type.qsym
-                t_params = stmt.var.type.pargs
-                t_cls = self.qsym_to_type[t_name]
-                param_check(t_cls.param_types, t_params)
-                if name in self.v_sym_table:
-                    raise TypeError(f"Redefinition of {name}")
-                if isinstance(stmt, OutDecl):
-                    out_decls[i] = stmt
-                    outputs[name] = t_cls(*t_params)
-                else:
-                    in_decls[i] = stmt
-                    self.v_sym_table[name] = t_cls(*t_params)
-            elif isinstance(stmt, Assign):
-                comb = self.qsym_to_comb[stmt.call.qsym]
-                if len(comb.input_types(*stmt.call.pargs)) != len(stmt.call.args):
-                    raise TypeError("Mismatch in number of args")
-
-                #Determine if this is a param_call or an arg call
-                p_call = all(isinstance(arg, str) and arg in self.p_sym_table for arg in stmt.args)
-                if p_call:
-                    param_assigns[i] = stmt
-                    #Type check the arguments
-                else:
-                    if not all(isinstance(arg, str) and arg in self.v_sym_table for arg in stmt.args):
-                        raise ValueError(f"{stmt} has arg used before defined")
-                param_check(comb.param_types, stmt.call.pargs)
-                output_types = comb.output_types(*stmt.call.pargs)
-                if len(stmt.lhss) != len(output_types):
-                    raise TypeError("Mismatch in number of outputs")
-                for lhs, output_type in zip(stmt.lhss, output_types):
-                    if lhs in self.v_sym_table:
-                        raise TypeError(f"Redefinition of {name}")
-                    self.v_sym_table[lhs] = output_type
-            else:
-                assert 0
-        for oname in outputs:
-            if oname not in self.v_sym_table:
-                raise TypeError(f"Output {oname} never assigned")
-
-    #Gather all the args and add to a list of things they need to equal
-    def type_check(self):
-        tc = collections.defaultdict(list)
-        consts = []
-        for sym, t in self.v_sym_table.items():
-            tc[sym].append(t)
-        for stmt in self.stmts:
-            if isinstance(stmt, Assign):
-                input_types = self.qsym_to_comb[stmt.call.qsym].input_types(*stmt.call.pargs)
-                assert len(stmt.call.args) == len(input_types)
-                for arg, t in zip(stmt.call.args, input_types):
-                    if isinstance(arg, BVValue):
-                        consts.append([t, TypeCall(arg.width)])
-                    else:
-                        tc[arg].append(t)
-        print(tc)
-        print(consts)
-        assert 0
+#def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
+#    from . import stdlib
+#    if isinstance(acomb, Obj):
+#        combs = [symbol_resolution(comb) for comb in acomb.comb_dict.values()]
+#        return Obj(combs)
+#    assert isinstance(acomb, ASTCombProgram)
+#    stmts = []
+#    for astmt in acomb.stmts:
+#        if isinstance(astmt, DeclStmt):
+#            stmt = astmt
+#            if isinstance(astmt.type, TypeCall):
+#                new_pargs = [resolve_expr(parg) for parg in astmt.type.pargs]
+#                new_T = TypeCall(astmt.type.type, new_pargs)
+#                stmt = type(astmt)(astmt.sym, new_T)
+#        elif isinstance(astmt, ASTAssignStmt):
+#            new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
+#            stmt = AssignStmt(astmt.lhss, new_exprs)
+#        else:
+#            raise ValueError(f"{astmt}: {type(astmt)}")
+#        stmts.append(stmt)
+#    return CombProgram(acomb.name, stmts)

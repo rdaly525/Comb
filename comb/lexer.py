@@ -2,7 +2,7 @@ import ply.lex as lex
 import ply.yacc as yacc
 import typing as tp
 from .ast import *
-from .ir import symbol_resolution
+from .ir import symbol_resolution, CombProgram
 
 #TODO THIS IS ALL WRONG
 '''
@@ -120,7 +120,10 @@ def t_error(t):
 lexer = lex.lex()
 
 #YACC
-start = 'comb'
+precedence = (
+    ('left', 'PLUS'),
+    ('left', 'MUL'),
+)
 
 def p_sym_0(p):
     'sym : VARID'
@@ -257,20 +260,36 @@ def p_stmts_1(p):
     'stmts : stmts stmt'
     p[0] = [*p[1], p[2]]
 
-# comb ::= <comb> <nsid> <stmts>
 def p_comb_0(p):
     'comb : COMB qsym stmts'
     p[0] = ASTCombProgram(p[2], p[3])
+
+def p_combs_0(p):
+    'combs : comb'
+    p[0] = [p[1]]
+
+def p_combs_1(p):
+    'combs : combs comb'
+    p[0] = [*p[1], p[2]]
+
+def p_obj_0(p):
+    'obj : combs'
+    p[0] = Obj(p[1])
 
 # Error rule for syntax errors
 def p_error(p):
     print(f"Syntax error in input!: {p}")
 
 # Build the parser
-parser = yacc.yacc()
+parser_comb = yacc.yacc(start = 'comb')
+parser_obj = yacc.yacc(start = 'obj')
 
 
-def compile_comb(program: str, debug=False) -> ASTCombProgram:
+def compile_program(program: str, debug=False, comb=True) -> CombProgram:
+    if comb:
+        parser = parser_comb
+    else:
+        parser = parser_obj
     acomb = parser.parse(program, lexer=lexer, debug=debug)
     if acomb is None:
         raise ValueError("Syntax Error!!!")

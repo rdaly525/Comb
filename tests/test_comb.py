@@ -1,6 +1,7 @@
-from comb import compile_comb
+from comb import compile_program
 import pytest
 
+from comb.ast import Obj
 
 iadd = '''
 Comb test.iadd
@@ -88,46 +89,60 @@ Comb test.p_inc2N2
 Param N: Int 
 In a: BV[3*N]
 Out o: BV[N+N+N]
-o = bv.add[(2*N)+N](a, [3*N]'h[N])
+o = bv.add[N + 2*N](a, [3*N]'h[N])
 '''
-#TODO HERE:
-# Type checking is mostly working
-# I need parenthesis in my mini expression langauge
-# Something is wonky with the Output
 @pytest.mark.parametrize("p", [
-    #iadd,
-    #add,
-    #add2,
-    #inc1,
-    #inc2,
-    #inc3,
-    #p_add,
-    #p_inc1,
-    #p_inc2,
-    #p_inc2N,
+    iadd,
+    add,
+    add2,
+    inc1,
+    inc2,
+    inc3,
+    p_add,
+    p_inc1,
+    p_inc2,
+    p_inc2N,
     p_inc2N2,
 ])
 def test_round_trip(p):
-    print(p)
-    comb = compile_comb(p, debug=False)
-    for k, v in comb.sym_table.items():
-        print(f"    {k} : {v}")
-    return
-
+    comb = compile_program(p, debug=False)
     p1 = comb.serialize()
-    comb1 = compile_comb(p1)
+    comb1 = compile_program(p1)
     p2 = comb1.serialize()
     assert p1 == p2
 
+
+p_obj0 = \
+'''
+Comb test.t1
+In i0 : BV[16]
+In i1 : BV[16]
+Out o : BV[16]
+t0 = bv.add[16](i0, i1)
+o = bv.add[16](t0, t0)
+
+Comb test.t0
+In i0 : BV[16]
+In i1 : BV[16]
+Out o : BV[16]
+t0 = test.t1(i0, i1)
+o = bv.add[16](t0, t0)
+'''
+
+@pytest.mark.parametrize("p", [
+    p_obj0,
+])
+def test_obj(p):
+    obj: Obj = compile_program(p, comb=False, debug=False)
 
 @pytest.mark.parametrize("p", [
     add,
     inc1,
     inc2,
-    #inc3,
+    inc3,
 ])
 def test_eval(p):
-    comb = compile_comb(p)
+    comb = compile_program(p)
     assert not comb.has_params
     args = comb.create_symbolic_inputs()
     res = comb.eval(*args)
@@ -143,10 +158,10 @@ def test_eval(p):
 @pytest.mark.parametrize("p", [
     p_add,
     p_inc1,
-    #p_inc2,
+    p_inc2,
 ])
 def test_partial_eval(p):
-    comb = compile_comb(p)
+    comb = compile_program(p)
     assert not comb.has_params
     args = comb.create_symbolic_inputs()
     res = comb.eval(*args)
