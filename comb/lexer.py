@@ -1,8 +1,6 @@
 import ply.lex as lex
 import ply.yacc as yacc
-import typing as tp
 from .ast import *
-from .ir import symbol_resolution, CombProgram
 
 #TODO THIS IS ALL WRONG
 '''
@@ -281,20 +279,6 @@ def p_error(p):
     print(f"Syntax error in input!: {p}")
 
 # Build the parser
-parser_comb = yacc.yacc(start = 'comb')
-parser_obj = yacc.yacc(start = 'obj')
 
-
-def compile_program(program: str, debug=False, comb=True) -> CombProgram:
-    if comb:
-        parser = parser_comb
-    else:
-        parser = parser_obj
-    acomb = parser.parse(program, lexer=lexer, debug=debug)
-    if acomb is None:
-        raise ValueError("Syntax Error!!!")
-    comb = symbol_resolution(acomb)
-    if comb is None:
-        raise ValueError("Syntax Error!!")
-    return comb
-
+def get_parser(start='comb'):
+    return yacc.yacc(start = start)

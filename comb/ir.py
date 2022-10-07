@@ -1,12 +1,10 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
     IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, Obj, Node, _list_to_str
-from dataclasses import dataclass
+from .ast import dataclass
 from hwtypes import smt_utils as fc
 import pysmt.shortcuts as smt
 import functools
-
-
 
 def ret_list(f):
     @functools.wraps(f)
@@ -26,6 +24,7 @@ class CallExpr(_CallExpr):
 
     def __post_init__(self):
         assert isinstance(self.comb, Comb)
+        super().__init__(self.comb, *self.pargs, *self.args)
         assert all(isinstance(p, Expr) for p in self.pargs)
         assert all(isinstance(a, Expr) for a in self.args), str(self.args)
 
@@ -37,13 +36,14 @@ class CallExpr(_CallExpr):
 
 
 @dataclass
-class AssignStmt:
+class AssignStmt(Node):
     lhss: tp.Tuple[Sym]
     rhss: tp.Tuple[Expr]
 
-    @property
-    def args(self):
-        return self.call.args
+    def __post_init__(self):
+        super().__init__(*self.lhss, *self.rhss)
+        assert all(isinstance(lhs, Sym) for lhs in self.lhss)
+        assert all(isinstance(rhs, Expr) for rhs in self.rhss)
 
     def __str__(self):
         return f"{_list_to_str(self.lhss)} = {_list_to_str(self.rhss)}"
@@ -53,6 +53,9 @@ class AssignStmt:
 class CombPrimitive(Comb):
     commutative = False
     param_types = []
+
+    def __str__(self):
+        return f"Comb {self.name}"
 
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program
@@ -75,6 +78,7 @@ class CombProgram(Comb):
 
     def __post_init__(self):
         assert all(isinstance(stmt, (AssignStmt, DeclStmt)) for stmt in self.stmts)
+        super().__init__(*self.stmts)
         #Generate the type signature
         self.type_inference()
 
@@ -119,12 +123,14 @@ class CombProgram(Comb):
                     vals[lhs.name] = rhs_val
         return vals
 
-    def serialize(self):
+    def __str__(self):
         lines = []
         lines.append(f"Comb {self.name}")
         lines += [str(stmt) for stmt in self.stmts]
         return "\n".join(lines)
 
+    def serialize(self):
+        return str(self)
 
     def type_inference(self):
         #str -> type
@@ -340,94 +346,3 @@ class CombProgram(Comb):
 
 
 Modules = {}
-#from .modules import BitVectorModule, ParamModule
-#
-#self.modules = {'bv': BitVectorModule(), 'p': ParamModule()}
-from DagVisitor import Visitor
-
-class SymRes(Visitor):
-
-    def run(self, node: Node):
-        assert isinstance(node, Node)
-        self._dag_cache = set()
-        self.new_node = {}
-        self.visit(node)
-        return self.new_node[node]
-
-    def generic_visit(self, node):
-        Visitor.generic_visit(self, node)
-        self.new_node[node] = node
-
-    def visit_QSym(self, qsym: QSym):
-        if qsym.module not in Modules:
-            raise ValueError("Missing module ", qsym.module)
-        self.new_node[qsym] = Modules[qsym.module].comb_from_sym(qsym)
-
-    def visit_ASTCallExpr(self, expr: ASTCallExpr):
-        Visitor.generic_visit(self, expr)
-        call_comb = self.new_node[expr.qsym]
-        new_pargs = [self.new_node[arg] for arg in expr.pargs]
-        new_args = [self.new_node[arg] for arg in expr.args]
-        new_expr = CallExpr(call_comb, new_pargs, new_args)
-        self.new_node[expr] = new_expr
-
-    def visit_TypeCall(self, node: TypeCall):
-        Visitor.generic_visit(self, node)
-        new_pargs = [self.new_node[parg] for parg in node.pargs]
-        new_T = TypeCall(self.new_node[node.type], new_pargs)
-        self.new_node[node] = new_T
-
-    def visit_ASTAssignStmt(self, node: ASTAssignStmt):
-        Visitor.generic_visit(self, node)
-        new_rhss = [self.new_node[rhs] for rhs in node.rhss]
-        new_lhss = [self.new_node[lhs] for lhs in node.lhss]
-        new_stmt = AssignStmt(new_lhss, new_rhss)
-        self.new_node[node] = new_stmt
-
-    def visit_ASTCombProgram(self, acomb: ASTCombProgram):
-        from . import stdlib
-        stmts = [self.new_node[stmt] for stmt in acomb.stmts]
-        return CombProgram(acomb.name, stmts)
-
-    def visit_Obj(self, obj: Obj):
-        return Obj([self.new_node[comb] for comb in obj])
-
-def resolve_qsym(qsym):
-    if qsym.module not in Modules:
-        raise ValueError("Missing module ", qsym.module)
-    return Modules[qsym.module].comb_from_sym(qsym)
-
-def resolve_expr(expr: Expr):
-    if isinstance(expr, ASTCallExpr):
-        acexpr = expr
-        call_comb = resolve_qsym(acexpr.qsym)
-        new_pargs = [resolve_expr(arg) for arg in acexpr.pargs]
-        new_args = [resolve_expr(arg) for arg in acexpr.args]
-        return CallExpr(call_comb, new_pargs, new_args)
-    return expr
-
-def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
-    print(str(acomb))
-    return SymRes().run(acomb)
-
-#def symbol_resolution(acomb: ASTCombProgram) -> CombProgram:
-#    from . import stdlib
-#    if isinstance(acomb, Obj):
-#        combs = [symbol_resolution(comb) for comb in acomb.comb_dict.values()]
-#        return Obj(combs)
-#    assert isinstance(acomb, ASTCombProgram)
-#    stmts = []
-#    for astmt in acomb.stmts:
-#        if isinstance(astmt, DeclStmt):
-#            stmt = astmt
-#            if isinstance(astmt.type, TypeCall):
-#                new_pargs = [resolve_expr(parg) for parg in astmt.type.pargs]
-#                new_T = TypeCall(astmt.type.type, new_pargs)
-#                stmt = type(astmt)(astmt.sym, new_T)
-#        elif isinstance(astmt, ASTAssignStmt):
-#            new_exprs = [resolve_expr(rhs) for rhs in astmt.rhss]
-#            stmt = AssignStmt(astmt.lhss, new_exprs)
-#        else:
-#            raise ValueError(f"{astmt}: {type(astmt)}")
-#        stmts.append(stmt)
-#    return CombProgram(acomb.name, stmts)

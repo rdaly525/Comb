@@ -2,6 +2,7 @@ import hwtypes as ht
 from .ast import Module, QSym, IntType, TypeCall, BVType, Expr
 from .ir import Modules, CombPrimitive
 
+
 class IntBinaryOp(CombPrimitive):
     def get_type(self, *pargs):
         assert len(pargs) == 0
@@ -78,8 +79,10 @@ class BitVectorModule(Module):
         raise NotImplementedError()
 
 
-Modules['bv'] = BitVectorModule()
-Modules['i'] = IntModule()
+GlobalModules = dict(
+    bv=BitVectorModule(),
+    i=IntModule(),
+)
 
 #class Bool:
 #    name = QSym('bv', 'bool')

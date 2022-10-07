@@ -5,13 +5,16 @@ import hwtypes as ht
 from DagVisitor import Visited
 
 
-dataclass = dataclass(hash=False)
+dataclass = dataclass(eq=False)
 
 def _list_to_str(l):
     return ", ".join(str(l_) for l_ in l)
 
 class Node(Visited):
     def __init__(self,*args):
+        for arg in args:
+            if not isinstance(arg, Node):
+                raise ValueError(f"{type(arg)}: {arg} not Node")
         assert all(isinstance(arg, Node) for arg in args)
         self._children = args
 
@@ -40,7 +43,10 @@ class QSym(Node):
     def __str__(self):
         return f"{self.module}.{self.name}"
 
-class Expr(Node): pass
+class Expr(Node):
+
+    def __post_init__(self):
+        super().__init__()
 
 @dataclass
 class Sym(Expr):
@@ -54,11 +60,14 @@ class Type(Node):
 
 class IntType(Type):
 
+    def __init__(self):
+        super().__init__()
+        assert hasattr(self, '__hash__')
+        self.__hash__()
+        hash(self)
+
     def __str__(self):
         return "Int"
-
-    def __eq__(self, other):
-        return IntType is type(other)
 
     def free_var(self, name: str):
         return ht.SMTInt(prefix=name)
@@ -67,19 +76,14 @@ class BoolType(Type):
     def __str__(self):
         return "Bool"
 
-    def __eq__(self, other):
-        return BoolType is type(other)
-
-
 class BVType(Type):
     param_types = [IntType()]
 
     def __str__(self):
         return "BV"
 
-    def __eq__(self, other):
-        return BVType is type(other)
-
+    #def __eq__(self, other):
+    #    return BVType is type(other)
 
 
 @dataclass
@@ -100,14 +104,15 @@ class TypeCall(Node):
 class IntValue(Expr):
     type = IntType()
     def __init__(self, val):
+        super().__init__()
         assert isinstance(val, int)
         self.value = val
 
     def __str__(self):
         return str(self.value)
 
-    def __eq__(self, other):
-        return self.value == other.value
+    #def __eq__(self, other):
+    #    return self.value == other.value
 
     def get_smt(self):
         return ht.SMTInt(self.value)
@@ -119,13 +124,14 @@ class DeclStmt(Stmt):
     sym: Sym
     type: Type
 
-    def __init__(self):
+    def __post_init__(self):
+        assert isinstance(self.sym, Sym)
         super().__init__(self.sym, self.type)
 
 @dataclass
 class ParamDecl(DeclStmt):
     def __post_init__(self):
-        assert isinstance(self.sym, Sym)
+        super().__post_init__()
         if not isinstance(self.type, IntType):
             raise NotImplementedError("Params currently must be Ints")
 
@@ -174,8 +180,6 @@ class ASTAssignStmt(Stmt):
         super().__init__(*self.lhss, *self.rhss)
         assert all(isinstance(lhs, Sym) for lhs in self.lhss)
         assert all(isinstance(rhs, Expr) for rhs in self.rhss)
-        if len(self.lhss) != len(self.rhss):
-            raise TypeError("Assigns must have same arity left and right")
 
     def __str__(self):
         return f"{_list_to_str(self.lhss)} = {_list_to_str(self.rhss)}"

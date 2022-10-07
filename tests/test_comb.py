@@ -1,4 +1,4 @@
-from comb import compile_program
+from comb.compiler import  compile_program
 import pytest
 
 from comb.ast import Obj
@@ -91,6 +91,9 @@ In a: BV[3*N]
 Out o: BV[N+N+N]
 o = bv.add[N + 2*N](a, [3*N]'h[N])
 '''
+
+
+
 @pytest.mark.parametrize("p", [
     iadd,
     add,
@@ -111,6 +114,12 @@ def test_round_trip(p):
     p2 = comb1.serialize()
     assert p1 == p2
 
+def test_basic():
+    c1 = compile_program(p_inc2N2)
+    c2 = compile_program(p_inc2N2)
+    assert str(c1) == str(c2)
+    assert hash(c1) == hash(c2)
+    assert c1 == c2
 
 p_obj0 = \
 '''
