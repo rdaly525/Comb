@@ -1,6 +1,6 @@
 import hwtypes as ht
-from .ast import Module, QSym, IntType, TypeCall, BVType, Expr
-from .ir import Modules, CombPrimitive
+from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue
+from .ir import Modules, CombPrimitive, CallExpr
 
 
 class IntBinaryOp(CombPrimitive):
@@ -10,15 +10,23 @@ class IntBinaryOp(CombPrimitive):
 
 class IntAdd(IntBinaryOp):
     name = QSym("i","add")
-    def eval(self, i0, i1, pargs=[]):
-        assert len(pargs)==0
-        return i0 + i1
+    def eval(self, pargs, args):
+        assert len(pargs) == 0
+        assert len(args) == 2
+        i0, i1 = args
+        if isinstance(i0, IntValue) and isinstance(i1, IntValue):
+            return IntValue(i0.value + i1.value)
+        return CallExpr(self, pargs, args)
 
 class IntMul(IntBinaryOp):
     name = QSym("i","mul")
-    def eval(self, i0, i1, pargs=[]):
-        assert len(pargs)==0
-        return i0 * i1
+    def eval(self, pargs, args):
+        assert len(pargs) == 0
+        assert len(args) == 2
+        i0, i1 = args
+        if isinstance(i0, IntValue) and isinstance(i1, IntValue):
+            return IntValue(i0.value * i1.value)
+        return CallExpr(self, pargs, args)
 
 class IntModule(Module):
     # Types
@@ -43,6 +51,9 @@ class BVConst(CombPrimitive):
         BVCall = TypeCall(BVType(), [N])
         return [IntType()], [BVCall]
 
+    def eval(self, pargs=[], args=[]):
+        return CallExpr(self, pargs, args)
+
 
 class BVAdd(CombPrimitive):
     name = QSym('bv', 'add')
@@ -52,8 +63,9 @@ class BVAdd(CombPrimitive):
         BVCall = TypeCall(BVType(), [N])
         return [BVCall, BVCall], [BVCall]
 
-    def eval(self, i0, i1, pargs=[]):
-        return i0 + i1
+    def eval(self, pargs=[], args=[]):
+        return CallExpr(self, pargs, args)
+        #return i0 + i1
 
     #def input_types(self, N: Type):
     #    return [BVType(N), BVType(N)]

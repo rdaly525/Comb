@@ -70,7 +70,7 @@ class IntType(Type):
         return "Int"
 
     def free_var(self, name: str):
-        return ht.SMTInt(prefix=name)
+        return IntValue(ht.SMTInt(prefix=name))
 
 class BoolType(Type):
     def __str__(self):
@@ -92,7 +92,7 @@ class TypeCall(Node):
     pargs : tp.Tuple[Expr]
 
     def __post_init__(self):
-        super().__init__(self.type, *self.pargs)
+        super().__init__(*self.pargs)
         assert isinstance(self.type, Type)
         assert all(isinstance(parg, Expr) for parg in self.pargs)
 
@@ -105,7 +105,7 @@ class IntValue(Expr):
     type = IntType()
     def __init__(self, val):
         super().__init__()
-        assert isinstance(val, int)
+        assert isinstance(val, (int, ht.SMTInt))
         self.value = val
 
     def __str__(self):
@@ -126,7 +126,7 @@ class DeclStmt(Stmt):
 
     def __post_init__(self):
         assert isinstance(self.sym, Sym)
-        super().__init__(self.sym, self.type)
+        super().__init__(self.type)
 
 @dataclass
 class ParamDecl(DeclStmt):

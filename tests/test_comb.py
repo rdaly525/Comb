@@ -111,15 +111,10 @@ def test_round_trip(p):
     comb = compile_program(p, debug=False)
     p1 = comb.serialize()
     comb1 = compile_program(p1)
-    p2 = comb1.serialize()
-    assert p1 == p2
-
-def test_basic():
-    c1 = compile_program(p_inc2N2)
-    c2 = compile_program(p_inc2N2)
-    assert str(c1) == str(c2)
-    assert hash(c1) == hash(c2)
-    assert c1 == c2
+    assert comb.serialize() == comb1.serialize()
+    assert str(comb) == str(comb1)
+    assert hash(comb) == hash(comb1)
+    assert comb == comb1
 
 p_obj0 = \
 '''

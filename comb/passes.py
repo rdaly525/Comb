@@ -1,7 +1,7 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
     IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, Obj, Node, _list_to_str
-from .ir import CombProgram, AssignStmt, CallExpr
+from .ir import CombProgram, AssignStmt, CallExpr, _flat, _make_list
 from DagVisitor import Visitor
 from .stdlib import GlobalModules
 class SymRes(Visitor):
@@ -37,7 +37,7 @@ class SymRes(Visitor):
     def visit_TypeCall(self, node: TypeCall):
         Visitor.generic_visit(self, node)
         new_pargs = [self.new_node[parg] for parg in node.pargs]
-        new_T = TypeCall(self.new_node[node.type], new_pargs)
+        new_T = TypeCall(node.type, new_pargs)
         self.new_node[node] = new_T
 
     def visit_ASTAssignStmt(self, node: ASTAssignStmt):
@@ -64,3 +64,86 @@ class VerifyNoAST(Visitor):
         Visitor.generic_visit(self, node)
         if isinstance(node, (ASTCallExpr, ASTAssignStmt, ASTCombProgram)):
             raise ValueError("Bad")
+
+
+class EvalCombProgram(Visitor):
+    def run(self, comb: 'CombProgram', pargs, args):
+        self._dag_cache = set()
+        self.comb = comb
+        self.pargs = pargs
+        self.args = args
+        self.pi = 0
+        self.ai = 0
+        self.expr_to_vals = {}
+        self.type_to_type = {}
+        self.expr_to_types = {}
+        self.output_to_type = {}
+        self.visit(comb)
+
+    def outputs(self):
+        outs = []
+        for stmt in self.comb.stmts:
+            if isinstance(stmt, OutDecl):
+                outs.append(self.expr_to_vals[stmt.sym])
+        return _flat(outs)
+
+    def is_constant(self, expr: Expr):
+        return isinstance(expr, IntValue)
+
+    def visit_Sym(self, node: Sym):
+        assert node in self.expr_to_vals
+
+    def visit_IntValue(self, node: IntValue):
+        self.expr_to_vals[node] = [node]
+        self.expr_to_types[node] = [IntType()]
+
+    def visit_CallExpr(self, node: CallExpr):
+        Visitor.generic_visit(self, node)
+        pargs = _flat([self.expr_to_vals[parg] for parg in node.pargs])
+        args = _flat([self.expr_to_vals[arg] for arg in node.args])
+        vals = _make_list(node.comb.eval(pargs, args))
+        self.expr_to_vals[node] = vals
+        self.expr_to_types[node] = node.comb.get_type(*pargs)[1]
+
+    def visit_IntType(self, node: IntType):
+        self.type_to_type[node] = node
+
+    def visit_BoolType(self, node: BoolType):
+        self.type_to_type[node] = node
+
+    def visit_TypeCall(self, node: TypeCall):
+        Visitor.generic_visit(self, node)
+        pargs = _flat([self.expr_to_vals[parg] for parg in node.pargs])
+        self.type_to_type[node] = TypeCall(node.type, pargs)
+
+    def visit_ParamDecl(self, node: ParamDecl):
+        Visitor.generic_visit(self, node)
+        if node.sym in self.expr_to_vals:
+            raise ValueError(f"ERROR: {node.sym} used before declared")
+        self.expr_to_vals[node.sym] = [self.pargs[self.pi]]
+        self.pi += 1
+        self.expr_to_types[node.sym] = [self.type_to_type[node.type]]
+
+    def visit_InDecl(self, node: InDecl):
+        Visitor.generic_visit(self, node)
+        if node.sym in self.expr_to_vals:
+            raise ValueError(f"ERROR: {node.sym} used before declared")
+        self.expr_to_vals[node.sym] = [self.args[self.ai]]
+        self.ai += 1
+        self.expr_to_types[node.sym] = [self.type_to_type[node.type]]
+
+    def visit_OutDecl(self, node: OutDecl):
+        Visitor.generic_visit(self, node)
+        self.output_to_type[node.sym] = self.type_to_type[node.type]
+
+
+    def visit_AssignStmt(self, node: AssignStmt):
+        Visitor.generic_visit(self, node)
+        rhss = _flat([self.expr_to_vals[rhs] for rhs in node.rhss])
+        rhss_types = _flat([self.expr_to_types[rhs] for rhs in node.rhss])
+        assert len(node.lhss) == len(rhss)
+        for lhs, rhs, rhs_type in zip(node.lhss, rhss, rhss_types):
+            if lhs in self.expr_to_vals:
+                raise ValueError(f"ERROR: {lhs} used before declared")
+            self.expr_to_vals[lhs] = [rhs]
+            self.expr_to_types[lhs] = [rhs_type]
