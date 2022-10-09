@@ -72,9 +72,11 @@ class IntType(Type):
     def free_var(self, name: str):
         return IntValue(ht.SMTInt(prefix=name))
 
+
 class BoolType(Type):
     def __str__(self):
         return "Bool"
+
 
 class BVType(Type):
     param_types = [IntType()]
@@ -82,8 +84,16 @@ class BVType(Type):
     def __str__(self):
         return "BV"
 
-    #def __eq__(self, other):
-    #    return BVType is type(other)
+    def free_var(self, name, pargs):
+        if len(pargs) != 1:
+            raise ValueError()
+        N = pargs[0]
+        if not isinstance(N, IntValue):
+            return None
+        if not isinstance(N.value, int):
+            raise NotImplementedError(f"{N}, the param, needs to be a constant")
+        N = N.value
+        return BVValue(ht.SMTBitVector[N](prefix=name))
 
 
 @dataclass
@@ -100,6 +110,18 @@ class TypeCall(Node):
         parg_str = ",".join(str(parg) for parg in self.pargs)
         return f"{self.type}[{parg_str}]"
 
+    def free_var(self, name):
+        return self.type.free_var(name, self.pargs)
+
+class BVValue(Expr):
+    type = BVType()
+    def __init__(self, val):
+        super().__init__()
+        assert isinstance(val, ht.SMTBitVector)
+        self.value = val
+
+    def __str__(self):
+        return f"BVValue: {self.value}"
 
 class IntValue(Expr):
     type = IntType()
@@ -192,18 +214,22 @@ class Obj:
 
 
 class Comb(Node):
-
     param_types = []
 
     def get_type(self, *pvals):
-        pass
+        raise NotImplementedError()
 
     @property
     def has_params(self):
         return len(self.param_types) > 0
 
     def eval(self, *args, pargs=[]):
-        pass
+        raise NotImplementedError()
+
+    def create_symbolic_inputs(self, *pvals):
+        iTs, _ = self.get_type(*pvals)
+        return [T.free_var(f"I{i}") for i, T in enumerate(iTs)]
+
 
     #def partial_eval(self, *params) -> 'Comb':
     #    pass

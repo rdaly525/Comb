@@ -78,6 +78,8 @@ class EvalCombProgram(Visitor):
         self.type_to_type = {}
         self.expr_to_types = {}
         self.output_to_type = {}
+        self.input_types = []
+        self.output_types = []
         self.visit(comb)
 
     def outputs(self):
@@ -130,11 +132,15 @@ class EvalCombProgram(Visitor):
             raise ValueError(f"ERROR: {node.sym} used before declared")
         self.expr_to_vals[node.sym] = [self.args[self.ai]]
         self.ai += 1
-        self.expr_to_types[node.sym] = [self.type_to_type[node.type]]
+        new_T = self.type_to_type[node.type]
+        self.expr_to_types[node.sym] = [new_T]
+        self.input_types.append(new_T)
 
     def visit_OutDecl(self, node: OutDecl):
         Visitor.generic_visit(self, node)
-        self.output_to_type[node.sym] = self.type_to_type[node.type]
+        new_T = self.type_to_type[node.type]
+        self.output_to_type[node.sym] = new_T
+        self.output_types.append(new_T)
 
 
     def visit_AssignStmt(self, node: AssignStmt):

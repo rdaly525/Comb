@@ -14,6 +14,13 @@ def _make_list(v):
     else:
         return list(v)
 
+def _unwrap_list(v):
+    if isinstance(v, (list, tuple)) and len(v)==1:
+        return v[0]
+    else:
+        return v
+
+
 def ret_list(f):
     @functools.wraps(f)
     def dec(*args, **kwargs):
@@ -28,9 +35,9 @@ class CallExpr(_CallExpr):
 
     def __post_init__(self):
         assert isinstance(self.comb, Comb)
-        super().__init__(*self.pargs, *self.args)
         assert all(isinstance(p, Expr) for p in self.pargs)
-        assert all(isinstance(a, Expr) for a in self.args), str(self.args)
+        assert all(isinstance(a, Expr) for a in self.args)
+        super().__init__(*self.pargs, *self.args)
 
     def __str__(self):
         parg_str = f"[{_list_to_str(self.pargs)}]"
@@ -96,47 +103,26 @@ class CombProgram(Comb):
         return len([stmt for stmt in self.stmts if isinstance(stmt, OutDecl)])
 
     def eval(self, pargs, args):
+        from .passes import EvalCombProgram
         e = EvalCombProgram()
         e.run(self, pargs, args)
-        return e.outputs()
+        return _unwrap_list(e.outputs())
 
     @property
     def param_types(self):
         return [stmt.type for stmt in self.stmts if isinstance(stmt, ParamDecl)]
 
+    @functools.lru_cache(None)
     def get_type(self, *pargs):
         assert all(isinstance(parg, Expr) for parg in pargs)
-
+        from .passes import EvalCombProgram
+        e = EvalCombProgram()
+        args = [Sym(f"I{i}") for i in range(self.num_inputs)]
+        e.run(self, pargs, args)
+        return e.input_types, e.output_types
 
     def symbolic_params(self):
         return {stmt.sym.name:stmt.type.free_var(stmt.sym.name) for stmt in self.stmts if isinstance(stmt, ParamDecl)}
-
-    def sym_eval(self, **vals):
-        vals = {**vals}
-        def do_sym(sym: Sym):
-            return [vals.get(sym.name, None)]
-        def do_expr(expr: Expr):
-            if isinstance(expr, Sym):
-                return do_sym(expr)
-            elif isinstance(expr, IntValue):
-                return [expr.get_smt()]
-            else:
-                assert isinstance(expr, CallExpr)
-                if len(expr.pargs) > 0:
-                    return None
-                arg_vals = _flat([do_expr(arg) for arg in expr.args])
-                if None in arg_vals:
-                    return None
-                return expr.comb.eval(*arg_vals)
-
-        for stmt in self.stmts:
-            if isinstance(stmt, AssignStmt):
-                rhs_vals = [do_expr(rhs) for rhs in stmt.rhss]
-                if None in rhs_vals:
-                    continue
-                for lhs, rhs_val in zip(stmt.lhss, rhs_vals):
-                    vals[lhs.name] = rhs_val
-        return vals
 
     def __str__(self):
         lines = []

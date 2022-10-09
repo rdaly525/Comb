@@ -1,7 +1,7 @@
 from comb.compiler import  compile_program
 import pytest
 
-from comb.ast import Obj
+from comb.ast import Obj, BVValue
 
 iadd = '''
 Comb test.iadd
@@ -92,8 +92,6 @@ Out o: BV[N+N+N]
 o = bv.add[N + 2*N](a, [3*N]'h[N])
 '''
 
-
-
 @pytest.mark.parametrize("p", [
     iadd,
     add,
@@ -115,6 +113,38 @@ def test_round_trip(p):
     assert str(comb) == str(comb1)
     assert hash(comb) == hash(comb1)
     assert comb == comb1
+
+@pytest.mark.parametrize("p", [
+    #iadd,
+    add,
+    add2,
+    inc1,
+    inc2,
+    inc3,
+])
+def test_eval(p):
+    comb = compile_program(p)
+    assert not comb.has_params
+    args = comb.create_symbolic_inputs()
+    res = comb.eval([], args)
+    assert isinstance(res, BVValue)
+
+@pytest.mark.parametrize("p", [
+    p_add,
+    p_inc1,
+    p_inc2,
+])
+def test_partial_eval(p):
+    comb = compile_program(p)
+    assert not comb.has_params
+    args = comb.create_symbolic_inputs()
+    res = comb.eval(*args)
+    print(res)
+
+    #comb5 = comb.partial_eval(N=5)
+    #args = comb.create_symbolic_inputs(N=5)
+    #print(comb5.eval(*args))
+    #print(comb.eval(*args, N=5))
 
 p_obj0 = \
 '''
@@ -138,42 +168,3 @@ o = bv.add[16](t0, t0)
 ])
 def test_obj(p):
     obj: Obj = compile_program(p, comb=False, debug=False)
-
-@pytest.mark.parametrize("p", [
-    add,
-    inc1,
-    inc2,
-    inc3,
-])
-def test_eval(p):
-    comb = compile_program(p)
-    assert not comb.has_params
-    args = comb.create_symbolic_inputs()
-    res = comb.eval(*args)
-    print(res)
-
-
-    #comb5 = comb.partial_eval(N=5)
-    #args = comb.create_symbolic_inputs(N=5)
-    #print(comb5.eval(*args))
-    #print(comb.eval(*args, N=5))
-
-
-@pytest.mark.parametrize("p", [
-    p_add,
-    p_inc1,
-    p_inc2,
-])
-def test_partial_eval(p):
-    comb = compile_program(p)
-    assert not comb.has_params
-    args = comb.create_symbolic_inputs()
-    res = comb.eval(*args)
-    print(res)
-
-    #comb5 = comb.partial_eval(N=5)
-    #args = comb.create_symbolic_inputs(N=5)
-    #print(comb5.eval(*args))
-    #print(comb.eval(*args, N=5))
-
-

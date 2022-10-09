@@ -1,5 +1,5 @@
 import hwtypes as ht
-from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue
+from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
 from .ir import Modules, CombPrimitive, CallExpr
 
 
@@ -52,6 +52,12 @@ class BVConst(CombPrimitive):
         return [IntType()], [BVCall]
 
     def eval(self, pargs=[], args=[]):
+        if len(pargs)==1 and len(args)==1:
+            N = pargs[0]
+            val = args[0]
+            if isinstance(N, IntValue) and isinstance(N.value, int):
+                if isinstance(val, IntValue) and isinstance(val.value, int):
+                    return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
 
 
@@ -64,15 +70,13 @@ class BVAdd(CombPrimitive):
         return [BVCall, BVCall], [BVCall]
 
     def eval(self, pargs=[], args=[]):
+        if len(pargs)==1 and len(args)==2:
+            N = pargs[0]
+            if isinstance(N, IntValue) and isinstance(N.value, int):
+                if all(isinstance(arg, BVValue) for arg in args):
+                    return BVValue(args[0].value + args[1].value)
         return CallExpr(self, pargs, args)
         #return i0 + i1
-
-    #def input_types(self, N: Type):
-    #    return [BVType(N), BVType(N)]
-
-    #def output_types(self, N):
-    #    return [BVType(N)]
-
 
 class BitVectorModule(Module):
     # Types
