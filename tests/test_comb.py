@@ -133,18 +133,15 @@ def test_eval(p):
     p_add,
     p_inc1,
     p_inc2,
+    p_inc2N,
+    p_inc2N2,
 ])
 def test_partial_eval(p):
     comb = compile_program(p)
-    assert not comb.has_params
+    assert comb.has_params
     args = comb.create_symbolic_inputs()
     res = comb.eval(*args)
     print(res)
-
-    #comb5 = comb.partial_eval(N=5)
-    #args = comb.create_symbolic_inputs(N=5)
-    #print(comb5.eval(*args))
-    #print(comb.eval(*args, N=5))
 
 p_obj0 = \
 '''
