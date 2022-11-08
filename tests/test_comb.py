@@ -1,6 +1,6 @@
 from comb.compiler import  compile_program
 import pytest
-
+import hwtypes as ht
 from comb.ast import Obj, BVValue, IntValue, TypeCall
 
 iadd = '''
@@ -32,23 +32,23 @@ o = bv.add[16](t0, t1)
 
 inc1 = '''
 Comb test.inc1
-In i0 : BV[13]
-Out o : BV[13]
-o = bv.add[13](i0, 13'h23)
+In i0 : BV[16]
+Out o : BV[16]
+o = bv.add[16](i0, 16'h23)
 '''
 
 inc2 = '''
 Comb test.inc2
-In i0 : BV[13]
-Out o : BV[13]
-o = bv.add[13](i0, [13]'h23)
+In i0 : BV[16]
+Out o : BV[16]
+o = bv.add[16](i0, [16]'h23)
 '''
 
 inc3 = '''
 Comb test.inc3
-In i0 : BV[13]
-Out o : BV[13]
-o = bv.add[13](i0, [13]'h[23])
+In i0 : BV[16]
+Out o : BV[16]
+o = bv.add[16](i0, [16]'h[35])
 '''
 
 p_add = '''
@@ -151,20 +151,41 @@ def test_evaluate_sym(p):
     assert isinstance(res, type(args[0]))
 
 
-
+BV = ht.SMTBitVector[16]
 @pytest.mark.parametrize("p, i, o", [
     (iadd, (4, 5), 18),
-    (add, (), 0),
-    (add2, (), 0),
-    (inc1, (), 0),
-    (inc2, (), 0),
-    (inc3, (), 0),
+    (add, (BV(4), BV(5)), BV(18)),
+    (add2, (BV(4), BV(5)), BV(13)),
+    (inc1, (BV(8),), BV(8+35)),
+    (inc2, (BV(8),), BV(8+35)),
+    (inc3, (BV(8),), BV(8+35)),
 ])
 def test_evaluate_raw(p, i, o):
     comb = compile_program(p)
     assert not comb.has_params
     res = comb.evaluate(*i)
-    assert o == res
+    if isinstance(o, int):
+        assert o == res
+    else:
+        assert (o == res).value.constant_value() is True
+
+
+BV32 = ht.SMTBitVector[32]
+BV48 = ht.SMTBitVector[48]
+
+@pytest.mark.parametrize("p, i, o", [
+    (p_add, (16, BV(4)), BV(8)),
+    (p_inc1, (16, BV(8)), BV(9)),
+    (p_inc2, (16, BV(8),), BV(24)),
+    (p_inc2N, (16, BV32(8),), BV32(40)),
+    (p_inc2N2, (16, BV48(8),), BV48(24)),
+])
+def test_evaluate_raw_p(p, i, o):
+    comb = compile_program(p)
+    assert comb.has_params
+    res = comb.evaluate(*i)
+    assert (o == res).value.constant_value() is True
+
 
 @pytest.mark.parametrize("p", [
     p_add,

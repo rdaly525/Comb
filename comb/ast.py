@@ -243,10 +243,14 @@ class Comb(Node):
     #args must be either python ints or hwtypes.AbstractBitVector
     def evaluate(self, *args):
 
-        def from_raw(v):
+        def from_raw(v, T):
             if isinstance(v, (int, ht.SMTInt)):
+                if not isinstance(T, IntType):
+                    raise ValueError(f"TC: {v} should be of type {T}")
                 return IntValue(v)
             elif isinstance(v, ht.SMTBitVector):
+                if not isinstance(T, TypeCall) or T.type is not BVType and T.pargs != [IntValue(v.size)]:
+                    raise ValueError(f"TC: {v} should be of type {T}")
                 return BVValue(v)
             else:
                 raise NotImplementedError(f"{v}: {type(v)} not supported")
@@ -256,8 +260,9 @@ class Comb(Node):
         N = len(self.param_types)
         if len(args) != N + self.num_inputs:
             raise ValueError("Wrong Number of inputs")
-        pargs = [from_raw(v) for v in args[:N]]
-        args = [from_raw(v) for v in args[N:]]
+        pargs = [from_raw(v, self.param_types[i]) for i, v in enumerate(args[:N])]
+        iTs, oTs = self.get_type(*pargs)
+        args = [from_raw(v, iTs[i]) for i, v in enumerate(args[N:])]
         rets = self.eval(*args, pargs=pargs)
         rets = [to_raw(v) for v in rets]
         if len(rets)==1:
