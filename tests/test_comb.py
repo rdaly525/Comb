@@ -1,7 +1,7 @@
 from comb.compiler import  compile_program
 import pytest
 
-from comb.ast import Obj, BVValue
+from comb.ast import Obj, BVValue, IntValue, TypeCall
 
 iadd = '''
 Comb test.iadd
@@ -115,7 +115,7 @@ def test_round_trip(p):
     assert comb == comb1
 
 @pytest.mark.parametrize("p", [
-    #iadd,
+    iadd,
     add,
     add2,
     inc1,
@@ -125,9 +125,46 @@ def test_round_trip(p):
 def test_eval(p):
     comb = compile_program(p)
     assert not comb.has_params
-    args = comb.create_symbolic_inputs()
-    res = comb.eval([], args)
-    assert isinstance(res, BVValue)
+    pargs = []
+    args = comb.create_symbolic_inputs(*pargs, node=True)
+    res = comb.eval(*args, pargs=pargs)[0]
+    outT = comb.get_type()[1][0]
+    if isinstance(outT, TypeCall):
+        assert isinstance(res, BVValue)
+    else:
+        assert isinstance(res, IntValue)
+
+@pytest.mark.parametrize("p", [
+    iadd,
+    add,
+    add2,
+    inc1,
+    inc2,
+    inc3,
+])
+def test_evaluate_sym(p):
+    comb = compile_program(p)
+    assert not comb.has_params
+    pargs = []
+    args = comb.create_symbolic_inputs(*pargs, node=False)
+    res = comb.evaluate(*args)
+    assert isinstance(res, type(args[0]))
+
+
+
+@pytest.mark.parametrize("p, i, o", [
+    (iadd, (4, 5), 18),
+    (add, (), 0),
+    (add2, (), 0),
+    (inc1, (), 0),
+    (inc2, (), 0),
+    (inc3, (), 0),
+])
+def test_evaluate_raw(p, i, o):
+    comb = compile_program(p)
+    assert not comb.has_params
+    res = comb.evaluate(*i)
+    assert o == res
 
 @pytest.mark.parametrize("p", [
     p_add,
@@ -137,10 +174,10 @@ def test_eval(p):
     p_inc2N2,
 ])
 def test_partial_eval(p):
+    N = 5
     comb = compile_program(p)
     assert comb.has_params
-    args = comb.create_symbolic_inputs()
-    res = comb.eval(*args)
+    res = comb.eval([IntValue(N)], [])
     print(res)
 
 p_obj0 = \

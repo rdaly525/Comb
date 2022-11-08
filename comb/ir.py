@@ -102,11 +102,11 @@ class CombProgram(Comb):
     def num_outputs(self):
         return len([stmt for stmt in self.stmts if isinstance(stmt, OutDecl)])
 
-    def eval(self, pargs, args):
+    def eval(self, *args, pargs=[]):
         from .passes import EvalCombProgram
         e = EvalCombProgram()
         e.run(self, pargs, args)
-        return _unwrap_list(e.outputs())
+        return e.outputs()
 
     @property
     def param_types(self):
@@ -136,7 +136,7 @@ class CombProgram(Comb):
     def type_check(self):
         from .passes import EvalCombProgram
         e = EvalCombProgram()
-        pargs = [p.free_var(f"P{i}") for i, p in enumerate(self.param_types)]
+        pargs = [p.free_var(f"P{i}", node=True) for i, p in enumerate(self.param_types)]
         args = [Sym(f"I{i}") for i in range(self.num_inputs)]
         e.run(self, pargs, args)
 

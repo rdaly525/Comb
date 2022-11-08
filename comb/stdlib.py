@@ -10,7 +10,7 @@ class IntBinaryOp(CombPrimitive):
 
 class IntAdd(IntBinaryOp):
     name = QSym("i","add")
-    def eval(self, pargs, args):
+    def eval(self, *args, pargs):
         assert len(pargs) == 0
         assert len(args) == 2
         i0, i1 = args
@@ -20,7 +20,7 @@ class IntAdd(IntBinaryOp):
 
 class IntMul(IntBinaryOp):
     name = QSym("i","mul")
-    def eval(self, pargs, args):
+    def eval(self, *args, pargs):
         assert len(pargs) == 0
         assert len(args) == 2
         i0, i1 = args
@@ -44,20 +44,20 @@ class IntModule(Module):
 
 
 class BVConst(CombPrimitive):
-    name = QSym('bv','const')
+    name = QSym('bv', 'const')
     param_types = [IntType()]
 
     def get_type(self, N: Expr):
         BVCall = TypeCall(BVType(), [N])
         return [IntType()], [BVCall]
 
-    def eval(self, pargs=[], args=[]):
-        if len(pargs)==1 and len(args)==1:
-            N = pargs[0]
-            val = args[0]
-            if isinstance(N, IntValue) and isinstance(N.value, int):
-                if isinstance(val, IntValue) and isinstance(val.value, int):
-                    return BVValue(ht.SMTBitVector[N.value](val.value))
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==1
+        N = pargs[0]
+        val = args[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if isinstance(val, IntValue) and isinstance(val.value, int):
+                return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
 
 
@@ -69,7 +69,7 @@ class BVAdd(CombPrimitive):
         BVCall = TypeCall(BVType(), [N])
         return [BVCall, BVCall], [BVCall]
 
-    def eval(self, pargs=[], args=[]):
+    def eval(self, *args, pargs):
         if len(pargs)==1 and len(args)==2:
             N = pargs[0]
             if isinstance(N, IntValue) and isinstance(N.value, int):

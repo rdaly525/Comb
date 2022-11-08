@@ -55,8 +55,7 @@ class Sym(Expr):
     def __str__(self):
         return self.name
 
-class Type(Node):
-    param_types = []
+class Type(Node): pass
 
 class IntType(Type):
 
@@ -69,22 +68,27 @@ class IntType(Type):
     def __str__(self):
         return "Int"
 
-    def free_var(self, name: str):
-        return IntValue(ht.SMTInt(prefix=name))
-
+    def free_var(self, name: str, node: bool=False):
+        ret = ht.SMTInt(prefix=name)
+        if node:
+            ret = IntValue(ret)
+        return ret
 
 class BoolType(Type):
     def __str__(self):
         return "Bool"
 
 
-class BVType(Type):
+class ParameterizedType(Node):
+    param_types = []
+
+class BVType(ParameterizedType):
     param_types = [IntType()]
 
     def __str__(self):
         return "BV"
 
-    def free_var(self, name, pargs):
+    def free_var(self, name, pargs, node: bool=False):
         if len(pargs) != 1:
             raise ValueError()
         N = pargs[0]
@@ -93,25 +97,28 @@ class BVType(Type):
         if not isinstance(N.value, int):
             raise NotImplementedError(f"{N}, the param, needs to be a constant")
         N = N.value
-        return BVValue(ht.SMTBitVector[N](prefix=name))
+        ret = ht.SMTBitVector[N](prefix=name)
+        if node:
+            ret = BVValue(ret)
+        return ret
 
 
 @dataclass
 class TypeCall(Node):
-    type: Type
-    pargs : tp.Tuple[Expr]
+    type: ParameterizedType
+    pargs : tp.Iterable[Expr]
 
     def __post_init__(self):
         super().__init__(*self.pargs)
-        assert isinstance(self.type, Type)
+        assert isinstance(self.type, ParameterizedType)
         assert all(isinstance(parg, Expr) for parg in self.pargs)
 
     def __str__(self):
         parg_str = ",".join(str(parg) for parg in self.pargs)
         return f"{self.type}[{parg_str}]"
 
-    def free_var(self, name):
-        return self.type.free_var(name, self.pargs)
+    def free_var(self, name, node: bool=False):
+        return self.type.free_var(name, self.pargs, node)
 
 class BVValue(Expr):
     type = BVType()
@@ -133,11 +140,6 @@ class IntValue(Expr):
     def __str__(self):
         return str(self.value)
 
-    #def __eq__(self, other):
-    #    return self.value == other.value
-
-    def get_smt(self):
-        return ht.SMTInt(self.value)
 
 class Stmt(Node): pass
 
@@ -176,8 +178,8 @@ class _CallExpr(Expr): pass
 @dataclass
 class ASTCallExpr(_CallExpr):
     qsym : QSym
-    pargs : tp.Tuple[Expr]
-    args : tp.Tuple[Expr]
+    pargs : tp.Iterable[Expr]
+    args : tp.Iterable[Expr]
 
     def __post_init__(self):
         super().__init__(self.qsym, *self.pargs, *self.args)
@@ -195,8 +197,8 @@ class ASTCallExpr(_CallExpr):
 
 @dataclass
 class ASTAssignStmt(Stmt):
-    lhss: tp.Tuple[Sym]
-    rhss: tp.Tuple[Expr]
+    lhss: tp.Iterable[Sym]
+    rhss: tp.Iterable[Expr]
 
     def __post_init__(self):
         super().__init__(*self.lhss, *self.rhss)
@@ -220,38 +222,61 @@ class Comb(Node):
         raise NotImplementedError()
 
     @property
+    def num_inputs(self) -> int:
+        return NotImplementedError()
+
+    @property
+    def num_outputs(self) -> int:
+        return NotImplementedError()
+
+    @property
     def has_params(self):
         return len(self.param_types) > 0
 
+    #All values must be Node types
     def eval(self, *args, pargs=[]):
         raise NotImplementedError()
 
-    def create_symbolic_inputs(self, *pvals):
+    #All values are the underlying type
+    #args contains pargs followed by args
+    #Params must be python ints
+    #args must be either python ints or hwtypes.AbstractBitVector
+    def evaluate(self, *args):
+
+        def from_raw(v):
+            if isinstance(v, (int, ht.SMTInt)):
+                return IntValue(v)
+            elif isinstance(v, ht.SMTBitVector):
+                return BVValue(v)
+            else:
+                raise NotImplementedError(f"{v}: {type(v)} not supported")
+        def to_raw(v):
+            return v.value
+
+        N = len(self.param_types)
+        if len(args) != N + self.num_inputs:
+            raise ValueError("Wrong Number of inputs")
+        pargs = [from_raw(v) for v in args[:N]]
+        args = [from_raw(v) for v in args[N:]]
+        rets = self.eval(*args, pargs=pargs)
+        rets = [to_raw(v) for v in rets]
+        if len(rets)==1:
+            rets = rets[0]
+        return rets
+
+    def create_symbolic_inputs(self, *pvals, node: bool=False):
         iTs, _ = self.get_type(*pvals)
-        return [T.free_var(f"I{i}") for i, T in enumerate(iTs)]
+        return [T.free_var(f"I{i}", node) for i, T in enumerate(iTs)]
 
-
-    #def partial_eval(self, *params) -> 'Comb':
-    #    pass
-
-    #def io(self, *params):
-    #    pass
-
-    #def eval(self, *args):
-    #    pass
-
-    #def input_free_vars(self, *params, prefix=""):
-    #    return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.inputs]
-
-    #def output_free_vars(self, prefix=""):
-    #    return [self.sym_table[ivar.qsym].free_var(f"{prefix}__{ivar.qsym}") for ivar in self.outputs]
+    def partial_eval(self, *pargs):
+        raise NotImplementedError()
 
 
 #@dataclass(unsafe_hash=True)
 @dataclass
 class ASTCombProgram(Comb):
     name: QSym
-    stmts: tp.Tuple[Stmt]
+    stmts: tp.Iterable[Stmt]
 
     def __post_init__(self):
         super().__init__(*self.stmts)

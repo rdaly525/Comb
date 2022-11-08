@@ -103,7 +103,7 @@ class EvalCombProgram(Visitor):
         Visitor.generic_visit(self, node)
         pargs = _flat([self.expr_to_vals[parg] for parg in node.pargs])
         args = _flat([self.expr_to_vals[arg] for arg in node.args])
-        vals = _make_list(node.comb.eval(pargs, args))
+        vals = _make_list(node.comb.eval(*args, pargs=pargs))
         self.expr_to_vals[node] = vals
         self.expr_to_types[node] = node.comb.get_type(*pargs)[1]
 
