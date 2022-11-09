@@ -6,12 +6,13 @@ from pysmt.fnode import FNode
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .ast import Comb, BVValue, OutDecl
-from .ir import AssignStmt, QSym
-from .stdlib import TypeCall as mds_BV
+from .ast import Comb, BVValue, OutDecl, TypeCall, BVType, InDecl, Sym
+from .ir import AssignStmt, QSym, _make_list, CombProgram, CallExpr
 import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV
+from .stdlib import GlobalModules, make_bv_const
+
 
 #import more_itertools as mit
 
@@ -48,21 +49,25 @@ class SynthQuery:
 
     def __post_init__(self):
 
+        #Spec, and ops cannot have params
+        if any(comb.has_params for comb in (self.spec, *self.op_list)):
+            raise ValueError("Cannot synth with non-concrete parameters")
+
         # Structure
-        input_vars = self.spec.input_free_vars(prefix="VI")
+        input_vars = self.spec.create_symbolic_inputs(prefix="VI")
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
         #const_vars = []
-        output_vars = self.spec.output_free_vars(prefix="VO")
+        output_vars = self.spec.create_symbolic_outputs(prefix="VO")
         op_out_vars = []
         op_in_vars = []
         tot_locs = Ninputs + Nconsts
         for i, op in enumerate(self.op_list):
             assert isinstance(op, Comb)
-            op_in_vars.append(op.input_free_vars(f"V_op{i}"))
-            op_out_vars.append(op.output_free_vars(f"V_op{i}"))
-            tot_locs += len(op.outputs)
+            op_in_vars.append(op.create_symbolic_inputs(prefix=f"V_op{i}"))
+            op_out_vars.append(op.create_symbolic_outputs(prefix=f"V_op{i}"))
+            tot_locs += op.num_outputs
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
 
         lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[len(bin(tot_locs))-2]
@@ -74,8 +79,8 @@ class SynthQuery:
         op_out_lvars = []
         op_in_lvars = []
         for i, op in enumerate(self.op_list):
-            op_out_lvars.append([lvar_t(prefix=f"Lo[{i},{j}]") for j in range(len(op.outputs))])
-            op_in_lvars.append([lvar_t(prefix=f"Li[{i},{j}]") for j in range(len(op.inputs))])
+            op_out_lvars.append([lvar_t(prefix=f"Lo[{i},{j}]") for j in range(op.num_outputs)])
+            op_in_lvars.append([lvar_t(prefix=f"Li[{i},{j}]") for j in range(op.num_inputs)])
         output_lvars = [lvar_t(prefix=f"Lo{i}") for i in range(len(output_vars))]
 
         #get list of lvars (existentially quantified in final query)
@@ -85,14 +90,14 @@ class SynthQuery:
 
         #Formal Spec (P_spec)
         P_spec = []
-        for (i, ov) in enumerate(self.spec.eval(*input_vars)):
+        for (i, ov) in enumerate(_make_list(self.spec.evaluate(*input_vars))):
             P_spec.append(output_vars[i] == ov)
 
         #Lib Spec (P_lib)
         #   temp_var[i] = OP(*op_in_vars[i])
         P_lib = []
         for i, op in enumerate(self.op_list):
-            ovars = op.eval(*op_in_vars[i])
+            ovars = _make_list(op.evaluate(*op_in_vars[i]))
             for j, op_out_var in enumerate(ovars):
                 P_lib.append(op_out_vars[i][j] == op_out_var)
 
@@ -284,11 +289,13 @@ class SynthQuery:
             for v in vals:
                 cnt[v] += 1
             return cnt
-        spec_inputs = cnt_vals(i.type for i in self.spec.inputs)
-        spec_outputs = cnt_vals(o.type for o in self.spec.outputs)
 
-        op_inputs = cnt_vals(flat([[i.type for i in op.inputs] for op in self.op_list]))
-        op_outputs = cnt_vals(flat([[o.type for o in op.outputs] for op in self.op_list]))
+        spec_iTs, spec_oTs = self.spec.get_type()
+        spec_inputs = cnt_vals(i.type for i in spec_iTs)
+        spec_outputs = cnt_vals(o.type for o in spec_oTs)
+
+        op_inputs = cnt_vals(flat([[i.type for i in op.get_type()[0]] for op in self.op_list]))
+        op_outputs = cnt_vals(flat([[o.type for o in op.get_type()[1]] for op in self.op_list]))
 
         if not all(t in op_inputs and op_inputs[t] >= cnt for t, cnt in spec_inputs.items()):
             return False
@@ -335,7 +342,6 @@ class SynthQuery:
                     E_guess = {v: solver.get_value(v) for v in E_vars}
                     query_guess = query.substitute(E_guess).simplify()
                     model = smt.get_model(smt.Not(query_guess), solver_name=solver_name, logic=logic)
-
                     if model is None:
                         if verbose:
                             print("SAT")
@@ -353,8 +359,7 @@ class SynthQuery:
 
     def comb_from_solved(self, lvals):
 
-        inputs = self.spec.inputs
-        outputs = self.spec.outputs
+        spec_iTs, spec_oTs = self.spec.get_type()
 
         input_vars, hard_consts, output_vars, op_out_vars, op_in_vars = self.vars
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
@@ -364,19 +369,22 @@ class SynthQuery:
             return int(val.constant_value())
         output_lvars = [to_int(lvals[lvar.value]) for lvar in output_lvars]
         def name_from_loc(loc, src=None):
-            if loc < len(inputs):
-                return inputs[loc].qsym
-            elif loc < len(inputs) + len(hard_consts):
+            if loc < self.spec.num_inputs:
+                return Sym(f"I{loc}")
+            elif loc < self.spec.num_inputs + len(hard_consts):
                 assert src is not None
                 i, j = src
-                type = self.spec.resolve_type(self.op_list[i].inputs[j].type)
-                if isinstance(type, mds_BV):
-                    return BVValue(type.N, hard_consts[loc - len(inputs)])
+                iT = self.op_list[i].get_type()[0][j].type
+                if isinstance(iT, TypeCall):
+                    assert isinstance(iT.type, BVType)
+                    N = iT.pargs[0].value
+                    const_val = hard_consts[loc - self.spec.num_inputs]
+                    return make_bv_const(N, const_val)
                 else:
                     raise NotImplementedError()
             else:
-                loc = loc - (len(inputs) + len(hard_consts))
-                return f"t{loc}"
+                loc = loc - (self.spec.num_inputs + len(hard_consts))
+                return Sym(f"t{loc}")
 
 
         out_lvar_vals = {}
@@ -385,16 +393,16 @@ class SynthQuery:
             out_lvar_vals[i] = [to_int(lvals[lvar.value]) for lvar in op_out_lvars[i]]
             in_lvar_vals[i] = [to_int(lvals[lvar.value]) for lvar in op_in_lvars[i]]
 
+        inputs = [InDecl(name_from_loc(i), T) for i, T in enumerate(spec_iTs)]
+        outputs = [OutDecl(name_from_loc(output_lvars[i]), T) for i, T in enumerate(spec_oTs)]
         stmts = []
         for i, out_lvars in sorted(out_lvar_vals.items(), key=lambda item: item[1][0]):
             lhss = [name_from_loc(loc) for loc in out_lvars]
             op = self.op_list[i]
-            args = [name_from_loc(loc,src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
-            stmts.append(AssignStmt(lhss, op.name, args))
-        outputs = [OutDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
+            args = [name_from_loc(loc, src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
+            stmts.append(AssignStmt(lhss, [op.call_expr([], args)]))
         name = QSym('solved', 'v0')
-        comb = ASTCombProgram(name, inputs, outputs, stmts)
-        comb.resolve_qualified_symbols(self.spec.module_list)
+        comb = CombProgram(name, [*inputs, *outputs, *stmts])
         return comb
 
 def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
@@ -407,8 +415,8 @@ def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
         assert o0.type == o1.type
 
     inputs = comb0.create_symbolic_inputs()
-    o0 = comb0.evaluate(*inputs)
-    o1 = comb1.evaluate(*inputs)
+    o0 = _make_list(comb0.evaluate(*inputs))
+    o1 = _make_list(comb1.evaluate(*inputs))
 
     formula = fc.And(o0_ == o1_ for o0_, o1_ in zip(o0, o1))
 

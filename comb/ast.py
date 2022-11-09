@@ -11,7 +11,7 @@ def _list_to_str(l):
     return ", ".join(str(l_) for l_ in l)
 
 class Node(Visited):
-    def __init__(self,*args):
+    def __init__(self, *args):
         for arg in args:
             if not isinstance(arg, Node):
                 raise ValueError(f"{type(arg)}: {arg} not Node")
@@ -218,6 +218,9 @@ class Obj:
 class Comb(Node):
     commutative = False
     param_types = []
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.partial_cache = {}
 
     def get_type(self, *pvals):
         raise NotImplementedError()
@@ -269,9 +272,13 @@ class Comb(Node):
             rets = rets[0]
         return rets
 
-    def create_symbolic_inputs(self, *pvals, node: bool=False):
+    def create_symbolic_inputs(self, *pvals, node: bool=False, prefix="In"):
         iTs, _ = self.get_type(*pvals)
-        return [T.free_var(f"I{i}", node) for i, T in enumerate(iTs)]
+        return [T.free_var(f"{prefix}_{i}", node) for i, T in enumerate(iTs)]
+
+    def create_symbolic_outputs(self, *pvals, node: bool=False, prefix="Out"):
+        _, oTs = self.get_type(*pvals)
+        return [T.free_var(f"{prefix}_{i}", node) for i, T in enumerate(oTs)]
 
     def partial_eval(self, *pargs):
         return None
@@ -281,6 +288,11 @@ class Comb(Node):
         if not isinstance(item, tuple):
             item = (item,)
         return self.partial_eval(*item)
+
+    def call_expr(self, pargs, args):
+        from .ir import CallExpr
+        return CallExpr(self, pargs, args)
+
 
 
 #@dataclass(unsafe_hash=True)

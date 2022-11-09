@@ -1,6 +1,8 @@
+import functools
+
 import hwtypes as ht
 from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
-from .ir import Modules, CombPrimitive, CallExpr
+from .ir import Modules, CombPrimitive, CallExpr, CombSpecialized
 
 
 class IntBinaryOp(CombPrimitive):
@@ -60,52 +62,50 @@ class BVConst(CombPrimitive):
                 return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
 
-class BVMul(CombPrimitive):
-    name = QSym('bv', 'mul')
-    param_types = [IntType()]
+def create_BVBinary(class_name: str, fun, comm):
+    class BVBin(CombPrimitive):
+        name = QSym('bv', class_name)
+        param_types = [IntType()]
+        commutative = comm
+        num_inputs = 2
+        num_outputs = 1
 
-    def get_type(self, N: Expr):
-        BVCall = TypeCall(BVType(), [N])
-        return [BVCall, BVCall], [BVCall]
+        def get_type(self, N: Expr):
+            BVCall = TypeCall(BVType(), [N])
+            return [BVCall, BVCall], [BVCall]
 
-    def eval(self, *args, pargs):
-        assert len(pargs)==1 and len(args)==2
-        N = pargs[0]
-        if isinstance(N, IntValue) and isinstance(N.value, int):
-            if all(isinstance(arg, BVValue) for arg in args):
-                return BVValue(args[0].value * args[1].value)
-        return CallExpr(self, pargs, args)
+        def eval(self, *args, pargs):
+            assert len(pargs)==1 and len(args)==2
+            N = pargs[0]
+            if isinstance(N, IntValue) and isinstance(N.value, int):
+                if all(isinstance(arg, BVValue) for arg in args):
+                    return [BVValue(fun(args[0].value, args[1].value))]
+            return CallExpr(self, pargs, args)
 
-class BVAdd(CombPrimitive):
-    name = QSym('bv', 'add')
-    param_types = [IntType()]
+        def partial_eval(self, N):
+            return CombSpecialized(self, [N])
 
-    def get_type(self, N: Expr):
-        BVCall = TypeCall(BVType(), [N])
-        return [BVCall, BVCall], [BVCall]
+    BVBin.__name__ = "BV"+class_name.capitalize()
+    return BVBin()
 
-    def eval(self, *args, pargs):
-        assert len(pargs)==1 and len(args)==2
-        N = pargs[0]
-        if isinstance(N, IntValue) and isinstance(N.value, int):
-            if all(isinstance(arg, BVValue) for arg in args):
-                return BVValue(args[0].value + args[1].value)
-        return CallExpr(self, pargs, args)
-        #return i0 + i1
-
-    def partial_eval(self, N):
-        pass
-
+_binops = dict(
+    add=(lambda x, y: x + y, True),
+    sub=(lambda x, y: x - y, False),
+    mul=(lambda x, y: x * y, True),
+    and_=(lambda x, y: x & y, True),
+    or_=(lambda x, y: x & y, True),
+    xor=(lambda x, y: x ^ y, True),
+)
 
 class BitVectorModule(Module):
     # Types
     name = 'bv'
+    def __init__(self):
+        opdict = {'const':BVConst()}
+        for name, (fun, comm) in _binops.items():
+            opdict[name] = create_BVBinary(name, fun, comm)
+        self.opdict = opdict
 
-    opdict = dict(
-        add=BVAdd(),
-        mul=BVMul(),
-        const=BVConst(),
-    )
     def __getattr__(self, item):
         if item in self.opdict:
             return self.opdict[item]
@@ -120,13 +120,19 @@ class BitVectorModule(Module):
         #    return BVBinary(*qsym.genargs, qsym.name)
         #elif qsym.name in _unary_ops:
         #    return BVUnary(*qsym.genargs, qsym.name)
-        raise NotImplementedError()
+        raise NotImplementedError(str(qsym))
 
 
 GlobalModules = dict(
     bv=BitVectorModule(),
     i=IntModule(),
 )
+
+#Return a call expression
+def make_bv_const(N: int, val: int) -> CallExpr:
+    const = GlobalModules['bv'].const
+    return CallExpr(const, [IntValue(N)], [IntValue(val)])
+
 
 #class Bool:
 #    name = QSym('bv', 'bool')

@@ -1,6 +1,6 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ParamDecl, TypeCall, \
-    InDecl, Type, OutDecl, IntValue, _CallExpr, Node, _list_to_str
+    InDecl, Type, OutDecl, IntValue, _CallExpr, Node, IntType, _list_to_str
 from .ast import dataclass
 from hwtypes import smt_utils as fc
 import pysmt.shortcuts as smt
@@ -26,6 +26,7 @@ def ret_list(f):
     def dec(*args, **kwargs):
         return _make_list(f(*args, **kwargs))
     return dec
+
 
 @dataclass
 class CallExpr(_CallExpr):
@@ -64,6 +65,36 @@ class CombPrimitive(Comb):
 
     def __str__(self):
         return f"Comb {self.name}"
+
+#Comb class which has concrete values for params
+class CombSpecialized(Comb):
+    param_types = []
+    def __init__(self, comb: Comb, pargs: tp.Tuple[int]):
+        assert isinstance(comb, Comb)
+        assert len(pargs) == len(comb.param_types)
+        assert all(isinstance(pT, IntType) for pT in comb.param_types)
+        assert all(isinstance(parg, int) for parg in pargs)
+        self.comb = comb
+        self.name = QSym("_", str(comb.name) + "["+", ".join(str(p) for p in pargs) + "]")
+        self.pargs = [IntValue(parg) for parg in pargs]
+
+    def get_type(self):
+        return self.comb.get_type(*self.pargs)
+
+    @property
+    def num_inputs(self) -> int:
+        return self.comb.num_inputs
+
+    @property
+    def num_outputs(self) -> int:
+        return self.comb.num_outputs
+
+    def eval(self, *args, pargs=[]):
+        return self.comb.eval(*args, pargs=self.pargs)
+
+    def call_expr(self, pargs, args):
+        assert len(pargs) == 0
+        return CallExpr(self.comb, self.pargs, args)
 
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program
@@ -116,7 +147,6 @@ class CombProgram(Comb):
             raise NotImplementedError("partial eval only on ints")
         if len(pargs) != len(self.param_types):
             raise NotImplementedError()
-
 
 
     @functools.lru_cache(None)
