@@ -75,7 +75,7 @@ BV = GlobalModules['bv']
 def test_add(p, ops, num_sols):
     comb = compile_program(p)
     sq = SynthQuery(comb, ops, loc_type_int=False)
-    comb_sols = sq.gen_all_sols(logic=None, maxloops=1000, permutations=True, verbose=True)
+    comb_sols = sq.gen_all_sols(logic=None, maxloops=1000, permutations=True, verbose=False)
     assert len(comb_sols) == num_sols
     for comb_sol in comb_sols:
         res = verify(comb_sol, comb)

@@ -44,7 +44,6 @@ class IntModule(Module):
             raise NotImplementedError()
         return self.prim_map[qsym.name]
 
-
 class BVConst(CombPrimitive):
     name = QSym('bv', 'const')
     param_types = [IntType()]
@@ -61,6 +60,31 @@ class BVConst(CombPrimitive):
             if isinstance(val, IntValue) and isinstance(val.value, int):
                 return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
+
+def create_BVUnary(class_name: str, fun):
+    class BVBin(CombPrimitive):
+        name = QSym('bv', class_name)
+        param_types = [IntType()]
+        num_inputs = 1
+        num_outputs = 1
+
+        def get_type(self, N: Expr):
+            BVCall = TypeCall(BVType(), [N])
+            return [BVCall], [BVCall]
+
+        def eval(self, *args, pargs):
+            assert len(pargs)==1 and len(args)==1
+            N = pargs[0]
+            if isinstance(N, IntValue) and isinstance(N.value, int):
+                if all(isinstance(arg, BVValue) for arg in args):
+                    return [BVValue(fun(args[0].value))]
+            return CallExpr(self, pargs, args)
+
+        def partial_eval(self, N):
+            return CombSpecialized(self, [N])
+
+    BVBin.__name__ = "BV"+class_name.capitalize()
+    return BVBin()
 
 def create_BVBinary(class_name: str, fun, comm):
     class BVBin(CombPrimitive):
@@ -97,6 +121,12 @@ _binops = dict(
     xor=(lambda x, y: x ^ y, True),
 )
 
+_unary_ops = dict(
+    identity=lambda x: x,
+    neg=lambda x: -x,
+    not_=lambda x: ~x,
+)
+
 class BitVectorModule(Module):
     # Types
     name = 'bv'
@@ -104,6 +134,8 @@ class BitVectorModule(Module):
         opdict = {'const':BVConst()}
         for name, (fun, comm) in _binops.items():
             opdict[name] = create_BVBinary(name, fun, comm)
+        for name, fun in _unary_ops.items():
+            opdict[name] = create_BVUnary(name, fun)
         self.opdict = opdict
 
     def __getattr__(self, item):

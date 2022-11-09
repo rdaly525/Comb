@@ -147,6 +147,8 @@ class CombProgram(Comb):
             raise NotImplementedError("partial eval only on ints")
         if len(pargs) != len(self.param_types):
             raise NotImplementedError()
+        #Temporary measure
+        return CombSpecialized(self, pargs)
 
 
     @functools.lru_cache(None)

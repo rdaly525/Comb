@@ -281,7 +281,6 @@ class Comb(Node):
         return [T.free_var(f"{prefix}_{i}", node) for i, T in enumerate(oTs)]
 
     def partial_eval(self, *pargs):
-        return None
         raise NotImplementedError()
 
     def __getitem__(self, item):
