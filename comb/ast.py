@@ -216,6 +216,7 @@ class Obj:
 
 
 class Comb(Node):
+    commutative = False
     param_types = []
 
     def get_type(self, *pvals):
@@ -242,7 +243,6 @@ class Comb(Node):
     #Params must be python ints
     #args must be either python ints or hwtypes.AbstractBitVector
     def evaluate(self, *args):
-
         def from_raw(v, T):
             if isinstance(v, (int, ht.SMTInt)):
                 if not isinstance(T, IntType):
@@ -274,7 +274,13 @@ class Comb(Node):
         return [T.free_var(f"I{i}", node) for i, T in enumerate(iTs)]
 
     def partial_eval(self, *pargs):
+        return None
         raise NotImplementedError()
+
+    def __getitem__(self, item):
+        if not isinstance(item, tuple):
+            item = (item,)
+        return self.partial_eval(*item)
 
 
 #@dataclass(unsafe_hash=True)

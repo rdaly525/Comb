@@ -60,6 +60,21 @@ class BVConst(CombPrimitive):
                 return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
 
+class BVMul(CombPrimitive):
+    name = QSym('bv', 'mul')
+    param_types = [IntType()]
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [BVCall, BVCall], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return BVValue(args[0].value * args[1].value)
+        return CallExpr(self, pargs, args)
 
 class BVAdd(CombPrimitive):
     name = QSym('bv', 'add')
@@ -70,24 +85,37 @@ class BVAdd(CombPrimitive):
         return [BVCall, BVCall], [BVCall]
 
     def eval(self, *args, pargs):
-        if len(pargs)==1 and len(args)==2:
-            N = pargs[0]
-            if isinstance(N, IntValue) and isinstance(N.value, int):
-                if all(isinstance(arg, BVValue) for arg in args):
-                    return BVValue(args[0].value + args[1].value)
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return BVValue(args[0].value + args[1].value)
         return CallExpr(self, pargs, args)
         #return i0 + i1
+
+    def partial_eval(self, N):
+        pass
+
 
 class BitVectorModule(Module):
     # Types
     name = 'bv'
 
+    opdict = dict(
+        add=BVAdd(),
+        mul=BVMul(),
+        const=BVConst(),
+    )
+    def __getattr__(self, item):
+        if item in self.opdict:
+            return self.opdict[item]
+        raise AttributeError()
+
+
     def comb_from_sym(self, qsym: QSym):
         assert qsym.module == self.name
-        if qsym.name == "add":
-            return BVAdd()
-        elif qsym.name == "const":
-            return BVConst()
+        if qsym.name in self.opdict:
+            return self.opdict[qsym.name]
         #if qsym.name in _binops:
         #    return BVBinary(*qsym.genargs, qsym.name)
         #elif qsym.name in _unary_ops:

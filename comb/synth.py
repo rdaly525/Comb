@@ -6,7 +6,8 @@ from pysmt.fnode import FNode
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .ast import Comb, ASTCombProgram, Assign, QSym, VarDecl, BVValue
+from .ast import Comb, BVValue, OutDecl
+from .ir import AssignStmt, QSym
 from .stdlib import TypeCall as mds_BV
 import typing as tp
 import pysmt.shortcuts as smt
@@ -39,7 +40,7 @@ def flat(l):
 
 @dataclass
 class SynthQuery:
-    spec: ASTCombProgram
+    spec: Comb
     op_list: tp.List[Comb]
     const_list: tp.Tuple[int] = ()
     unique_comm: bool = True
@@ -389,8 +390,8 @@ class SynthQuery:
             lhss = [name_from_loc(loc) for loc in out_lvars]
             op = self.op_list[i]
             args = [name_from_loc(loc,src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
-            stmts.append(Assign(lhss, op.name, args))
-        outputs = [VarDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
+            stmts.append(AssignStmt(lhss, op.name, args))
+        outputs = [OutDecl(name_from_loc(output_lvars[i]), v.type) for i, v in enumerate(self.spec.outputs)]
         name = QSym('solved', 'v0')
         comb = ASTCombProgram(name, inputs, outputs, stmts)
         comb.resolve_qualified_symbols(self.spec.module_list)
@@ -398,14 +399,16 @@ class SynthQuery:
 
 def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
     #Verify that the two interfaces are identical
-    for i0, i1 in zip(comb0.inputs, comb1.inputs):
+    i0Ts, o0Ts = comb0.get_type()
+    i1Ts, o1Ts = comb1.get_type()
+    for i0, i1 in zip(i0Ts, i1Ts):
         assert i0.type == i1.type
-    for o0, o1 in zip(comb0.outputs, comb1.outputs):
+    for o0, o1 in zip(o0Ts, o1Ts):
         assert o0.type == o1.type
 
-    inputs = comb0.input_free_vars()
-    o0 = comb0.eval(*inputs)
-    o1 = comb1.eval(*inputs)
+    inputs = comb0.create_symbolic_inputs()
+    o0 = comb0.evaluate(*inputs)
+    o1 = comb1.evaluate(*inputs)
 
     formula = fc.And(o0_ == o1_ for o0_, o1_ in zip(o0, o1))
 
