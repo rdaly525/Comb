@@ -96,6 +96,12 @@ class CombSpecialized(Comb):
         assert len(pargs) == 0
         return CallExpr(self.comb, self.pargs, args)
 
+    def serialize(self):
+        raise NotImplementedError()
+
+    def __str__(self):
+        return str(self.name)
+
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program
 Turns "bv.add" to the object representing that add

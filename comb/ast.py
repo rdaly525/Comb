@@ -321,3 +321,9 @@ class Module:
     def comb_from_sym(self, qsym: QSym) -> 'ASTCombProgram':
         ...
 
+
+#Contains a set of module declarations, comb definitions, etc...
+class Object:
+    modules: tp.List[Module]
+
+
