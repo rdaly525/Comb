@@ -213,8 +213,8 @@ t0 = test.t1(i0, i1)
 o = bv.add[16](t0, t0)
 '''
 
-@pytest.mark.parametrize("p", [
-    p_obj0,
-])
-def test_obj(p):
-    obj: Obj = compile_program(p, comb=False, debug=False)
+#@pytest.mark.parametrize("p", [
+#    p_obj0,
+#])
+#def test_obj(p):
+#    obj: Obj = compile_program(p, comb=False, debug=False)

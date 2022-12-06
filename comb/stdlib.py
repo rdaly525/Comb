@@ -117,7 +117,7 @@ _binops = dict(
     sub=(lambda x, y: x - y, False),
     mul=(lambda x, y: x * y, True),
     and_=(lambda x, y: x & y, True),
-    or_=(lambda x, y: x & y, True),
+    or_=(lambda x, y: x | y, True),
     xor=(lambda x, y: x ^ y, True),
 )
 

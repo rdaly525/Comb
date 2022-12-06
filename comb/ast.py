@@ -281,7 +281,12 @@ class Comb(Node):
         return [T.free_var(f"{prefix}_{i}", node) for i, T in enumerate(oTs)]
 
     def partial_eval(self, *pargs):
-        raise NotImplementedError()
+        if not all(isinstance(parg, int) for parg in pargs):
+            raise NotImplementedError("partial eval only on ints")
+        if len(pargs) != len(self.param_types):
+            raise NotImplementedError()
+        from .ir import CombSpecialized
+        return CombSpecialized(self, pargs)
 
     def __getitem__(self, item):
         if not isinstance(item, tuple):

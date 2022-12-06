@@ -148,13 +148,6 @@ class CombProgram(Comb):
     def param_types(self):
         return [stmt.type for stmt in self.stmts if isinstance(stmt, ParamDecl)]
 
-    def partial_eval(self, *pargs):
-        if not all(isinstance(parg, int) for parg in pargs):
-            raise NotImplementedError("partial eval only on ints")
-        if len(pargs) != len(self.param_types):
-            raise NotImplementedError()
-        #Temporary measure
-        return CombSpecialized(self, pargs)
 
 
     @functools.lru_cache(None)
