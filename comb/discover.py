@@ -27,6 +27,6 @@ def discover(spec: Comb, N: int, op_list: tp.List[Comb], const_list = ()):
         op_str = "(" + ", ".join(str(op) for op in ops) + ")"
         print(f"Ops:{op_str}")
         sq = SynthQuery(spec, ops, const_list=const_list)
-        combs = sq.gen_all_sols(maxloops=5000, verbose=True, permutations=False)
+        combs = sq.gen_all_sols(maxloops=200, verbose=True, permutations=False)
         all_combs += combs
     return all_combs

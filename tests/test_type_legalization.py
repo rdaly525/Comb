@@ -2,38 +2,33 @@ from comb.compiler import compile_program
 from comb.discover import discover, discover_up_to_N
 from comb.ast import QSym
 from comb.stdlib import BitVectorModule, GlobalModules
-from comb.synth import SynthQuery, verify
 import pytest
 import hwtypes as ht
 
-pid = '''
+p_or32 = '''
 Comb test.id
 Param N: Int 
-In a: BV[N]
-Out o: BV[N]
-o = bv.add[N](a, [N]'h1)
+In x0: BV[N]
+In x1: BV[N]
+In y0: BV[N]
+In y1: BV[N]
+Out z1: BV[N]
+x = bv.concat[N, N](x0, x1)
+y = bv.concat[N, N](y0, y1)
+z = bv.mul[N*2](x, y)
+z1 = bv.slice[2*N, N, 2*N](z)
 '''
 
 
-ops = [
-    #'identity',
-    'not_',
-    #'neg',
-    #'mul',
-    'add',
-    #'sub',
-]
-
 BV = GlobalModules['bv']
 @pytest.mark.parametrize("p, N", [
-    (pid, 4),
-    (pid, 2),
+    (p_or32, 2),
+    #(p_or32, 16),
 ])
 def test_discover(p, N: int):
     c1 = compile_program(p)
-    op_list = [getattr(BV, op)[N] for op in ops]
-    N_, combs = discover_up_to_N(c1[N], N, op_list)
-    assert len(combs) == 6
+    op_list = [BV.add[N], BV.mul[N]]
+    N_, combs = discover_up_to_N(c1[N], 8, op_list)
     for i, comb in enumerate(combs):
         print("*"*80)
         print(i)

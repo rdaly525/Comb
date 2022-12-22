@@ -39,7 +39,6 @@ out z1 : BV[N]
 '''
 
 
-
 BV = GlobalModules['bv']
 width = 4
 op_list = [BV.add[width]]

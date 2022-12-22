@@ -92,6 +92,22 @@ Out o: BV[N+N+N]
 o = bv.add[N + 2*N](a, [3*N]'h[N])
 '''
 
+p_concat = '''
+Comb test.p_concat
+Param N: Int
+In a: BV[N]
+Out b: BV[N+N]
+b = bv.concat[N, N](a, a)
+'''
+
+p_slice = '''
+Comb test.p_concat
+Param N: Int
+In a: BV[2*N]
+Out b: BV[N]
+b = bv.slice[2*N, 0, N](a)
+'''
+
 @pytest.mark.parametrize("p", [
     iadd,
     add,
@@ -104,6 +120,8 @@ o = bv.add[N + 2*N](a, [3*N]'h[N])
     p_inc2,
     p_inc2N,
     p_inc2N2,
+    p_concat,
+    p_slice,
 ])
 def test_round_trip(p):
     comb = compile_program(p, debug=False)
@@ -174,11 +192,13 @@ BV32 = ht.SMTBitVector[32]
 BV48 = ht.SMTBitVector[48]
 
 @pytest.mark.parametrize("p, i, o", [
-    (p_add, (16, BV(4)), BV(8)),
-    (p_inc1, (16, BV(8)), BV(9)),
-    (p_inc2, (16, BV(8),), BV(24)),
-    (p_inc2N, (16, BV32(8),), BV32(40)),
-    (p_inc2N2, (16, BV48(8),), BV48(24)),
+    #(p_add, (16, BV(4)), BV(8)),
+    #(p_inc1, (16, BV(8)), BV(9)),
+    #(p_inc2, (16, BV(8),), BV(24)),
+    #(p_inc2N, (16, BV32(8),), BV32(40)),
+    #(p_inc2N2, (16, BV48(8),), BV48(24)),
+    (p_concat, (16, BV(5),), BV32((5<<16)+5)),
+    (p_slice, (16, BV32((5<<16)+5),), BV(5)),
 ])
 def test_evaluate_raw_p(p, i, o):
     comb = compile_program(p)

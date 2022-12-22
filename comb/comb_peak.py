@@ -43,6 +43,8 @@ class CombPeak(CombPrimitive):
     def eval(self, *args, pargs=[]):
         if not all(isinstance(p, IntValue) and isinstance(p.value, int) for p in pargs):
             return CallExpr(self, pargs, args)
+        if not all(isinstance(arg, BVValue) for arg in args):
+            return CallExpr(self, pargs, args)
         pargs = tuple(p.value for p in pargs)
         if pargs in self.cache:
             peak_smt = self.cache[pargs]
