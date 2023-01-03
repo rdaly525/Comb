@@ -130,6 +130,14 @@ class BVValue(Expr):
     def __str__(self):
         return f"BVValue: {self.value}"
 
+import functools
+def int_wrap(f):
+    @functools.wraps(f)
+    def wrapped(*args):
+        args = [IntValue(arg) if isinstance(arg, int) else arg for arg in args]
+        return f(*args)
+    return wrapped
+
 class IntValue(Expr):
     type = IntType()
     def __init__(self, val):
@@ -139,6 +147,18 @@ class IntValue(Expr):
 
     def __str__(self):
         return str(self.value)
+
+    @int_wrap
+    def __add__(self, other):
+        return IntValue(self.value + other.value)
+
+    @int_wrap
+    def __mul__(self, other):
+        return IntValue(self.value * other.value)
+
+    @int_wrap
+    def __sub__(self, other):
+        return IntValue(self.value - other.value)
 
 
 class Stmt(Node): pass
@@ -281,7 +301,12 @@ class Comb(Node):
         return [T.free_var(f"{prefix}_{i}", node) for i, T in enumerate(oTs)]
 
     def partial_eval(self, *pargs):
-        raise NotImplementedError()
+        if not all(isinstance(parg, int) for parg in pargs):
+            raise NotImplementedError("partial eval only on ints")
+        if len(pargs) != len(self.param_types):
+            raise NotImplementedError()
+        from .ir import CombSpecialized
+        return CombSpecialized(self, pargs)
 
     def __getitem__(self, item):
         if not isinstance(item, tuple):
@@ -320,4 +345,10 @@ class Module:
     @abc.abstractmethod
     def comb_from_sym(self, qsym: QSym) -> 'ASTCombProgram':
         ...
+
+
+#Contains a set of module declarations, comb definitions, etc...
+class Object:
+    modules: tp.List[Module]
+
 

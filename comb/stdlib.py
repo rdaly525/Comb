@@ -2,6 +2,7 @@ import functools
 
 import hwtypes as ht
 from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
+from .comb_peak import CombPeak
 from .ir import Modules, CombPrimitive, CallExpr, CombSpecialized
 
 
@@ -20,6 +21,16 @@ class IntAdd(IntBinaryOp):
             return IntValue(i0.value + i1.value)
         return CallExpr(self, pargs, args)
 
+class IntSub(IntBinaryOp):
+    name = QSym("i","add")
+    def eval(self, *args, pargs):
+        assert len(pargs) == 0
+        assert len(args) == 2
+        i0, i1 = args
+        if isinstance(i0, IntValue) and isinstance(i1, IntValue):
+            return IntValue(i0.value - i1.value)
+        return CallExpr(self, pargs, args)
+
 class IntMul(IntBinaryOp):
     name = QSym("i","mul")
     def eval(self, *args, pargs):
@@ -34,15 +45,19 @@ class IntModule(Module):
     # Types
     name = 'i'
 
-    prim_map = dict(
+    opdict = dict(
         add=IntAdd(),
+        sub=IntSub(),
         mul=IntMul(),
     )
     def comb_from_sym(self, qsym: QSym):
         assert qsym.module == self.name
-        if qsym.name not in self.prim_map:
+        if qsym.name not in self.opdict:
             raise NotImplementedError()
-        return self.prim_map[qsym.name]
+        return self.opdict[qsym.name]
+
+    def get(self, name):
+        return self.opdict.get(name)
 
 class BVConst(CombPrimitive):
     name = QSym('bv', 'const')
@@ -117,7 +132,7 @@ _binops = dict(
     sub=(lambda x, y: x - y, False),
     mul=(lambda x, y: x * y, True),
     and_=(lambda x, y: x & y, True),
-    or_=(lambda x, y: x & y, True),
+    or_=(lambda x, y: x | y, True),
     xor=(lambda x, y: x ^ y, True),
 )
 
@@ -127,11 +142,51 @@ _unary_ops = dict(
     not_=lambda x: ~x,
 )
 
+
+
+from peak import family_closure, Peak
+def concat_peak(lsbs, msbs):
+    BV = ht.BitVector
+    @family_closure
+    def concat_fc(family):
+        @family.assemble(locals(), globals())
+        class Concat(Peak):
+            def __call__(self, x: BV[lsbs], y: BV[msbs]) -> BV[lsbs+msbs]:
+                return x.concat(y)
+        return Concat
+    return concat_fc
+
+class BVConcat(CombPeak):
+    name = QSym("bv", "concat")
+    def __init__(self):
+        super().__init__(concat_peak, 2, lambda lsbs, msbs: ((lsbs, msbs), lsbs+msbs))
+
+def slice_peak(o, l, h):
+    BV = ht.BitVector
+    @family_closure
+    def slice_fc(family):
+        @family.assemble(locals(), globals())
+        class Slice(Peak):
+            def __call__(self, x: BV[o]) -> BV[o+l-h]:
+                return x[l:h]
+        return Slice
+    return slice_fc
+
+class BVSlice(CombPeak):
+    name = QSym("bv", "slice")
+    def __init__(self):
+        super().__init__(slice_peak, 3, lambda o, l, h: (o, o - (h-l)))
+
+
 class BitVectorModule(Module):
     # Types
     name = 'bv'
     def __init__(self):
-        opdict = {'const':BVConst()}
+        opdict = dict(
+            const=BVConst(),
+            concat=BVConcat(),
+            slice=BVSlice(),
+        )
         for name, (fun, comm) in _binops.items():
             opdict[name] = create_BVBinary(name, fun, comm)
         for name, fun in _unary_ops.items():

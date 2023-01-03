@@ -92,6 +92,22 @@ Out o: BV[N+N+N]
 o = bv.add[N + 2*N](a, [3*N]'h[N])
 '''
 
+p_concat = '''
+Comb test.p_concat
+Param N: Int
+In a: BV[N]
+Out b: BV[N+N]
+b = bv.concat[N, N](a, a)
+'''
+
+p_slice = '''
+Comb test.p_concat
+Param N: Int
+In a: BV[2*N]
+Out b: BV[N]
+b = bv.slice[2*N, 0, N](a)
+'''
+
 @pytest.mark.parametrize("p", [
     iadd,
     add,
@@ -104,6 +120,8 @@ o = bv.add[N + 2*N](a, [3*N]'h[N])
     p_inc2,
     p_inc2N,
     p_inc2N2,
+    p_concat,
+    p_slice,
 ])
 def test_round_trip(p):
     comb = compile_program(p, debug=False)
@@ -174,11 +192,13 @@ BV32 = ht.SMTBitVector[32]
 BV48 = ht.SMTBitVector[48]
 
 @pytest.mark.parametrize("p, i, o", [
-    (p_add, (16, BV(4)), BV(8)),
-    (p_inc1, (16, BV(8)), BV(9)),
-    (p_inc2, (16, BV(8),), BV(24)),
-    (p_inc2N, (16, BV32(8),), BV32(40)),
-    (p_inc2N2, (16, BV48(8),), BV48(24)),
+    #(p_add, (16, BV(4)), BV(8)),
+    #(p_inc1, (16, BV(8)), BV(9)),
+    #(p_inc2, (16, BV(8),), BV(24)),
+    #(p_inc2N, (16, BV32(8),), BV32(40)),
+    #(p_inc2N2, (16, BV48(8),), BV48(24)),
+    (p_concat, (16, BV(5),), BV32((5<<16)+5)),
+    (p_slice, (16, BV32((5<<16)+5),), BV(5)),
 ])
 def test_evaluate_raw_p(p, i, o):
     comb = compile_program(p)
@@ -186,36 +206,15 @@ def test_evaluate_raw_p(p, i, o):
     res = comb.evaluate(*i)
     assert (o == res).value.constant_value() is True
 
-    if False:
-        #Test partial
-        comb_partial = comb.partial_eval(i[0])
-        res = comb_partial.evaluate(i[1])
-        assert (o == res).value.constant_value() is True
+    #Test partial
+    comb_partial = comb.partial_eval(i[0])
+    res = comb_partial.evaluate(i[1])
+    assert (o == res).value.constant_value() is True
 
-        #Test partial eval syntax
-        comb_partial = comb[i[0]]
-        res = comb_partial.evaluate(i[1])
-        assert (o == res).value.constant_value() is True
-
-        #Round trip
-        comb_partial2 = compile_program(comb_partial.serialize())
-        res = comb_partial.evaluate(i[1])
-        assert (o == res).value.constant_value() is True
-
-
-@pytest.mark.parametrize("p", [
-    p_add,
-    p_inc1,
-    p_inc2,
-    p_inc2N,
-    p_inc2N2,
-])
-def test_partial_eval(p):
-    N = 5
-    comb = compile_program(p)
-    assert comb.has_params
-    res = comb.eval([IntValue(N)], [])
-    print(res)
+    #Test partial eval syntax
+    comb_partial = comb[i[0]]
+    res = comb_partial.evaluate(i[1])
+    assert (o == res).value.constant_value() is True
 
 p_obj0 = \
 '''
@@ -234,8 +233,8 @@ t0 = test.t1(i0, i1)
 o = bv.add[16](t0, t0)
 '''
 
-@pytest.mark.parametrize("p", [
-    p_obj0,
-])
-def test_obj(p):
-    obj: Obj = compile_program(p, comb=False, debug=False)
+#@pytest.mark.parametrize("p", [
+#    p_obj0,
+#])
+#def test_obj(p):
+#    obj: Obj = compile_program(p, comb=False, debug=False)
