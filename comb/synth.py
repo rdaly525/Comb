@@ -259,13 +259,13 @@ class SynthQuery:
 
     #Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
-    def gen_all_sols(self, logic=QF_BV, maxloops=2000, solver_name="z3", verbose=False, permutations=True):
+    def gen_all_sols(self, logic=QF_BV, max_iters=2000, solver_name="z3", verbose=False, permutations=True):
         sol = True
         exclude_list = []
         sols = []
         while True:
             try:
-                sol = self.cegis(logic, maxloops, solver_name, verbose, exclude_list=exclude_list)
+                sol = self.cegis(logic, max_iters, solver_name, verbose, exclude_list=exclude_list)
             except IterLimitError:
                 print("MAXITER")
                 break
@@ -304,9 +304,9 @@ class SynthQuery:
         return True
 
 
-    def cegis(self, logic=QF_BV, maxloops=1000, solver_name="z3", verbose=False, exclude_list=[]):
+    def cegis(self, logic=QF_BV, max_iters=1000, solver_name="z3", verbose=False, exclude_list=[]):
 
-        assert maxloops > 0
+        assert max_iters > 0
         if not self.types_viable():
             if verbose:
                 print("Typing incompatible")
@@ -329,7 +329,7 @@ class SynthQuery:
             # Start with checking all A vals beings 0
             A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
             solver.add_assertion(query.substitute(A_vals).simplify())
-            for i in range(maxloops):
+            for i in range(max_iters):
                 if verbose and i%50==0:
                     print(f".{i}", end='', flush=True)
                 E_res = solver.solve()
@@ -350,10 +350,10 @@ class SynthQuery:
                         A_vals = {v: model.get_value(v) for v in A_vars}
                         solver.add_assertion(query.substitute(A_vals).simplify())
 
-            raise IterLimitError(f"Unknown result in CEGIS in {maxloops} number of iterations")
+            raise IterLimitError(f"Unknown result in CEGIS in {max_iters} number of iterations")
 
-    def cegis_comb(self, logic=QF_BV, maxloops=1000, solver_name="z3", verbose=True):
-        E_vals = self.cegis(logic, maxloops, solver_name, verbose)
+    def cegis_comb(self, logic=QF_BV, max_iters=1000, solver_name="z3", verbose=True):
+        E_vals = self.cegis(logic, max_iters, solver_name, verbose)
         if E_vals is not None:
             return self.comb_from_solved(E_vals)
 
