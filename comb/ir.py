@@ -1,4 +1,6 @@
 import typing as tp
+from collections import OrderedDict
+
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ParamDecl, TypeCall, \
     InDecl, Type, OutDecl, IntValue, _CallExpr, Node, IntType, _list_to_str
 from .ast import dataclass
@@ -226,5 +228,13 @@ class CombProgram(Comb):
                 return
             raise TypeError(f"TC: Type check failed: \n{f.serialize()}")
 
+class Obj(Node):
+    def __init__(self, combs):
+        super().__init__(*combs)
+        self.comb_dict = OrderedDict({str(comb.name): comb for comb in combs})
 
-Modules = {}
+    def __str__(self):
+        return "\n\n".join(str(comb) for comb in self.comb_dict.values())
+
+    def serialize(self):
+        return str(self)

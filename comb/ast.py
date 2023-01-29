@@ -228,12 +228,15 @@ class ASTAssignStmt(Stmt):
     def __str__(self):
         return f"{_list_to_str(self.lhss)} = {_list_to_str(self.rhss)}"
 
-class Obj:
-    def __init__(self, combs):
-        super().__init__(self, *combs)
-        assert all(isinstance(comb, Comb) for comb in combs)
-        self.comb_dict = {comb.name:comb for comb in combs}
 
+class ASTObj(Node):
+    def __init__(self, combs):
+        super().__init__(*combs)
+        assert all(isinstance(comb, ASTCombProgram) for comb in combs)
+        self.combs = combs
+
+    def __str__(self):
+        return ",".join(str(comb.name) for comb in self.combs)
 
 class Comb(Node):
     commutative = False
@@ -336,19 +339,18 @@ class ASTCombProgram(Comb):
 
 #Software Module
 class Module:
-    name: str
-
-    #@abc.abstractmethod
-    #def type_from_sym(self, qsym: QSym) -> 'ASTType':
-    #    ...
+    def __init__(self, name: str):
+        self.name = name
+        self.comb_dict = {}
 
     @abc.abstractmethod
     def comb_from_sym(self, qsym: QSym) -> 'ASTCombProgram':
-        ...
+        if qsym in self.comb_dict:
+            return self.comb_dict[qsym]
+        raise ValueError(f"{qsym} not defined in module {self.name}")
 
-
-#Contains a set of module declarations, comb definitions, etc...
-class Object:
-    modules: tp.List[Module]
-
-
+    def _add_comb(self, comb: Comb):
+        assert comb.name.module == self.name
+        if comb.name in self.comb_dict:
+            raise ValueError(f"Cannot overwirte {comb.name} in {self.name}")
+        self.comb_dict[comb.name] = comb

@@ -272,7 +272,7 @@ def p_combs_1(p):
 
 def p_obj_0(p):
     'obj : combs'
-    p[0] = Obj(p[1])
+    p[0] = ASTObj(p[1])
 
 # Error rule for syntax errors
 def p_error(p):

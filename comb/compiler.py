@@ -1,16 +1,27 @@
+from .ast import ASTObj, QSym, Module
 from .lexer import get_parser, lexer
 from .passes import SymRes, VerifyNoAST
+from .stdlib import GlobalModules
 
-def compile_program(program: str, debug=False, yacc_start='comb'):
+
+def compile_program(program: str, debug=False):
+    yacc_start = 'obj'
     parser = get_parser(yacc_start)
-    acomb = parser.parse(program, lexer=lexer, debug=debug)
-    if acomb is None:
+    aobj = parser.parse(program, lexer=lexer, debug=debug)
+    if aobj is None:
         raise ValueError("Syntax Error!!!")
-    comb = symbol_resolution(acomb)
+    comb = symbol_resolution(aobj)
     return comb
 
 
-def symbol_resolution(acomb):
-    comb = SymRes().run(acomb)
+def symbol_resolution(aobj: ASTObj):
+    modules = {}
+    for acomb in aobj.combs:
+        cname: QSym = acomb.name
+        if cname.module in GlobalModules:
+            raise NotImplementedError("Cannot redefine pre-existing modules: " + str(cname))
+        if cname.module not in modules:
+            modules[cname.module] = Module(cname.module)
+    comb = SymRes(modules).run(aobj)
     VerifyNoAST().run(comb)
     return comb

@@ -1,10 +1,13 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
-    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, Obj, Node, _list_to_str
-from .ir import CombProgram, AssignStmt, CallExpr, _flat, _make_list
+    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, ASTObj, Node, _list_to_str
+from .ir import CombProgram, AssignStmt, CallExpr, _flat, _make_list, Obj
 from DagVisitor import Visitor
 from .stdlib import GlobalModules
 class SymRes(Visitor):
+
+    def __init__(self, modules):
+        self.modules = modules
 
     def run(self, node: Node):
         assert isinstance(node, Node)
@@ -22,9 +25,13 @@ class SymRes(Visitor):
         self.new_node[node] = type(node)(node.sym, self.new_node[node.type])
 
     def visit_QSym(self, qsym: QSym):
-        if qsym.module not in GlobalModules:
+        if qsym.module in GlobalModules:
+            comb = GlobalModules[qsym.module].comb_from_sym(qsym)
+        elif qsym.module in self.modules:
+            comb = self.modules[qsym.module].comb_from_sym(qsym)
+        else:
             raise ValueError("Missing module ", qsym.module)
-        self.new_node[qsym] = GlobalModules[qsym.module].comb_from_sym(qsym)
+        self.new_node[qsym] = comb
 
     def visit_ASTCallExpr(self, expr: ASTCallExpr):
         Visitor.generic_visit(self, expr)
@@ -50,10 +57,16 @@ class SymRes(Visitor):
     def visit_ASTCombProgram(self, acomb: ASTCombProgram):
         Visitor.generic_visit(self, acomb)
         new_stmts = [self.new_node[stmt] for stmt in acomb.stmts]
-        self.new_node[acomb] = CombProgram(acomb.name, new_stmts)
+        comb = CombProgram(acomb.name, new_stmts)
+        self.new_node[acomb] = comb
+        #Add comb to module
+        assert comb.name.module in self.modules
+        self.modules[comb.name.module]._add_comb(comb)
 
-    def visit_Obj(self, obj: Obj):
-        return Obj([self.new_node[comb] for comb in obj])
+    def visit_ASTObj(self, aobj: ASTObj):
+        Visitor.generic_visit(self, aobj)
+        new_combs = [self.new_node[comb] for comb in aobj.combs]
+        self.new_node[aobj] = Obj(new_combs)
 
 class VerifyNoAST(Visitor):
     def run(self, node):
