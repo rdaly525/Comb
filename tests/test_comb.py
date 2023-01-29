@@ -1,7 +1,8 @@
 from comb.compiler import  compile_program
 import pytest
 import hwtypes as ht
-from comb.ast import Obj, BVValue, IntValue, TypeCall
+from comb.ast import BVValue, IntValue, TypeCall
+from comb.ir import Obj
 
 iadd = '''
 Comb test.iadd
@@ -215,26 +216,3 @@ def test_evaluate_raw_p(p, i, o):
     comb_partial = comb[i[0]]
     res = comb_partial.evaluate(i[1])
     assert (o == res).value.constant_value() is True
-
-p_obj0 = \
-'''
-Comb test.t1
-In i0 : BV[16]
-In i1 : BV[16]
-Out o : BV[16]
-t0 = bv.add[16](i0, i1)
-o = bv.add[16](t0, t0)
-
-Comb test.t0
-In i0 : BV[16]
-In i1 : BV[16]
-Out o : BV[16]
-t0 = test.t1(i0, i1)
-o = bv.add[16](t0, t0)
-'''
-
-#@pytest.mark.parametrize("p", [
-#    p_obj0,
-#])
-#def test_obj(p):
-#    obj: Obj = compile_program(p, comb=False, debug=False)

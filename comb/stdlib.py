@@ -3,7 +3,7 @@ import functools
 import hwtypes as ht
 from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
 from .comb_peak import CombPeak
-from .ir import Modules, CombPrimitive, CallExpr, CombSpecialized
+from .ir import CombPrimitive, CallExpr, CombSpecialized
 
 
 class IntBinaryOp(CombPrimitive):
@@ -43,7 +43,9 @@ class IntMul(IntBinaryOp):
 
 class IntModule(Module):
     # Types
-    name = 'i'
+
+    def __init__(self):
+        super().__init__('i')
 
     opdict = dict(
         add=IntAdd(),
@@ -180,8 +182,8 @@ class BVSlice(CombPeak):
 
 class BitVectorModule(Module):
     # Types
-    name = 'bv'
     def __init__(self):
+        super().__init__('bv')
         opdict = dict(
             const=BVConst(),
             concat=BVConcat(),
