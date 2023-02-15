@@ -125,13 +125,13 @@ b = bv.slice[2*N, 0, N](a)
     p_slice,
 ])
 def test_round_trip(p):
-    comb = compile_program(p, debug=False)
-    p1 = comb.serialize()
-    comb1 = compile_program(p1)
-    assert comb.serialize() == comb1.serialize()
-    assert str(comb) == str(comb1)
-    assert hash(comb) == hash(comb1)
-    assert comb == comb1
+    obj = compile_program(p)
+    p1 = obj.serialize()
+    obj1 = compile_program(p1)
+    assert obj.serialize() == obj1.serialize()
+    assert str(obj) == str(obj1)
+    assert hash(obj) == hash(obj1)
+    assert obj == obj1
 
 @pytest.mark.parametrize("p", [
     iadd,
@@ -142,7 +142,8 @@ def test_round_trip(p):
     inc3,
 ])
 def test_eval(p):
-    comb = compile_program(p)
+    obj = compile_program(p)
+    comb = list(obj.comb_dict.values())[0]
     assert not comb.has_params
     pargs = []
     args = comb.create_symbolic_inputs(*pargs, node=True)
@@ -162,7 +163,8 @@ def test_eval(p):
     inc3,
 ])
 def test_evaluate_sym(p):
-    comb = compile_program(p)
+    obj = compile_program(p)
+    comb = list(obj.comb_dict.values())[0]
     assert not comb.has_params
     pargs = []
     args = comb.create_symbolic_inputs(*pargs, node=False)
@@ -180,7 +182,8 @@ BV = ht.SMTBitVector[16]
     (inc3, (BV(8),), BV(8+35)),
 ])
 def test_evaluate_raw(p, i, o):
-    comb = compile_program(p)
+    obj = compile_program(p)
+    comb = list(obj.comb_dict.values())[0]
     assert not comb.has_params
     res = comb.evaluate(*i)
     if isinstance(o, int):
@@ -202,13 +205,15 @@ BV48 = ht.SMTBitVector[48]
     (p_slice, (16, BV32((5<<16)+5),), BV(5)),
 ])
 def test_evaluate_raw_p(p, i, o):
-    comb = compile_program(p)
+    obj = compile_program(p)
+    comb = list(obj.comb_dict.values())[0]
     assert comb.has_params
     res = comb.evaluate(*i)
     assert (o == res).value.constant_value() is True
 
     #Test partial
     comb_partial = comb.partial_eval(i[0])
+    print(comb_partial.call_expr([], []))
     res = comb_partial.evaluate(i[1])
     assert (o == res).value.constant_value() is True
 

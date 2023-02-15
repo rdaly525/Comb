@@ -136,6 +136,7 @@ _binops = dict(
     and_=(lambda x, y: x & y, True),
     or_=(lambda x, y: x | y, True),
     xor=(lambda x, y: x ^ y, True),
+    lshr=(lambda x, y: x << y, True),
 )
 
 _unary_ops = dict(

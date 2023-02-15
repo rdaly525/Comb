@@ -45,6 +45,7 @@ def PE_fc(family):
                 z = x + y
             else:
                 z = x * y
+            return z
     return PE
 
 def test_peak_enum():

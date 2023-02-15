@@ -25,7 +25,8 @@ BV = GlobalModules['bv']
     (pid, 4, 6),
 ])
 def test_discover(p, N: int, exp_N: int):
-    c1 = compile_program(p)
+    obj = compile_program(p)
+    c1 = list(obj.comb_dict.values())[0]
     op_list = [getattr(BV, op)[N] for op in ops]
     N_, combs = discover_up_to_N(c1[N], N, op_list, max_iters=1000)
     assert len(combs) == exp_N
