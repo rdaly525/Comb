@@ -71,13 +71,14 @@ class CombPrimitive(Comb):
 #Comb class which has concrete values for params
 class CombSpecialized(Comb):
     param_types = []
+    specialzied = True
     def __init__(self, comb: Comb, pargs: tp.Tuple[int]):
         assert isinstance(comb, Comb)
         assert len(pargs) == len(comb.param_types)
         assert all(isinstance(pT, IntType) for pT in comb.param_types)
         assert all(isinstance(parg, int) for parg in pargs)
         self.comb = comb
-        self.name = QSym("_", str(comb.name) + "["+", ".join(str(p) for p in pargs) + "]")
+        self.name = comb.name
         self.pargs = [IntValue(parg) for parg in pargs]
 
     def get_type(self):

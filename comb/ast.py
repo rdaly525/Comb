@@ -240,6 +240,7 @@ class ASTObj(Node):
 
 class Comb(Node):
     commutative = False
+    specialzied = False
     param_types = []
     def __init__(self, *args):
         super().__init__(*args)

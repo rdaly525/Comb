@@ -26,8 +26,10 @@ o = bv.mul[8](a, b_p_c)
 
 # A*(B+C) == A*B + A*C
 def test_dist():
-    c1 = compile_program(ab_p_ac)
-    c2 = compile_program(a_bpc)
+    obj1 = compile_program(ab_p_ac)
+    c1 = list(obj1.comb_dict.values())[0]
+    obj2 = compile_program(a_bpc)
+    c2 = list(obj2.comb_dict.values())[0]
     res = verify(c1, c2)
     assert res is None
 
@@ -73,7 +75,8 @@ BV = GlobalModules['bv']
     #(padd4, tuple(it.repeat(BV.add[16], 3)), 144),
 ])
 def test_add(p, ops, num_sols):
-    comb = compile_program(p)
+    obj = compile_program(p)
+    comb = list(obj.comb_dict.values())[0]
     sq = SynthQuery(comb, ops, loc_type_int=False)
     comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
     assert len(comb_sols) == num_sols

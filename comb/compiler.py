@@ -10,8 +10,8 @@ def compile_program(program: str, debug=False):
     aobj = parser.parse(program, lexer=lexer, debug=debug)
     if aobj is None:
         raise ValueError("Syntax Error!!!")
-    comb = symbol_resolution(aobj)
-    return comb
+    obj = symbol_resolution(aobj)
+    return obj
 
 
 def symbol_resolution(aobj: ASTObj):
@@ -22,6 +22,6 @@ def symbol_resolution(aobj: ASTObj):
             raise NotImplementedError("Cannot redefine pre-existing modules: " + str(cname))
         if cname.module not in modules:
             modules[cname.module] = Module(cname.module)
-    comb = SymRes(modules).run(aobj)
-    VerifyNoAST().run(comb)
-    return comb
+    obj = SymRes(modules).run(aobj)
+    VerifyNoAST().run(obj)
+    return obj
