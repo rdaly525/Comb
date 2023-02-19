@@ -1,5 +1,5 @@
 from comb.compiler import compile_program
-from comb.synth import BuckSynth, verify
+from comb.synth import BuckSynth, verify, SolverOpts
 import pytest
 
 
@@ -79,7 +79,14 @@ def test_add(p, ops, num_sols):
     comb = list(obj.comb_dict.values())[0]
     sq = BuckSynth(comb, ops, loc_type_int=False)
     #comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
-    combs = sq.gen_all_sols(logic=None, max_iters=1000, permutations=False, verbose=False)
+    combs = sq.gen_all_sols(
+        permutations=True,
+        opts=SolverOpts(
+            logic=None,
+            max_iters=1000,
+            verbose=False,
+        ),
+    )
     assert len(combs) == num_sols
     for comb_sol in combs:
         res = verify(comb_sol, comb)

@@ -10,7 +10,7 @@ from .ast import Comb, BVValue, OutDecl, TypeCall, BVType, InDecl, Sym, Type
 from .ir import AssignStmt, QSym, _make_list, CombProgram, CallExpr, Obj
 import typing as tp
 import pysmt.shortcuts as smt
-from pysmt.logics import QF_BV
+from pysmt.logics import QF_BV, Logic
 from .stdlib import GlobalModules, make_bv_const
 
 
@@ -39,13 +39,20 @@ def flat(l):
     return [l__ for l_ in l for l__ in l_]
 
 @dataclass
+class SolverOpts:
+    logic: Logic = QF_BV
+    max_iters: int = 1000
+    solver_name: str = "z3"
+    verbose: bool = False
+
+@dataclass
 class Cegis:
     query: ht.SMTBit
     E_vars: tp.Iterable['freevars']
 
-    def cegis(self, logic=QF_BV, max_iters=1000, solver_name="z3", verbose=False, exclude_list=[]):
+    def cegis(self, opts: SolverOpts=SolverOpts(), exclude_list=[]):
 
-        assert max_iters > 0
+        assert opts.max_iters > 0
         query = self.query.value
 
         for sol in exclude_list:
@@ -58,36 +65,49 @@ class Cegis:
         E_vars = set(var.value for var in self.E_vars)  # forall_vars
         A_vars = query.get_free_variables() - E_vars  # exist vars
 
-        with smt.Solver(logic=logic, name=solver_name) as solver:
+        with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
             solver.add_assertion(smt.Bool(True))
 
             # Start with checking all A vals beings 0
             A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
             solver.add_assertion(query.substitute(A_vals).simplify())
-            for i in range(max_iters):
-                if verbose and i%50==0:
+            for i in range(opts.max_iters):
+                if opts.verbose and i%50==0:
                     print(f".{i}", end='', flush=True)
                 E_res = solver.solve()
 
                 if not E_res:
-                    if verbose:
+                    if opts.verbose:
                         print("UNSAT")
                     return None
                 else:
                     E_guess = {v: solver.get_value(v) for v in E_vars}
                     query_guess = query.substitute(E_guess).simplify()
-                    model = smt.get_model(smt.Not(query_guess), solver_name=solver_name, logic=logic)
+                    model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
                     if model is None:
-                        if verbose:
+                        if opts.verbose:
                             print("SAT")
                         return E_guess
                     else:
                         A_vals = {v: model.get_value(v) for v in A_vars}
                         solver.add_assertion(query.substitute(A_vals).simplify())
 
-            raise IterLimitError(f"Unknown result in CEGIS in {max_iters} number of iterations")
+            raise IterLimitError(f"Unknown result in CEGIS in {opts.max_iters} number of iterations")
 
-
+    def cegis_all(self, opts: SolverOpts=SolverOpts()):
+        exclude_list = []
+        sols = []
+        while True:
+            try:
+                sol = self.cegis(opts, exclude_list=exclude_list)
+            except IterLimitError:
+                print("MAXITER")
+                break
+            if sol is None:
+                break
+            sols.append(sol)
+            exclude_list.append(sol)
+        return sols
 
 @dataclass
 class CombSynth:
@@ -105,11 +125,13 @@ class CombSynth:
 
         # Structure
         input_vars = [T.free_var(f"VI_{i}") for i, T in enumerate(iTs)]
+        self.input_vars = input_vars
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
         #const_vars = []
         output_vars = [T.free_var(f"VO_{i}") for i, T in enumerate(oTs)]
+        self.output_vars = output_vars
         op_out_vars = []
         op_in_vars = []
         tot_locs = Ninputs + Nconsts
@@ -305,7 +327,6 @@ class CombSynth:
 
 
     def comb_from_solved(self, lvals, name: QSym):
-
         spec_iTs, spec_oTs = self.comb_type
 
         input_vars, hard_consts, output_vars, op_out_vars, op_in_vars = self.vars
@@ -333,7 +354,6 @@ class CombSynth:
             else:
                 loc = loc - (num_inputs + len(hard_consts))
                 return Sym(f"t{loc}")
-
 
         out_lvar_vals = {}
         in_lvar_vals = {}
@@ -396,20 +416,8 @@ class BuckSynth(Cegis):
 
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
-    def gen_all_sols(self, logic=QF_BV, max_iters=2000, solver_name="z3", verbose=False, permutations=True) -> tp.List[Comb]:
-        exclude_list = []
-        sols = []
-        while True:
-            try:
-                sol = self.cegis(logic, max_iters, solver_name, verbose, exclude_list=exclude_list)
-            except IterLimitError:
-                print("MAXITER")
-                break
-            if sol is None:
-                break
-            sols.append(sol)
-            exclude_list.append(sol)
-
+    def gen_all_sols(self, permutations=True, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
+        sols = self.cegis_all(opts)
         if permutations:
             sols = flat([self.cs.gen_permutations(sol) for sol in sols])
 
@@ -426,11 +434,6 @@ class BuckSynth(Cegis):
             raise ValueError("Somehting went wrong")
         return combs
 
-    #def cegis_comb(self, logic=QF_BV, max_iters=1000, solver_name="z3", verbose=True):
-    #    E_vals = self.cegis(logic, max_iters, solver_name, verbose)
-    #    if E_vals is not None:
-    #        #TODO better solved name
-    #        return self.cs.comb_from_solved(E_vals, QSym("solved", "v0"))
 
 def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
     #Verify that the two interfaces are identical
@@ -456,19 +459,3 @@ def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
             return None
         vals = {v.value: v.value.constant_value() for v in inputs}
         return vals
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
