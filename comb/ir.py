@@ -171,6 +171,10 @@ class CombProgram(Comb):
         lines += [str(stmt) for stmt in self.stmts]
         return "\n".join(lines)
 
+    def serialize_body(self):
+        lines = [str(stmt) for stmt in self.stmts]
+        return "\n".join(lines)
+
     def serialize(self):
         return str(self)
 

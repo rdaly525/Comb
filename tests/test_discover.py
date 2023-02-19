@@ -2,7 +2,7 @@ from comb.compiler import compile_program
 from comb.discover import discover, discover_up_to_N
 from comb.ast import QSym
 from comb.stdlib import BitVectorModule, GlobalModules
-from comb.synth import SynthQuery, verify
+from comb.synth import BuckSynth, verify
 import pytest
 import hwtypes as ht
 

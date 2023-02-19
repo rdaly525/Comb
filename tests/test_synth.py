@@ -1,5 +1,5 @@
 from comb.compiler import compile_program
-from comb.synth import SynthQuery, verify
+from comb.synth import BuckSynth, verify
 import pytest
 
 
@@ -77,9 +77,10 @@ BV = GlobalModules['bv']
 def test_add(p, ops, num_sols):
     obj = compile_program(p)
     comb = list(obj.comb_dict.values())[0]
-    sq = SynthQuery(comb, ops, loc_type_int=False)
-    comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
-    assert len(comb_sols) == num_sols
-    for comb_sol in comb_sols:
+    sq = BuckSynth(comb, ops, loc_type_int=False)
+    #comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
+    combs = sq.gen_all_sols(logic=None, max_iters=1000, permutations=False, verbose=False)
+    assert len(combs) == num_sols
+    for comb_sol in combs:
         res = verify(comb_sol, comb)
         assert res is None
