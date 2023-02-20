@@ -1,5 +1,6 @@
 from comb import Comb
-from comb.synth import Cegis, CombSynth
+from comb.ast import QSym
+from comb.synth import Cegis, CombSynth, SolverOpts
 import hwtypes.smt_utils as fc
 import typing as tp
 
@@ -16,7 +17,7 @@ import typing as tp
 #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
 
 
-class Strat2(Cegis):
+class Strat2Synth(Cegis):
     def __init__(
         self,
         comb_type,
@@ -55,18 +56,13 @@ class Strat2(Cegis):
 
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
-
-        combs = [self.cs.comb_from_solved(sol, name=QSym('Solved', f"v{i}")) for i, sol in enumerate(sols)]
-        if len(set(c.serialize_body() for c in combs)) != len(combs):
-            c0 = combs[0].serialize_body()
-            for i in range(1, len(combs)):
-                if c0 == combs[i].serialize_body():
-                    print(f"BAD!, 0 = {i}")
-                    print(combs[0])
-                    print(combs[i])
-                    print(f"0:", sols[0])
-                    print(f"{i}:", sols[i])
-            raise ValueError("Somehting went wrong")
-        return combs
+    def gen_all_sols(self, opts=SolverOpts()):
+        sols = self.cegis_all(opts)
+        RRs = []
+        for i, sol in enumerate(sols):
+            lhs_comb = self.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
+            rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
+            RRs.append((lhs_comb, rhs_comb))
+        return RRs
 
 

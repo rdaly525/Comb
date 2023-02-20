@@ -72,7 +72,7 @@ class Cegis:
             A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
             solver.add_assertion(query.substitute(A_vals).simplify())
             for i in range(opts.max_iters):
-                if opts.verbose and i%50==0:
+                if opts.verbose and i%10==0:
                     print(f".{i}", end='', flush=True)
                 E_res = solver.solve()
 
@@ -142,7 +142,7 @@ class CombSynth:
             tot_locs += op.num_outputs
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
 
-        lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[len(bin(tot_locs))-2]
+        lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[tot_locs]
 
         #These can be hardcoded
         input_lvars = list(range(len(input_vars)))
@@ -196,10 +196,11 @@ class CombSynth:
 
         #TODO flag?
         #output loc cannot be inputs
-        for lvar in output_lvars:
-            P_in_range.append(lvar >= Ninputs+Nconsts)
+        #for lvar in output_lvars:
+        #    P_in_range.append(lvar >= Ninputs+Nconsts)
 
         # Temp locs are unique
+        #Could simplify to only the first lhs of each stmt
         P_loc_unique = []
         for i in range(len(flat_op_out_lvars)):
             for j in range(i+1, len(flat_op_out_lvars)):
@@ -239,6 +240,18 @@ class CombSynth:
                     P_comm.append(lv0 <= lv1)
 
 
+        def rhss():
+            for lvar in flat(op_in_lvars):
+                yield lvar
+            for lvar in output_lvars:
+                yield lvar
+
+        #All vars are used
+        used = lvar_t(0)
+        for lvar_rhs in rhss():
+            used |= (lvar_t(1) << lvar_rhs)
+        P_used = (used == (2**tot_locs)-1)
+
         P_wfp = [
             And(P_in_range),
             And(P_loc_unique),
@@ -246,6 +259,7 @@ class CombSynth:
             And(P_acyc),
             And(P_same_op),
             And(P_comm),
+            P_used,
         ]
 
         #Locations correspond to vars (P_conn)
