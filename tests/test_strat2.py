@@ -11,20 +11,35 @@ BV = GlobalModules['bv']
 import hwtypes as ht
 
 
+#Issues:
+#   If the inputs are the same type, there are different permutation issues
+#       #It would be safe to add strict argument ordering for inputs of the same type
+#       #I could figure out how to enumerate all the different input orderings
+#   The code line number order is an issue.
+#       Either I need to come up with a encoding of the canonical topological sort 
+#           (Seems kind of impossible)
+#           Maybe not... Could be a cool presentation if I figure it out
+#           I could encode indicator for first line and last line
+#           Perhaps there is a 2D (or ND) location grid which ops could be mapped to
+#           Then I could encoder an indicator for the second dep, and third, etc... ??
+#       OR Just enumerate all other topological sorts and add them as solution constraints
+#           I suspect doing the exercise of enumerating all topological sorts would work
+
 def test_strat2():
-    BV16 = TypeCall(BVType(), [IntValue(16)])
-    lhs = [BV.add[16], BV.mul[16]]
-    rhs = [BV.add[16], BV.mul[16], BV.mul[16]]
-    iT = [BV16 for _ in range(3)]
-    oT = [BV16 for _ in range(1)]
+    N = 4
+    BVN = TypeCall(BVType(), [IntValue(N)])
+    lhs = [BV.add[N], BV.mul[N]]
+    rhs = [BV.add[N], BV.mul[N]]
+    rhs = [BV.add[N], BV.mul[N], BV.mul[N]]
+    iT = [BVN for _ in range(3)]
+    oT = [BVN for _ in range(1)]
     ss = Strat2Synth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,
     )
-    opts = SolverOpts(verbose=True, max_iters=1000, solver_name='z3')
-    sols = ss.gen_all_sols(opts=opts)
-    for l,r in sols:
+    opts = SolverOpts(verbose=1, max_iters=400, solver_name='btor')
+    for l,r in ss.gen_all_sols(opts=opts):
         print("-"*80)
         print(l)
         print("->")

@@ -45,13 +45,27 @@ class SolverOpts:
     solver_name: str = "z3"
     verbose: bool = False
 
+
+def print_e(e):
+    print()
+    for k, v in e.items():
+        print(f"  {k}: {v}")
+
 @dataclass
 class Cegis:
     query: ht.SMTBit
     E_vars: tp.Iterable['freevars']
 
     def cegis(self, opts: SolverOpts=SolverOpts(), exclude_list=[]):
-
+        if opts.verbose==2:
+            show_e = True
+            show_iter = True
+        elif opts.verbose:
+            show_e = False
+            show_iter = True
+        else:
+            show_e = False
+            show_iter = False
         assert opts.max_iters > 0
         query = self.query.value
 
@@ -72,20 +86,22 @@ class Cegis:
             A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
             solver.add_assertion(query.substitute(A_vals).simplify())
             for i in range(opts.max_iters):
-                if opts.verbose and i%10==0:
+                if show_iter and i%10==0:
                     print(f".{i}", end='', flush=True)
                 E_res = solver.solve()
 
                 if not E_res:
-                    if opts.verbose:
+                    if show_iter:
                         print("UNSAT")
                     return None
                 else:
                     E_guess = {v: solver.get_value(v) for v in E_vars}
+                    if show_e and i%100==50:
+                        print_e(E_guess)
                     query_guess = query.substitute(E_guess).simplify()
                     model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
                     if model is None:
-                        if opts.verbose:
+                        if show_iter:
                             print("SAT")
                         return E_guess
                     else:
@@ -96,7 +112,7 @@ class Cegis:
 
     def cegis_all(self, opts: SolverOpts=SolverOpts()):
         exclude_list = []
-        sols = []
+        #sols = []
         while True:
             try:
                 sol = self.cegis(opts, exclude_list=exclude_list)
@@ -105,9 +121,9 @@ class Cegis:
                 break
             if sol is None:
                 break
-            sols.append(sol)
+            #sols.append(sol)
             exclude_list.append(sol)
-        return sols
+            yield sol
 
 @dataclass
 class CombSynth:
@@ -235,6 +251,7 @@ class CombSynth:
         #Strict ordering on arguments of commutative ops
         P_comm = []
         for i, op in enumerate(self.op_list):
+            assert op.commutative
             if op.commutative:
                 for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
                     P_comm.append(lv0 <= lv1)
@@ -430,7 +447,7 @@ class BuckSynth(Cegis):
 
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
-    def gen_all_sols(self, permutations=True, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
+    def gen_all_sols(self, permutations=False, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
         sols = self.cegis_all(opts)
         if permutations:
             sols = flat([self.cs.gen_permutations(sol) for sol in sols])

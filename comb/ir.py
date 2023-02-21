@@ -80,6 +80,7 @@ class CombSpecialized(Comb):
         self.comb = comb
         self.name = comb.name
         self.pargs = [IntValue(parg) for parg in pargs]
+        self.commutative = comb.commutative
 
     def get_type(self):
         return self.comb.get_type(*self.pargs)

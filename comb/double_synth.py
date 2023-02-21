@@ -35,6 +35,7 @@ class Strat2Synth(Cegis):
         And = fc.And
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
+        print(lhs_cs.P_wfp.serialize())
         query = And([
             lhs_cs.P_wfp,
             rhs_cs.P_wfp,
@@ -57,12 +58,9 @@ class Strat2Synth(Cegis):
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
     def gen_all_sols(self, opts=SolverOpts()):
-        sols = self.cegis_all(opts)
-        RRs = []
-        for i, sol in enumerate(sols):
+        for i, sol in enumerate(self.cegis_all(opts)):
             lhs_comb = self.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
             rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
-            RRs.append((lhs_comb, rhs_comb))
-        return RRs
+            yield (lhs_comb, rhs_comb)
 
 
