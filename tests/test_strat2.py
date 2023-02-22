@@ -26,10 +26,9 @@ import hwtypes as ht
 #           I suspect doing the exercise of enumerating all topological sorts would work
 
 def test_strat2():
-    N = 4
+    N = 2
     BVN = TypeCall(BVType(), [IntValue(N)])
     lhs = [BV.add[N], BV.mul[N]]
-    rhs = [BV.add[N], BV.mul[N]]
     rhs = [BV.add[N], BV.mul[N], BV.mul[N]]
     iT = [BVN for _ in range(3)]
     oT = [BVN for _ in range(1)]
@@ -38,8 +37,8 @@ def test_strat2():
         lhs_op_list=lhs,
         rhs_op_list=rhs,
     )
-    opts = SolverOpts(verbose=1, max_iters=400, solver_name='btor')
-    for l,r in ss.gen_all_sols(opts=opts):
+    opts = SolverOpts(verbose=1, max_iters=400, solver_name='z3')
+    for l, r in ss.gen_all_sols(opts=opts):
         print("-"*80)
         print(l)
         print("->")

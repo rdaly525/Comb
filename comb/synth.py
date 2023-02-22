@@ -234,7 +234,6 @@ class CombSynth:
         for o_lvars, i_lvars in zip(op_out_lvars, op_in_lvars):
             P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
 
-
         #Same operations have a strict order
         op_to_i = {}
         for i, op in enumerate(self.op_list):
@@ -247,15 +246,12 @@ class CombSynth:
                     assert i < j
                     P_same_op.append(op_out_lvars[i][0] < op_out_lvars[j][0])
 
-
         #Strict ordering on arguments of commutative ops
         P_comm = []
         for i, op in enumerate(self.op_list):
-            assert op.commutative
             if op.commutative:
                 for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
                     P_comm.append(lv0 <= lv1)
-
 
         def rhss():
             for lvar in flat(op_in_lvars):
@@ -310,7 +306,7 @@ class CombSynth:
         self.P_conn = And(P_conn)
 
 
-    def gen_permutations(self, sol):
+    def gen_op_permutations(self, sol):
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
 
         #Get indices of each commutative op
@@ -326,14 +322,14 @@ class CombSynth:
             lvals = [sol[lvar.value] for lvar in op_in_lvars[i]]
             lvar_perms.append(set(it.permutations(lvals)))
 
-        sols = []
         for lvals in it.product(*lvar_perms):
             lval_list = flat([lval_tuple for lval_tuple in lvals])
             new_vals = {lvar: lval for lvar, lval in zip(lvar_list, lval_list)}
             new_sol = {**sol, **new_vals}
-            sols.append(new_sol)
-        assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
-        return sols
+            yield new_sol
+            #sols.append(new_sol)
+        #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
+        #return sols
 
     #Makes sure the typing makes sense for the query
     def types_viable(self):
@@ -450,7 +446,7 @@ class BuckSynth(Cegis):
     def gen_all_sols(self, permutations=False, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
         sols = self.cegis_all(opts)
         if permutations:
-            sols = flat([self.cs.gen_permutations(sol) for sol in sols])
+            sols = flat([self.cs.gen_op_permutations(sol) for sol in sols])
 
         combs = [self.cs.comb_from_solved(sol, name=QSym('Solved', f"v{i}")) for i, sol in enumerate(sols)]
         if len(set(c.serialize_body() for c in combs)) != len(combs):
