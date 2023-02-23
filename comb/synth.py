@@ -110,9 +110,9 @@ class Cegis:
 
             raise IterLimitError(f"Unknown result in CEGIS in {opts.max_iters} number of iterations")
 
-    def cegis_all(self, opts: SolverOpts=SolverOpts()):
+    #enum_fun takes a single solution and enumerates all 'permutations' of that solution to add to the exclude list
+    def cegis_all(self, opts: SolverOpts=SolverOpts(), enum_fun=None):
         exclude_list = []
-        #sols = []
         while True:
             try:
                 sol = self.cegis(opts, exclude_list=exclude_list)
@@ -121,8 +121,10 @@ class Cegis:
                 break
             if sol is None:
                 break
-            #sols.append(sol)
-            exclude_list.append(sol)
+            if enum_fun is not None:
+                exclude_list += list(enum_fun(sol))
+            else:
+                exclude_list.append(sol)
             yield sol
 
 @dataclass
@@ -131,6 +133,7 @@ class CombSynth:
     op_list: tp.List[Comb]
     const_list: tp.Tuple[int] = ()
     loc_type_int: bool = False
+    prefix: str = ""
 
     def __post_init__(self):
 
@@ -140,24 +143,25 @@ class CombSynth:
         iTs, oTs = self.comb_type
 
         # Structure
-        input_vars = [T.free_var(f"VI_{i}") for i, T in enumerate(iTs)]
+        input_vars = [T.free_var(f"{self.prefix}__VI_{i}") for i, T in enumerate(iTs)]
         self.input_vars = input_vars
+
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
         #const_vars = []
-        output_vars = [T.free_var(f"VO_{i}") for i, T in enumerate(oTs)]
+        output_vars = [T.free_var(f"{self.prefix}__VO_{i}") for i, T in enumerate(oTs)]
         self.output_vars = output_vars
         op_out_vars = []
         op_in_vars = []
         tot_locs = Ninputs + Nconsts
         for i, op in enumerate(self.op_list):
             assert isinstance(op, Comb)
-            op_in_vars.append(op.create_symbolic_inputs(prefix=f"V_op{i}"))
-            op_out_vars.append(op.create_symbolic_outputs(prefix=f"V_op{i}"))
+            op_in_vars.append(op.create_symbolic_inputs(prefix=f"{self.prefix}__V_op{i}"))
+            op_out_vars.append(op.create_symbolic_outputs(prefix=f"{self.prefix}__V_op{i}"))
             tot_locs += op.num_outputs
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
-
+        self.tot_locs = tot_locs
         lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[tot_locs]
 
         #These can be hardcoded
@@ -167,13 +171,16 @@ class CombSynth:
         op_out_lvars = []
         op_in_lvars = []
         for i, op in enumerate(self.op_list):
-            op_out_lvars.append([lvar_t(prefix=f"Lo[{i},{j}]") for j in range(op.num_outputs)])
-            op_in_lvars.append([lvar_t(prefix=f"Li[{i},{j}]") for j in range(op.num_inputs)])
-        output_lvars = [lvar_t(prefix=f"Lo{i}") for i in range(len(output_vars))]
+            op_out_lvars.append([lvar_t(prefix=f"{self.prefix}__Lt[{i},{j}]") for j in range(op.num_outputs)])
+            op_in_lvars.append([lvar_t(prefix=f"{self.prefix}__Li[{i},{j}]") for j in range(op.num_inputs)])
+        output_lvars = [lvar_t(prefix=f"{self.prefix}__Lo{i}") for i in range(len(output_vars))]
+        self.op_in_lvars = op_in_lvars
 
         #get list of lvars (existentially quantified in final query)
         self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars)
         self.lvars = (input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
+
+        self.rhs_lvars = flat(op_in_lvars) + output_lvars
 
         And = fc.And
         #Lib Spec (P_lib)
@@ -195,9 +202,9 @@ class CombSynth:
 
         #op in locs and outputs are in range(0,tot)
 
-        for lvars in [lvars for lvars in op_in_lvars] + [output_lvars]:
-            for lvar in lvars:
-                P_in_range.append(lvar < tot_locs)
+        for lvar in self.rhs_lvars:
+            P_in_range.append(lvar < tot_locs)
+
         #Ints are >= 0
         #BitVectors do not need this check
         if lvar_t is ht.SMTInt:
@@ -305,6 +312,11 @@ class CombSynth:
         self.P_lib = And(P_lib)
         self.P_conn = And(P_conn)
 
+
+    def gen_input_permutations(self, sol):
+        idxs = [it.combinations(indices, 2) for k, indices in self.ivar_by_T.items()]
+        for ids in it.product(*idxs):
+            assert all([len(ids_)==2 for ids_ in ids])
 
     def gen_op_permutations(self, sol):
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars

@@ -28,8 +28,14 @@ import hwtypes as ht
 def test_strat2():
     N = 2
     BVN = TypeCall(BVType(), [IntValue(N)])
+    #lhs = [BV.sub[N]]
+    #rhs = [BV.add[N], BV.not_[N]]*3
+
     lhs = [BV.add[N], BV.mul[N]]
     rhs = [BV.add[N], BV.mul[N], BV.mul[N]]
+
+    #lhs = [BV.sub[N]]
+    #rhs = [BV.sub[N]]
     iT = [BVN for _ in range(3)]
     oT = [BVN for _ in range(1)]
     ss = Strat2Synth(
