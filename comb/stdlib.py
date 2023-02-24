@@ -78,6 +78,7 @@ class BVConst(CombPrimitive):
                 return BVValue(ht.SMTBitVector[N.value](val.value))
         return CallExpr(self, pargs, args)
 
+
 def create_BVUnary(class_name: str, fun):
     class BVBin(CombPrimitive):
         name = QSym('bv', class_name)

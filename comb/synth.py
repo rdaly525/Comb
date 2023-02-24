@@ -12,7 +12,7 @@ import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV, Logic
 from .stdlib import GlobalModules, make_bv_const
-
+import networkx as nx
 
 #import more_itertools as mit
 
@@ -312,11 +312,19 @@ class CombSynth:
         self.P_lib = And(P_lib)
         self.P_conn = And(P_conn)
 
+    def gen_all_program_orders(self, sol):
+        comb = self.comb_from_solved(sol, QSym("_","_"))
+        #Create Graph
+        g = nx.DiGraph()
+        #Run the gen all topographical orderings algorithm
 
-    def gen_input_permutations(self, sol):
-        idxs = [it.combinations(indices, 2) for k, indices in self.ivar_by_T.items()]
-        for ids in it.product(*idxs):
-            assert all([len(ids_)==2 for ids_ in ids])
+        #Translate the ordering to an updated sol and yield
+
+
+    #def gen_input_permutations(self, sol):
+    #    idxs = [it.combinations(indices, 2) for k, indices in self.ivar_by_T.items()]
+    #    for ids in it.product(*idxs):
+    #        assert all([len(ids_)==2 for ids_ in ids])
 
     def gen_op_permutations(self, sol):
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars

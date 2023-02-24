@@ -56,6 +56,15 @@ class Strat2Synth(Cegis):
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 
+
+    def gen_all_program_orders(self, sol):
+        yield from it.product(
+            self.lhs_cs.gen_all_program_orders(sol),
+            self.rhs_cs.gen_all_program_orders(sol),
+        )
+
+
+
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
     def gen_all_sols(self, opts=SolverOpts()):

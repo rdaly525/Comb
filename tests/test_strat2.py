@@ -25,18 +25,33 @@ import hwtypes as ht
 #       OR Just enumerate all other topological sorts and add them as solution constraints
 #           I suspect doing the exercise of enumerating all topological sorts would work
 
+
+Cprog = '''
+Comb c.const
+Param N: Int
+Param val: Int
+Out o: BV[N]
+o = bv.const[N](val)
+'''
+
+
 def test_strat2():
+    obj = compile_program(Cprog)
+    C = list(obj.comb_dict.values())[0]
+
     N = 2
     BVN = TypeCall(BVType(), [IntValue(N)])
-    #lhs = [BV.sub[N]]
-    #rhs = [BV.add[N], BV.not_[N]]*3
 
+    #Synthesize a subtract rule
+    #lhs = [BV.sub[N]]
+    #rhs = [BV.add[N], BV.add[N], BV.not_[N], C[N, 1]]
+    #iT = [BVN for _ in range(2)]
+
+    #Synthesize Distributive rule for Multiplication
     lhs = [BV.add[N], BV.mul[N]]
-    rhs = [BV.add[N], BV.mul[N], BV.mul[N]]
-
-    #lhs = [BV.sub[N]]
-    #rhs = [BV.sub[N]]
+    rhs = [BV.add[N]] + [BV.mul[N]]*2
     iT = [BVN for _ in range(3)]
+
     oT = [BVN for _ in range(1)]
     ss = Strat2Synth(
         comb_type=(iT, oT),
