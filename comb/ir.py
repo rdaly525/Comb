@@ -80,6 +80,7 @@ class CombSpecialized(Comb):
         self.comb = comb
         self.name = comb.name
         self.pargs = [IntValue(parg) for parg in pargs]
+        self.commutative = comb.commutative
 
     def get_type(self):
         return self.comb.get_type(*self.pargs)
@@ -169,6 +170,10 @@ class CombProgram(Comb):
         lines = []
         lines.append(f"Comb {self.name}")
         lines += [str(stmt) for stmt in self.stmts]
+        return "\n".join(lines)
+
+    def serialize_body(self):
+        lines = [str(stmt) for stmt in self.stmts]
         return "\n".join(lines)
 
     def serialize(self):
