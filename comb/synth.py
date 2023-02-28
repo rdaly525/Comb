@@ -29,8 +29,7 @@ def _int_to_pysmt(x: int, sort):
 
 def _to_int(x):
     assert x.is_constant()
-    return x.constant_value()
-
+    return int(x.constant_value())
 
 SBV = ht.SMTBitVector
 SBit = ht.SMTBit
@@ -122,7 +121,8 @@ class Cegis:
             if sol is None:
                 break
             if enum_fun is not None:
-                exclude_list += list(enum_fun(sol))
+                new_exclude = list(enum_fun(sol))
+                exclude_list += new_exclude
             else:
                 exclude_list.append(sol)
             yield sol
@@ -312,19 +312,83 @@ class CombSynth:
         self.P_lib = And(P_lib)
         self.P_conn = And(P_conn)
 
+
+    def fix_comm(self, sol):
+        comm_ids = [i for i, op in enumerate(self.op_list) if op.commutative]
+        v_sols = []
+        for i in comm_ids:
+            lvars = self.op_in_lvars[i]
+            lvals = [sol[lvar.value] for lvar in lvars]
+            vals = sorted([(int(sol[lvar.value].constant_value()), li) for li, lvar in enumerate(lvars)])
+            v_sols.append({lvars[si].value: lvals[oi] for si, (v, oi) in enumerate(vals)})
+
+        new_sol = dict(sol)
+        for d in v_sols:
+            new_sol = {**new_sol, **d}
+        return new_sol
+
+
     def gen_all_program_orders(self, sol):
-        comb = self.comb_from_solved(sol, QSym("_","_"))
-        #Create Graph
+        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+        #Create Graph from sol
+        lvar_to_nid = {}
+        int_to_lval = {}
+        for v in input_lvars:
+            lvar_to_nid[v] = 'In'
+        assert len(hard_const_lvars) == 0
+        ln_to_nid = {}
+
+        nids = []
+        for li, lvars in enumerate(op_out_lvars):
+            tmp_vals = tuple(_to_int(sol[lvar.value]) for lvar in lvars)
+            nid = tmp_vals
+            nids.append((tmp_vals[0], nid))
+            ln_to_nid[li] = nid
+            for v, lvar in zip(tmp_vals, lvars):
+                lvar_to_nid[v] = nid
+                int_to_lval[v] = sol[lvar.value]
+        nids = ["In"] + [v for _, v in sorted(nids)] + ["Out"]
         g = nx.DiGraph()
+        #Add the edges
+        for ti, lvars in enumerate(op_in_lvars):
+            op_nid = ln_to_nid[ti]
+            tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
+            for v, lvar in zip(tmp_vals, lvars):
+                assert v in lvar_to_nid
+                g.add_edge(lvar_to_nid[v], op_nid)
+                int_to_lval[v] = sol[lvar.value]
+
+        #Add Output edges
+        for oval in [_to_int(sol[lvar.value]) for lvar in output_lvars]:
+            assert oval in lvar_to_nid
+            g.add_edge(lvar_to_nid[oval], "Out")
+
+        for k, lval in int_to_lval.items():
+            assert _to_int(lval) == k
+
+        all_lvars = flat(op_in_lvars) + flat(op_out_lvars) + output_lvars
+        i_to_lvars = {}
+        for lvar in all_lvars:
+            v = int(sol[lvar.value].constant_value())
+            i_to_lvars.setdefault(v, []).append(lvar)
+
+        def sort_to_sol(sort):
+            v_sols = []
+            for from_nid, to_nid in zip(nids[1:-1], sort[1:-1]):
+                for from_val, to_val in zip(from_nid, to_nid):
+                    to_lval = int_to_lval[to_val]
+                    v_sols.append({lvar.value: to_lval for lvar in i_to_lvars[from_val]})
+
+            new_sol = dict(sol)
+            for d in v_sols:
+                new_sol = {**new_sol, **d}
+            return new_sol
+
         #Run the gen all topographical orderings algorithm
+        for sort in nx.all_topological_sorts(g):
+            new_sol = sort_to_sol(sort)
+            yield new_sol
 
-        #Translate the ordering to an updated sol and yield
-
-
-    #def gen_input_permutations(self, sol):
-    #    idxs = [it.combinations(indices, 2) for k, indices in self.ivar_by_T.items()]
-    #    for ids in it.product(*idxs):
-    #        assert all([len(ids_)==2 for ids_ in ids])
 
     def gen_op_permutations(self, sol):
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
@@ -381,9 +445,7 @@ class CombSynth:
         iTs, oTs = self.comb_type
         num_inputs = len(iTs)
         #Fill in all the lvars
-        def to_int(val:FNode):
-            return int(val.constant_value())
-        output_lvars = [to_int(lvals[lvar.value]) for lvar in output_lvars]
+        output_lvars = [_to_int(lvals[lvar.value]) for lvar in output_lvars]
         def name_from_loc(loc, src=None):
             if loc < num_inputs:
                 return Sym(f"I{loc}")
@@ -405,8 +467,8 @@ class CombSynth:
         out_lvar_vals = {}
         in_lvar_vals = {}
         for i in range(len(op_out_lvars)):
-            out_lvar_vals[i] = [to_int(lvals[lvar.value]) for lvar in op_out_lvars[i]]
-            in_lvar_vals[i] = [to_int(lvals[lvar.value]) for lvar in op_in_lvars[i]]
+            out_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_out_lvars[i]]
+            in_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_in_lvars[i]]
 
         inputs = [InDecl(name_from_loc(i), T) for i, T in enumerate(spec_iTs)]
         outputs = [OutDecl(name_from_loc(output_lvars[i]), T) for i, T in enumerate(spec_oTs)]
@@ -448,18 +510,6 @@ class BuckSynth(Cegis):
         ])
         E_vars = self.cs.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
-
-        #in fc form
-        #print(self.query.serialize())
-        #Create the massive bitvector
-        #self.unique_dag = {}
-        #for i, _ in enumerate(self.op_list):
-        #    for j, i_lvar in enumerate(op_in_lvars[i]):
-        #        for k in input_lvars:
-        #            self.unique_dag[(i, j, k, 0)] = (i_lvar==k)
-        #        for k, _ in enumerate(self.op_list):
-        #            for l, o_lvar in enumerate(op_out_lvars[k]):
-        #                self.unique_dag[(i,j,k+len(input_lvars),l)] = (i_lvar==o_lvar)
 
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
