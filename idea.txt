@@ -1,0 +1,47 @@
+How do I find all the rewrite rules given my scheme?
+Only save minimal rewrite rules.
+Exclude all constructive examples of rules or excluide direclty in the formula
+
+Is there a way to detect if a rule is within a program. Basically determine if a rule matches
+I could construct direct "does this match" code embedded in the formula. There absolutely is.
+
+If I added those exclusions, I do not think I need to enumerate either 
+  the input permutations
+  nor the program permutations.
+  nor the commutative permutations 
+As long as it was all 'enumerated' in the matching function
+
+Symbolic pattern matching to construct a constrained search
+
+I cannot merely perform symbolic pattern matching. I need a full covering in order to exclude it.
+
+So the issue I am thinking is:
+Lets say I have a very simple rewrite rule ie a.mul -> b.mul
+    Do I really want to exclude any rewrite rule like a*(b+c) -> a*b + a*c.
+    I do not.
+    In order for this to work, I must do full symbolic instruction selection
+        What this means is find a set of rewrite rules whose sum matches all the ops.a
+        then allocate ops to each pattern.
+        Create the inter-pattern constraints
+
+I need to think how plausable this actually is.
+    I think it actually might be plausable. I should get up early to try and implement it.
+    Doing the constructive version (to create all the exclusions) would probably be very helpful.
+There is an interesting sub problem I also need to solve. Basically how can I use a multi-subset of
+the existing rewrite rules
+I could literally code that up in SMT. That is a pretty simple sub problem.
+
+The real question is how to encode all the matches
+
+a.sub(x, y) -> b.sub(x, y)
+
+In X
+In Y
+a.sub(?,?)
+
+
+
+
+
+
+(I had this idea while 15mg high + 2 beers deep)

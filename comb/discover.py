@@ -1,4 +1,7 @@
-from .ast import QSym, Comb
+import dataclasses
+
+from .ast import QSym, Comb, TypeCall, BVType, IntValue
+from .double_synth import Strat2Synth
 from .stdlib import BitVectorModule
 from .synth import BuckSynth, verify, flat, SolverOpts
 import typing as tp
@@ -30,3 +33,59 @@ def discover(spec: Comb, N: int, op_list: tp.List[Comb], const_list = (), opts=S
         combs = sq.gen_all_sols(permutations=False, opts=opts)
         all_combs += combs
     return all_combs
+
+
+def discover_strat2(
+    lhs: tp.List[Comb],
+    rhs: tp.List[Comb],
+    ranges,
+    N,
+    opts
+):
+    rI, rO, rL, rR = ranges
+    BVN = TypeCall(BVType(), [IntValue(N)])
+    for iN, oN in it.product(rI, rO):
+        iT = [BVN for _ in range(iN)]
+        oT = [BVN for _ in range(oN)]
+        for lN, rN in it.product(rL, rR):
+            yield from _discover_strat2(lhs, rhs, lN, rN, (iT, oT), opts=opts)
+
+#Iterate over all possible combinations of the op list
+def _discover_strat2(
+    lhs: tp.List[Comb],
+    rhs: tp.List[Comb],
+    lN: int,
+    rN: int,
+    T,
+    opts=SolverOpts(),
+):
+    iT, oT = T
+    lhs_indices = flat([[i for _ in range(lN)] for i in range(len(lhs))])
+    rhs_indices = flat([[i for _ in range(rN)] for i in range(len(rhs))])
+    multicomb = mit.distinct_combinations
+    for (lhs_id, rhs_id) in it.product(multicomb(lhs_indices, lN), multicomb(rhs_indices, rN)):
+        lhs_ops = [lhs[i] for i in lhs_id]
+        rhs_ops = [rhs[i] for i in rhs_id]
+        print("*"*80)
+        op_strs = ["[" + ", ".join(str(op.name) for op in ops) + "]" for ops in (lhs_ops, rhs_ops)]
+        print(f"{op_strs[0]} -> {op_strs[1]}")
+
+        ss = Strat2Synth(
+            comb_type=(iT, oT),
+            lhs_op_list=lhs_ops,
+            rhs_op_list=rhs_ops,
+        )
+        yield from ss.gen_all_sols(opts=opts)
+
+from dataclasses import dataclass
+@dataclass
+class Start2Discvoer:
+    lhs: tp.List[Comb]
+    rhs: tp.List[Comb]
+    lN: int
+    rN: int
+    opts = SolverOpts(),
+    def __post_init__(self):
+        pass
+
+)

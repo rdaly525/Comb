@@ -239,6 +239,9 @@ class Obj(Node):
         super().__init__(*combs)
         self.comb_dict = OrderedDict({str(comb.name): comb for comb in combs})
 
+    def get(self, k):
+        return self.comb_dict.get(k, None)
+
     def __str__(self):
         return "\n\n".join(str(comb) for comb in self.comb_dict.values())
 

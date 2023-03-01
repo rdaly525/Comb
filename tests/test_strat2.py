@@ -146,3 +146,20 @@ def test_dag():
     )
     opts = SolverOpts(verbose=1, max_iters=400, solver_name='z3')
     verify(ss, opts, 1, debug=True)
+
+def test_addsub():
+    N = 3
+    BVN = TypeCall(BVType(), [IntValue(N)])
+
+    lhs = [BV.add[N]]
+    rhs = [BV.sub[N]]*3
+    iT = [BVN for _ in range(2)]
+
+    oT = [BVN for _ in range(1)]
+    ss = Strat2Synth(
+        comb_type=(iT, oT),
+        lhs_op_list=lhs,
+        rhs_op_list=rhs,
+    )
+    opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
+    verify(ss, opts, 1, debug=True)

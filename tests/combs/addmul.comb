@@ -1,0 +1,13 @@
+Comb am.add
+Param N: Int
+In a: BV[N]
+In b: BV[N]
+Out o: BV[N]
+o = bv.add[N](a, b)
+
+Comb am.mul
+Param N: Int
+In a: BV[N]
+In b: BV[N]
+Out o: BV[N]
+o = bv.mul[N](a, b)
