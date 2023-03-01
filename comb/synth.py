@@ -42,7 +42,7 @@ class SolverOpts:
     logic: Logic = QF_BV
     max_iters: int = 1000
     solver_name: str = "z3"
-    verbose: bool = False
+    verbose: int = 0
 
 
 def print_e(e):
@@ -353,6 +353,8 @@ class CombSynth:
         for ti, lvars in enumerate(op_in_lvars):
             op_nid = ln_to_nid[ti]
             tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
+            #Add edge to input
+            g.add_edge('In', op_nid)
             for v, lvar in zip(tmp_vals, lvars):
                 assert v in lvar_to_nid
                 g.add_edge(lvar_to_nid[v], op_nid)
