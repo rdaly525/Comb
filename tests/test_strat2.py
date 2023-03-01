@@ -1,11 +1,22 @@
 from comb.ast import BVType, IntValue, TypeCall
 from comb.compiler import compile_program
-from comb.synth import verify, SolverOpts
+from comb.synth import verify as synth_verify, SolverOpts
 from comb.double_synth import Strat2Synth
 
 from comb.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
+def verify(ss, opts, gold, debug=False):
+    cnt = 0
+    for l, r in ss.gen_all_sols(opts=opts):
+        assert synth_verify(l, r) is None
+        cnt += 1
+        if debug:
+            print("-" * 80)
+            print(l)
+            print("->")
+            print(r)
+    assert cnt == gold
 
 Cprog = '''
 Comb c.const
@@ -14,7 +25,7 @@ Param val: Int
 Out o: BV[N]
 o = bv.const[N](val)
 '''
-def test_strat2():
+def test_mul_dis():
     obj = compile_program(Cprog)
     C = list(obj.comb_dict.values())[0]
 
@@ -38,15 +49,41 @@ def test_strat2():
         rhs_op_list=rhs,
     )
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
-    cnt = 0
-    for l, r in ss.gen_all_sols(opts=opts):
-        assert verify(l, r) is None
-        cnt += 1
-        print("-"*80)
-        print(l)
-        print("->")
-        print(r)
-    assert cnt == 1
+    verify(ss, opts, 1, debug=True)
+
+
+Cprog = '''
+Comb c.const
+Param N: Int
+Param val: Int
+Out o: BV[N]
+o = bv.const[N](val)
+'''
+def test_add_sub():
+    obj = compile_program(Cprog)
+    C = list(obj.comb_dict.values())[0]
+
+    N = 3
+    BVN = TypeCall(BVType(), [IntValue(N)])
+
+    #Synthesize a subtract rule
+    lhs = [BV.sub[N]]
+    rhs = [BV.add[N], BV.add[N], BV.not_[N], C[N, 1]]
+    iT = [BVN for _ in range(2)]
+    oT = [BVN for _ in range(1)]
+    ss = Strat2Synth(
+        comb_type=(iT, oT),
+        lhs_op_list=lhs,
+        rhs_op_list=rhs,
+    )
+    opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
+
+    #3 solitions currently because of (A+B)+C, (A+C)+B, (B+C)+A
+    #   TODO Think about how to cull these cases
+    #   Idea: What If I had an AddN primitive somehow
+    gold = 3
+    verify(ss, opts, gold, debug=True)
+
 
 prog_iswap = '''
 Comb u.t1
@@ -77,15 +114,7 @@ def test_iswap():
         rhs_op_list=rhs,
     )
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
-    cnt = 0
-    for l, r in ss.gen_all_sols(opts=opts):
-        assert verify(l, r) is None
-        cnt += 1
-        print("-"*80)
-        print(l)
-        print("->")
-        print(r)
-    assert cnt == 1
+    verify(ss, opts, 1, debug=True)
 
 
 prog = '''
@@ -116,12 +145,4 @@ def test_dag():
         rhs_op_list=rhs,
     )
     opts = SolverOpts(verbose=1, max_iters=400, solver_name='z3')
-    cnt = 0
-    for l, r in ss.gen_all_sols(opts=opts):
-        assert verify(l, r) is None
-        cnt += 1
-        print("-"*80)
-        print(l)
-        print("->")
-        print(r)
-    assert cnt == 1
+    verify(ss, opts, 1, debug=True)
