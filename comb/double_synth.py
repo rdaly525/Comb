@@ -56,6 +56,9 @@ class Strat2Synth(Cegis):
         super().__init__(query.to_hwtypes(), E_vars)
 
 
+    def add_rule_cover(self, rules):
+        raise NotImplementedError()
+
     def gen_all_program_orders(self, sol):
         yield from it.product(
             self.lhs_cs.gen_all_program_orders(sol),

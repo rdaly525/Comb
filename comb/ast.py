@@ -246,6 +246,10 @@ class Comb(Node):
         super().__init__(*args)
         self.partial_cache = {}
 
+    @property
+    def qualified_name(self):
+        return str(self.name)
+
     def get_type(self, *pvals):
         raise NotImplementedError()
 

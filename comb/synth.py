@@ -20,6 +20,26 @@ class IterLimitError(Exception):
     pass
 
 
+@dataclass
+class SolverOpts:
+    logic: Logic = QF_BV
+    max_iters: int = 1000
+    solver_name: str = "z3"
+    verbose: int = 0
+
+def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
+    E_vars = f.get_free_variables()
+    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+        solver.add_assertion(f)
+        while solver.solve():
+            sol = {v: solver.get_value(v) for v in E_vars}
+            yield sol
+            #Construct sol
+            sol_term = smt.Bool(True)
+            for var, val in sol.items():
+                sol_term = smt.And(sol_term, smt.Equals(var, val))
+            solver.add_assertion(smt.Not(sol_term))
+
 def _int_to_pysmt(x: int, sort):
     if sort.is_bv_type():
         return smt.BV(x % sort.width, sort.width)
@@ -36,13 +56,6 @@ SBit = ht.SMTBit
 
 def flat(l):
     return [l__ for l_ in l for l__ in l_]
-
-@dataclass
-class SolverOpts:
-    logic: Logic = QF_BV
-    max_iters: int = 1000
-    solver_name: str = "z3"
-    verbose: int = 0
 
 
 def print_e(e):
