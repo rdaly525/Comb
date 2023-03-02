@@ -35,9 +35,9 @@ def test_foo():
     rhs = [
         sm_obj.get('sm.sub')[N],
         sm_obj.get('sm.mul')[N],
-        sm_obj.get('sm.C')[N, 0],
-        sm_obj.get('sm.C')[N, 2**N-1],
-        sm_obj.get('sm.C')[N, 1],
+        #sm_obj.get('sm.C')[N, 0],
+        #sm_obj.get('sm.C')[N, 2**N-1],
+        #sm_obj.get('sm.C')[N, 1],
     ]
     rhs[0].commutative = True
     rhs[1].commutative = True

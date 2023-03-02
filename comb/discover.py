@@ -76,16 +76,3 @@ def _discover_strat2(
             rhs_op_list=rhs_ops,
         )
         yield from ss.gen_all_sols(opts=opts)
-
-from dataclasses import dataclass
-@dataclass
-class Start2Discvoer:
-    lhs: tp.List[Comb]
-    rhs: tp.List[Comb]
-    lN: int
-    rN: int
-    opts = SolverOpts(),
-    def __post_init__(self):
-        pass
-
-)

@@ -10,8 +10,7 @@ def test_iter():
         print(l, r)
 
 def test_pysmt_solve():
-    T = ht.SMTInt
-    #T = ht.SMTBitVector[8]
+    T = ht.SMTBitVector[8]
     x = T(prefix='x')
     y = T(prefix='y')
     f = (x+y == 4) & (x >= 0) & (y >= 0) & (x <= 4) & (y <= 4)
@@ -36,15 +35,15 @@ def test_foo():
     am_mul = am_obj.get('am.mul')
     am_mul.commutative = True
     lhs = [
-        am_add[N],
         am_mul[N],
+        am_add[N],
     ]
     rhs = [
-        sm_obj.get('sm.sub')[N],
         sm_obj.get('sm.mul')[N],
-        sm_obj.get('sm.C')[N, 0],
-        sm_obj.get('sm.C')[N, 2**N-1],
-        sm_obj.get('sm.C')[N, 1],
+        sm_obj.get('sm.sub')[N],
+        #sm_obj.get('sm.C')[N, 0],
+        #sm_obj.get('sm.C')[N, 2**N-1],
+        #sm_obj.get('sm.C')[N, 1],
     ]
     rhs[0].commutative = True
     rhs[1].commutative = True

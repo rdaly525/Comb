@@ -19,6 +19,17 @@ import networkx as nx
 class IterLimitError(Exception):
     pass
 
+#Represnts the raw dag structure of a particular pattern
+class Pattern:
+    def __init__(self, ops):
+        self.ops = ops
+        self.nodes = ['In'] + list(range(len(ops))) + ['Out']
+        self.edges = []
+    def add_edge(self, lhs, rhs):
+        assert len(lhs)==2 and len(rhs)==2
+        assert lhs[0] in self.nodes
+        assert rhs[0] in self.nodes
+        self.edges.append((lhs, rhs))
 
 @dataclass
 class SolverOpts:
@@ -257,7 +268,7 @@ class CombSynth:
         #Same operations have a strict order
         op_to_i = {}
         for i, op in enumerate(self.op_list):
-            op_to_i.setdefault(op.name, []).append(i)
+            op_to_i.setdefault(op.qualified_name, []).append(i)
 
         P_same_op = []
         for op, ilist in op_to_i.items():
@@ -451,14 +462,33 @@ class CombSynth:
             return False
         return True
 
+    def pattern_from_solved(self, sol):
+        spec_iTs, spec_oTs = self.comb_type
+        num_inputs = len(spec_iTs)
+        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+        if len(hard_const_lvars) > 0:
+            raise NotImplementedError()
+        op_out_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_out_lvars]
+        op_in_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_in_lvars]
+        output_lvals = [_to_int(sol[lvar.value]) for lvar in output_lvars]
+        nodes = [(op_out_lvals[i][0], i) for i, _ in enumerate(self.op_list)]
+        sorted_nis = [v[1] for v in sorted(nodes)]
+        sorted_ops = [self.op_list[ni] for ni in sorted_nis]
+        p = Pattern(sorted_ops)
+        for opi, lvals in enumerate(op_in_lvals):
+            for argi, arg in enumerate(lvals):
+                rhs = ()
+                p.add_edge(lhs, rhs)
+
+
+
 
     def comb_from_solved(self, lvals, name: QSym):
         spec_iTs, spec_oTs = self.comb_type
 
         input_vars, hard_consts, output_vars, op_out_vars, op_in_vars = self.vars
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
-        iTs, oTs = self.comb_type
-        num_inputs = len(iTs)
+        num_inputs = len(spec_iTs)
         #Fill in all the lvars
         output_lvars = [_to_int(lvals[lvar.value]) for lvar in output_lvars]
         def name_from_loc(loc, src=None):
