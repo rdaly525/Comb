@@ -80,6 +80,12 @@ class Strat2Synth(Cegis):
         rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r, _ in cover]
         rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r, _ in cover]
 
+        #First goal: Enumerate over all the possible partitions
+        for rule, cnt in cover:
+            rule.lhs_pat
+            
+
+
         lhs = self.lhs_cs
         if len(cover) !=1:
             raise NotImplementedError()
@@ -113,6 +119,10 @@ class Strat2Synth(Cegis):
         #f = from
         #t = to
         #TODO separate out into 'interior' edges and IO edges
+        #foreach allocation of ops to each RR (do the product from both sides)
+        #   pattern match on each side. ie (input_lvars, interior_edge_conds, output_lvars)
+        #   for each enumerated pattern arangement
+        #       attach inputs/outputs of each pattern
         #Interior edges constraint should be done independently for l pat and r pat
         #exterior edges can be grouped together but simultaneously
         #   ie ((l_lvar==l_pos_in0) & (r_lvar==r_pos_in0)) |

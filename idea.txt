@@ -40,6 +40,8 @@ In Y
 a.sub(?,?)
 
 
+The ordering of searching for rules is well defined. Do all (1,1) before any (1,2). Do any (1,2) before (2,2) etc...
+
 
 
 

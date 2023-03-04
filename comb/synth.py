@@ -31,6 +31,11 @@ class Pattern:
         assert rhs[0] in self.nodes
         self.edges.append((lhs, rhs))
 
+    def get_op_dict(self):
+        list_to_dict
+        for i
+
+
 @dataclass
 class SolverOpts:
     logic: Logic = QF_BV
