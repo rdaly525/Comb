@@ -83,9 +83,11 @@ def test_foo():
     ]
     rhs[0].commutative = True
     rhs[1].commutative = True
-    maxL = 2
-    maxR = 2
+    maxL = 1
+    maxR = 1
     ss = SymSelSynth(lhs, rhs, maxL, maxR)
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
     for rule in ss.gen_all(opts):
+        print("RULE")
         print(rule)
+        print("ENDRULE")

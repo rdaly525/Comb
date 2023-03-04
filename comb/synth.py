@@ -1,18 +1,19 @@
 import collections
 import itertools as it
 
-from pysmt.fnode import FNode
-
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
-from .ast import Comb, BVValue, OutDecl, TypeCall, BVType, InDecl, Sym, Type
-from .ir import AssignStmt, QSym, _make_list, CombProgram, CallExpr, Obj
+from .ast import Comb, OutDecl, TypeCall, BVType, InDecl, Sym, Type
+from .ir import AssignStmt, QSym, _make_list, CombProgram
 import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV, Logic
-from .stdlib import GlobalModules, make_bv_const
+from .stdlib import make_bv_const
 import networkx as nx
+
+from .utils import flat, _to_int
+
 
 #import more_itertools as mit
 
@@ -21,16 +22,34 @@ class IterLimitError(Exception):
 
 #Represnts the raw dag structure of a particular pattern
 class Pattern:
-    def __init__(self, ops):
+    def __init__(self, comb_type, ops):
+        self.comb_type = comb_type
         self.ops = ops
         self.op_names = [op.qualified_name for op in self.ops]
         self.nodes = ['In'] + list(range(len(ops))) + ['Out']
         self.edges = []
+
     def add_edge(self, lhs, rhs):
         assert len(lhs)==2 and len(rhs)==2
         assert lhs[0] in self.nodes
         assert rhs[0] in self.nodes
+        if lhs[0] == "In":
+            assert lhs[1] < len(self.comb_type[0])
+        if rhs[0] == "Out":
+            assert rhs[1] < len(self.comb_type[1])
         self.edges.append((lhs, rhs))
+
+    @property
+    def interior_edges(self):
+        yield from (e for e in self.edges if all(isinstance(v, int) for v in (e[0][0], e[1][0])))
+
+    @property
+    def in_edges(self):
+        yield from (e for e in self.edges if e[0][0]=='In')
+
+    @property
+    def out_edges(self):
+        yield from (e for e in self.edges if e[1][0]=='Out')
 
     @property
     def op_dict(self):
@@ -69,16 +88,8 @@ def _int_to_pysmt(x: int, sort):
         assert sort.is_bool_type()
         return smt.Bool(bool(x))
 
-def _to_int(x):
-    assert x.is_constant()
-    return int(x.constant_value())
-
 SBV = ht.SMTBitVector
 SBit = ht.SMTBit
-
-def flat(l):
-    return [l__ for l_ in l for l__ in l_]
-
 
 def print_e(e):
     print()
@@ -210,6 +221,8 @@ class CombSynth:
             op_in_lvars.append([lvar_t(prefix=f"{self.prefix}__Li[{i},{j}]") for j in range(op.num_inputs)])
         output_lvars = [lvar_t(prefix=f"{self.prefix}__Lo{i}") for i in range(len(output_vars))]
         self.op_in_lvars = op_in_lvars
+        self.op_out_lvars = op_out_lvars
+        self.output_lvars = output_lvars
 
         #get list of lvars (existentially quantified in final query)
         self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars)
@@ -244,9 +257,9 @@ class CombSynth:
         #BitVectors do not need this check
         if lvar_t is ht.SMTInt:
             for lvars in (
-                output_lvars,
-                flat(op_out_lvars),
-                flat(op_in_lvars),
+                    output_lvars,
+                    flat(op_out_lvars),
+                    flat(op_in_lvars),
             ):
                 for lvar in lvars:
                     assert isinstance(lvar, lvar_t)
@@ -497,7 +510,7 @@ class CombSynth:
                 lval_to_node[lval] = (i_to_ni[i], argi)
 
         sorted_ops = [self.op_list[i] for ni, i in ni_to_i.items()]
-        p = Pattern(sorted_ops)
+        p = Pattern(self.comb_type, sorted_ops)
         for opi, lvals in enumerate(op_in_lvals):
             for argi, lval in enumerate(lvals):
                 rhs = (i_to_ni[opi], argi)

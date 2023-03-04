@@ -3,7 +3,8 @@ import dataclasses
 from .ast import QSym, Comb, TypeCall, BVType, IntValue
 from .double_synth import Strat2Synth
 from .stdlib import BitVectorModule
-from .synth import BuckSynth, verify, flat, SolverOpts
+from .synth import BuckSynth, verify, SolverOpts
+from .utils import flat
 import typing as tp
 import itertools as it
 

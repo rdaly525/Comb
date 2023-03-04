@@ -1,8 +1,8 @@
 from . import Comb
 from .ast import QSym, TypeCall, BVType, IntValue
 from .double_synth import Strat2Synth
-from .synth import Cegis, CombSynth, SolverOpts, flat, smt_solve_all, _to_int, Pattern
-from .utils import _list_to_counts
+from .synth import Cegis, CombSynth, SolverOpts, smt_solve_all, Pattern
+from .utils import _list_to_counts, flat, _to_int, print_model
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht
@@ -25,10 +25,12 @@ def smart_iter(mL: int, mR: int):
 class Rule:
     lhs_pat: Pattern
     rhs_pat: Pattern
-    #lhs_ids: tp.List[int]
-    #rhs_ids: tp.List[int]
-    #def __post_init__(self):
-    #    self.comb_type = self.lhs_comb.get_type()
+    lhs_ids: tp.List[int] #each id is the index into the SymSynth op list (which has all ops)
+    rhs_ids: tp.List[int]
+    def __post_init__(self):
+        self.lhs_cnt = _list_to_counts(self.lhs_ids)
+        self.rhs_cnt = _list_to_counts(self.rhs_ids)
+        self.comb_type = self.lhs_pat.comb_type
 
     def __str__(self):
         ret = str(self.lhs_pat)
@@ -138,11 +140,18 @@ class SymSelSynth:
                         sol = ss.cegis(opts)
                         if sol is None:
                             break
+                        print_model(sol)
+                        if i==2:
+                            assert 0
                         #lhs_comb = ss.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
                         #rhs_comb = ss.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
                         lhs_pat = ss.lhs_cs.pattern_from_solved(sol)
                         rhs_pat = ss.rhs_cs.pattern_from_solved(sol)
-                        rule = Rule(lhs_pat, rhs_pat)
+                        rule = Rule(lhs_pat, rhs_pat, lhs_ids, rhs_ids)
+                        self.add_rule(rule)
                         yield rule
+                        #Force the new cover to be used in the current it
+                        #Recalculate the covers generator for other Types
                         cur_cover = [(rule, 1)]
                         ss.add_rule_cover(cur_cover)
+                        covers = self.all_rule_covers(lhs_ids, rhs_ids)

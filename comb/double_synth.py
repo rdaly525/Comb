@@ -1,7 +1,7 @@
 from . import Comb
-from .ast import QSym, BoolType, TypeCall, BVType, IntValue
+from .ast import QSym
 from .synth import Cegis, CombSynth, SolverOpts, Pattern
-from .utils import _list_to_counts, _list_to_dict, bucket_combinations
+from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
 
 import hwtypes.smt_utils as fc
 import typing as tp
@@ -19,18 +19,29 @@ import itertools as it
 #  Exists(L1) Forall(V1) P1_wfp(L1) & (P1_lib & P1_conn) => P1_spec
 #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
 
-def comb_type_to_sT(T):
-    Ns = []
-    for t in T:
-        if isinstance(t, BoolType):
-            n = 0
-        else:
-            assert isinstance(t, TypeCall)
-            assert isinstance(t.type, BVType)
-            n = t.pargs[0].value
-            assert isinstance(n, int)
-            Ns.append(n)
-    return _list_to_counts(Ns)
+
+#Yields a map from pattern index to CombSynth index
+def enum_pattern_partitions(p: Pattern, partitions):
+    #Pattern: [A, A, B, C, C, C]
+    #          0  1  2  3  4  5
+    #Have:
+    # A: [a0, a1], B: [b0], C: [c0, c1, c2]
+    # Want:
+    # [
+    #   0: a0, 1: a1, 2: b0, 3: b0
+    #
+    #I need another level of enumeration
+    #I currently have a set of matching ops. Now i need to assign each of those ops to each pattern idx
+    assert set(p.op_dict.keys()) == set(partitions.keys())
+    product_ids = []
+    for op, p_ids in p.op_dict.items():
+        cs_ids = partitions[op]
+        assert len(p_ids) == len(cs_ids)
+        product_ids.append(it.permutations(cs_ids))
+    for op_perms in it.product(*product_ids):
+        for cs_ids, (op, p_ids) in zip(op_perms, p.op_dict.items()):
+            pid_to_csid = {p_id:cs_id for p_id, cs_id in zip(p_ids, cs_ids)}
+            yield pid_to_csid
 
 
 def enum_rule_partitions(op_list, rule_op_cnts):
@@ -53,6 +64,85 @@ def enum_rule_partitions(op_list, rule_op_cnts):
         product_list.append(bucket_combinations(ids, list(op_to_rcnt[op].values())))
     for op_ids in it.product(*product_list):
         yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
+
+
+def match_one_pattern(p: Pattern, cs: CombSynth, pid_to_csid: tp.Mapping[int, int]):
+    #Interior edges
+    interior_edges = []
+    for (li, lai), (ri, rai) in p.interior_edges:
+        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
+        r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
+        interior_edges.append(l_lvar==r_lvar)
+    #Exterior edges
+    in_lvars = {}
+    for (li, lai), (ri, rai) in p.in_edges:
+        assert li == "In"
+        r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
+        in_lvars[lai] = r_lvar
+    out_lvars = {}
+    for (li, lai), (ri, rai) in p.out_edges:
+        assert ri == "Out"
+        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
+        out_lvars[lai] = l_lvar
+    return fc.And(interior_edges), in_lvars, out_lvars
+
+
+def match_pattern(p: Pattern, cs: CombSynth, ri_op_cnts):
+    for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
+        yield match_one_pattern(p, cs, pid_to_csid)
+
+def enum_dags(goal_T, rules):
+    from .symsel_synth import Rule
+    rules: tp.List[Rule] = rules
+    if len(rules) != 1:
+        raise NotImplementedError()
+    goal_iT = comb_type_to_sT(goal_T[0])
+    goal_oT = comb_type_to_sT(goal_T[1])
+    rule_iTs = [comb_type_to_sT(r.lhs_pat.comb_type[0]) for r in rules]
+    rule_oTs = [comb_type_to_sT(r.lhs_pat.comb_type[1]) for r in rules]
+
+    rule_iT = rule_iTs[0]
+    rule_oT = rule_oTs[0]
+
+    if len(goal_iT) != 1:
+        raise NotImplementedError()
+
+    #This strategy will produce invalid graphs
+    poss_src = [("In", i) for i in goal_iT[3]] + [(0, i) for i in rule_oT[3]]
+    snks = [("Out", i) for i in goal_oT[3]] + [(0, i) for i in rule_iT[3]]
+    snk_srcs = [poss_src for _ in snks]
+    for srcs in it.product(*snk_srcs):
+        d = list(zip(srcs, snks))
+        yield d
+
+
+
+    #This represents the 'serial' dag
+    #connections
+    ds = [
+        [
+            (("In",0), (0, 0)),
+            (("In",1), (0, 0)),
+            ((0,0), ("Out", 0)),
+        ],
+        [
+            (("In",0), (0, 0)),
+            (("In",1), (0, 1)),
+            ((0,0), ("Out", 0)),
+        ],
+        [
+            (("In",0), (0, 1)),
+            (("In",1), (0, 0)),
+            ((0,0), ("Out", 0)),
+        ],
+        [
+            (("In",0), (0, 1)),
+            (("In",1), (0, 1)),
+            ((0,0), ("Out", 0)),
+        ],
+    ]
+    #for d in ds:
+    #    yield d
 
 
 class Strat2Synth(Cegis):
@@ -97,6 +187,7 @@ class Strat2Synth(Cegis):
     def add_rule_cover(self, cover):
         from .symsel_synth import Rule
         cover: tp.List[tp.Tuple[Rule, int]] = cover
+        rules = flat([[r for _ in range(cnt)] for r, cnt in cover])
         #Need to get type info for everthing
         #self_iT = comb_type_to_sT(self.comb_type[0])
         #self_oT = comb_type_to_sT(self.comb_type[1])
@@ -117,71 +208,39 @@ class Strat2Synth(Cegis):
 
         lhs_op_list = [op.qualified_name for op in self.lhs_cs.op_list]
         rhs_op_list = [op.qualified_name for op in self.rhs_cs.op_list]
+
+        matches = []
         for lhs_rule_partions in enum_rule_partitions(lhs_op_list, lhs_rule_op_cnts):
             for rhs_rule_partions in enum_rule_partitions(rhs_op_list, rhs_rule_op_cnts):
-                print("%"*80)
-                print(lhs_rule_partions)
-                print(rhs_rule_partions)
-
-
-
-
-
-
-        #pat = cover[0][0].lhs_pat
-
-        #def gen_get_lvar(s: CombSynth):
-        #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = s.lvars
-        #    def get_lvar(id, aid, src=True):
-        #        if id == "In":
-        #            return input_lvars[aid]
-        #        elif id == "Out":
-        #            return output_lvars[aid]
-        #        if src:
-        #            lvars = op_out_lvars
-        #        else:
-        #            lvars = op_in_lvars
-        #        op_idx = pat_idx_to_op_idx[id]
-        #        return lvars[op_idx][aid]
-        #    return get_lvar
-
-        ##associate the ops in pat with the ops in lhs
-        #pat_idx_to_op_idx = {}
-        #input_lvars = []
-        #output_lvars = []
-        #l_get_lvar = gen_get_lvar(self.lhs_cs)
-        #r_get_lvar = gen_get_lvar(self.rhs_cs)
-        #edge_cons = []
-        ##ai = argument index
-        ##f = from
-        ##t = to
-        ##TODO separate out into 'interior' edges and IO edges
-        ##foreach allocation of ops to each RR (do the product from both sides)
-        ##   pattern match on each side. ie (input_lvars, interior_edge_conds, output_lvars)
-        ##   for each enumerated pattern arangement
-        ##       attach inputs/outputs of each pattern
-        ##Interior edges constraint should be done independently for l pat and r pat
-        ##exterior edges can be grouped together but simultaneously
-        ##   ie ((l_lvar==l_pos_in0) & (r_lvar==r_pos_in0)) |
-        ##      ((l_lvar==l_pos_in1) & (r_lvar==r_pos_in1)) |
-        #for ((f_i, f_ai), (t_i, t_ai)) in pat.edges:
-        #    f_lvar = l_get_lvar(f_i, f_ai, src=True)
-        #    t_lvar = l_get_lvar(t_i, t_ai, src=False)
-        #    edge_cons.append(f_lvar==t_lvar)
-
-
-        #Given a set of rules
-        raise NotImplementedError()
-
-
-
-
-
-
-
-
-
-
+                for dag in enum_dags(self.lhs_cs.comb_type, rules):
+                    for ri, rule in enumerate(rules):
+                        lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items()}
+                        rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items()}
+                        lhs_matcher = match_pattern(rule.lhs_pat, self.lhs_cs, lhs_ri_op_cnts)
+                        rhs_matcher = match_pattern(rule.rhs_pat, self.rhs_cs, rhs_ri_op_cnts)
+                        for lhs_match, rhs_match in it.product(lhs_matcher, rhs_matcher):
+                            l_inside, l_in, l_out = lhs_match
+                            r_inside, r_in, r_out = rhs_match
+                            ios = []
+                            for (src, src_i), (snk, snk_i) in dag:
+                                if src=="In":
+                                    l_src_lvar = src_i
+                                    r_src_lvar = src_i
+                                else:
+                                    l_src_lvar = l_out[src_i]
+                                    r_src_lvar = r_out[src_i]
+                                if snk == "Out":
+                                    l_snk_lvar = self.lhs_cs.output_lvars[snk_i]
+                                    r_snk_lvar = self.rhs_cs.output_lvars[snk_i]
+                                else:
+                                    l_snk_lvar = l_in[snk_i]
+                                    r_snk_lvar = r_in[snk_i]
+                                ios.append((l_src_lvar == l_snk_lvar) & (r_src_lvar == r_snk_lvar))
+                            pat = fc.And([l_inside, r_inside, fc.And(ios)])
+                            matches.append(pat)
+        f_matches = fc.Or(matches)
+        print(f_matches.serialize())
+        self.query = self.query & ~(f_matches.to_hwtypes())
 
 
 
@@ -213,7 +272,6 @@ class Strat2Synth(Cegis):
             yield (lhs_comb, rhs_comb)
 
 
-import pysmt.shortcuts as smt
 def gen_input_perms(iTs, sol, l_lvars, r_lvars):
 
     #Current issue. After swap, the commutative ops will be swapped
