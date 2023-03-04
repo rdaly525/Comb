@@ -1,0 +1,24 @@
+import typing as tp
+import itertools as it
+
+def _list_to_counts(vals):
+    ret = {}
+    for v in vals:
+        ret[v] = ret.get(v, 0) + 1
+    return ret
+
+def _list_to_dict(vals):
+    d = {}
+    for i, v in enumerate(vals):
+        d.setdefault(v,[]).append(i)
+    return d
+
+def bucket_combinations(vals: tp.Iterable[tp.Any], buckets: tp.List[int]):
+    assert len(vals) == sum(buckets)
+    if len(buckets)==0:
+        yield []
+    else:
+        for c_vals in it.combinations(vals, buckets[0]):
+            new_vals = set(vals)-set(c_vals)
+            for rest_vals in bucket_combinations(new_vals, buckets[1:]):
+                yield [c_vals] + rest_vals

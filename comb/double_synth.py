@@ -1,6 +1,8 @@
-from comb import Comb
-from comb.ast import QSym, BoolType, TypeCall, BVType, IntValue
-from comb.synth import Cegis, CombSynth, SolverOpts, Pattern
+from . import Comb
+from .ast import QSym, BoolType, TypeCall, BVType, IntValue
+from .synth import Cegis, CombSynth, SolverOpts, Pattern
+from .utils import _list_to_counts, _list_to_dict, bucket_combinations
+
 import hwtypes.smt_utils as fc
 import typing as tp
 import itertools as it
@@ -18,7 +20,6 @@ import itertools as it
 #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
 
 def comb_type_to_sT(T):
-    from .symsel_synth import _list_to_counts
     Ns = []
     for t in T:
         if isinstance(t, BoolType):
@@ -30,6 +31,29 @@ def comb_type_to_sT(T):
             assert isinstance(n, int)
             Ns.append(n)
     return _list_to_counts(Ns)
+
+
+def enum_rule_partitions(op_list, rule_op_cnts):
+    self_op_ids = _list_to_dict(op_list)
+    op_to_rcnt = {op:{} for op in self_op_ids.keys()}
+    for ri, op_cnt in enumerate(rule_op_cnts):
+        for op in self_op_ids.keys():
+            cnt = 0
+            if op in op_cnt:
+                cnt = op_cnt[op]
+            op_to_rcnt[op][ri] = cnt
+
+    #Verify sum of all ops in each rule adds up to total
+
+    product_list = []
+    for op, ids in self_op_ids.items():
+        exp_cnt = len(ids)
+        rcnt = sum(op_to_rcnt[op].values())
+        assert exp_cnt == rcnt
+        product_list.append(bucket_combinations(ids, list(op_to_rcnt[op].values())))
+    for op_ids in it.product(*product_list):
+        yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
+
 
 class Strat2Synth(Cegis):
     def __init__(
@@ -74,63 +98,76 @@ class Strat2Synth(Cegis):
         from .symsel_synth import Rule
         cover: tp.List[tp.Tuple[Rule, int]] = cover
         #Need to get type info for everthing
-        self_iT = comb_type_to_sT(self.comb_type[0])
-        self_oT = comb_type_to_sT(self.comb_type[1])
+        #self_iT = comb_type_to_sT(self.comb_type[0])
+        #self_oT = comb_type_to_sT(self.comb_type[1])
 
-        rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r, _ in cover]
-        rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r, _ in cover]
+        #rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r, _ in cover]
+        #rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r, _ in cover]
 
-        #First goal: Enumerate over all the possible partitions
-        for rule, cnt in cover:
-            rule.lhs_pat
-            
+        #First goal: Enumerate over all the possible partitions.
+        #for each rule, get the op dict count.
+        lhs_rule_op_cnts = []
+        rhs_rule_op_cnts = []
+        for rule, rcnt in cover:
+            lhs_op_cnt = {op: len(ids) for op, ids in rule.lhs_pat.op_dict.items()}
+            rhs_op_cnt = {op: len(ids) for op, ids in rule.rhs_pat.op_dict.items()}
+            for _ in range(rcnt):
+                lhs_rule_op_cnts.append(lhs_op_cnt)
+                rhs_rule_op_cnts.append(rhs_op_cnt)
+
+        lhs_op_list = [op.qualified_name for op in self.lhs_cs.op_list]
+        rhs_op_list = [op.qualified_name for op in self.rhs_cs.op_list]
+        for lhs_rule_partions in enum_rule_partitions(lhs_op_list, lhs_rule_op_cnts):
+            for rhs_rule_partions in enum_rule_partitions(rhs_op_list, rhs_rule_op_cnts):
+                print("%"*80)
+                print(lhs_rule_partions)
+                print(rhs_rule_partions)
 
 
-        lhs = self.lhs_cs
-        if len(cover) !=1:
-            raise NotImplementedError()
-        if cover[0][1] != 1:
-            raise NotImplementedError()
-        pat = cover[0][0].lhs_pat
 
-        def gen_get_lvar(s: CombSynth):
-            input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = s.lvars
-            def get_lvar(id, aid, src=True):
-                if id == "In":
-                    return input_lvars[aid]
-                elif id == "Out":
-                    return output_lvars[aid]
-                if src:
-                    lvars = op_out_lvars
-                else:
-                    lvars = op_in_lvars
-                op_idx = pat_idx_to_op_idx[id]
-                return lvars[op_idx][aid]
-            return get_lvar
 
-        #associate the ops in pat with the ops in lhs
-        pat_idx_to_op_idx = {}
-        input_lvars = []
-        output_lvars = []
-        l_get_lvar = gen_get_lvar(self.lhs_cs)
-        r_get_lvar = gen_get_lvar(self.rhs_cs)
-        edge_cons = []
-        #ai = argument index
-        #f = from
-        #t = to
-        #TODO separate out into 'interior' edges and IO edges
-        #foreach allocation of ops to each RR (do the product from both sides)
-        #   pattern match on each side. ie (input_lvars, interior_edge_conds, output_lvars)
-        #   for each enumerated pattern arangement
-        #       attach inputs/outputs of each pattern
-        #Interior edges constraint should be done independently for l pat and r pat
-        #exterior edges can be grouped together but simultaneously
-        #   ie ((l_lvar==l_pos_in0) & (r_lvar==r_pos_in0)) |
-        #      ((l_lvar==l_pos_in1) & (r_lvar==r_pos_in1)) |
-        for ((f_i, f_ai), (t_i, t_ai)) in pat.edges:
-            f_lvar = l_get_lvar(f_i, f_ai, src=True)
-            t_lvar = l_get_lvar(t_i, t_ai, src=False)
-            edge_cons.append(f_lvar==t_lvar)
+
+
+        #pat = cover[0][0].lhs_pat
+
+        #def gen_get_lvar(s: CombSynth):
+        #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = s.lvars
+        #    def get_lvar(id, aid, src=True):
+        #        if id == "In":
+        #            return input_lvars[aid]
+        #        elif id == "Out":
+        #            return output_lvars[aid]
+        #        if src:
+        #            lvars = op_out_lvars
+        #        else:
+        #            lvars = op_in_lvars
+        #        op_idx = pat_idx_to_op_idx[id]
+        #        return lvars[op_idx][aid]
+        #    return get_lvar
+
+        ##associate the ops in pat with the ops in lhs
+        #pat_idx_to_op_idx = {}
+        #input_lvars = []
+        #output_lvars = []
+        #l_get_lvar = gen_get_lvar(self.lhs_cs)
+        #r_get_lvar = gen_get_lvar(self.rhs_cs)
+        #edge_cons = []
+        ##ai = argument index
+        ##f = from
+        ##t = to
+        ##TODO separate out into 'interior' edges and IO edges
+        ##foreach allocation of ops to each RR (do the product from both sides)
+        ##   pattern match on each side. ie (input_lvars, interior_edge_conds, output_lvars)
+        ##   for each enumerated pattern arangement
+        ##       attach inputs/outputs of each pattern
+        ##Interior edges constraint should be done independently for l pat and r pat
+        ##exterior edges can be grouped together but simultaneously
+        ##   ie ((l_lvar==l_pos_in0) & (r_lvar==r_pos_in0)) |
+        ##      ((l_lvar==l_pos_in1) & (r_lvar==r_pos_in1)) |
+        #for ((f_i, f_ai), (t_i, t_ai)) in pat.edges:
+        #    f_lvar = l_get_lvar(f_i, f_ai, src=True)
+        #    t_lvar = l_get_lvar(t_i, t_ai, src=False)
+        #    edge_cons.append(f_lvar==t_lvar)
 
 
         #Given a set of rules

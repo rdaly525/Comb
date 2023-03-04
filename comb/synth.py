@@ -23,6 +23,7 @@ class IterLimitError(Exception):
 class Pattern:
     def __init__(self, ops):
         self.ops = ops
+        self.op_names = [op.qualified_name for op in self.ops]
         self.nodes = ['In'] + list(range(len(ops))) + ['Out']
         self.edges = []
     def add_edge(self, lhs, rhs):
@@ -31,10 +32,15 @@ class Pattern:
         assert rhs[0] in self.nodes
         self.edges.append((lhs, rhs))
 
-    def get_op_dict(self):
-        list_to_dict
-        for i
+    @property
+    def op_dict(self):
+        cnt = {}
+        for i, op in enumerate(self.op_names):
+            cnt.setdefault(op, []).append(i)
+        return cnt
 
+    def __str__(self):
+        return "\n".join(f"{l} -> {r}" for l,r in self.edges)
 
 @dataclass
 class SolverOpts:
@@ -477,15 +483,31 @@ class CombSynth:
         op_in_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_in_lvars]
         output_lvals = [_to_int(sol[lvar.value]) for lvar in output_lvars]
         nodes = [(op_out_lvals[i][0], i) for i, _ in enumerate(self.op_list)]
-        sorted_nis = [v[1] for v in sorted(nodes)]
-        sorted_ops = [self.op_list[ni] for ni in sorted_nis]
+        #ni is new sorted index
+        #i is original index
+        i_to_ni = {i:ni for ni, (_,i) in enumerate(sorted(nodes))}
+        ni_to_i = {ni:i for ni, (_,i) in enumerate(sorted(nodes))}
+
+        lval_to_node = {}
+        for i in range(num_inputs):
+            lval_to_node[i] = ("In", i)
+        for i, lvals in enumerate(op_out_lvals):
+            for argi, lval in enumerate(lvals):
+                assert lval not in lval_to_node
+                lval_to_node[lval] = (i_to_ni[i], argi)
+
+        sorted_ops = [self.op_list[i] for ni, i in ni_to_i.items()]
         p = Pattern(sorted_ops)
         for opi, lvals in enumerate(op_in_lvals):
-            for argi, arg in enumerate(lvals):
-                rhs = ()
+            for argi, lval in enumerate(lvals):
+                rhs = (i_to_ni[opi], argi)
+                lhs = lval_to_node[lval]
                 p.add_edge(lhs, rhs)
-
-
+        for out_i, lval in enumerate(output_lvals):
+            rhs = ("Out", out_i)
+            lhs = lval_to_node[lval]
+            p.add_edge(lhs, rhs)
+        return p
 
 
     def comb_from_solved(self, lvals, name: QSym):

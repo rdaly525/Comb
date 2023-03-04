@@ -41,6 +41,18 @@ a.sub(?,?)
 
 
 The ordering of searching for rules is well defined. Do all (1,1) before any (1,2). Do any (1,2) before (2,2) etc...
+    This can be easily proven
+
+Issue:
+    If the pattern itself contains independent dags?
+        This is technically possible but only when one side is a single dag and the other are independent dags
+        This is only possible if one side is not independent from the other side
+
+
+
+
+
+
 
 
 

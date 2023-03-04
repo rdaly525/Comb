@@ -1,7 +1,9 @@
-from comb import Comb
-from comb.ast import QSym, TypeCall, BVType, IntValue
-from comb.double_synth import Strat2Synth
-from comb.synth import Cegis, CombSynth, SolverOpts, flat, smt_solve_all, _to_int, Pattern
+from . import Comb
+from .ast import QSym, TypeCall, BVType, IntValue
+from .double_synth import Strat2Synth
+from .synth import Cegis, CombSynth, SolverOpts, flat, smt_solve_all, _to_int, Pattern
+from .utils import _list_to_counts
+
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 import typing as tp
@@ -19,27 +21,19 @@ def smart_iter(mL: int, mR: int):
             if l <= mL and r <= mR:
                 yield (l, r)
 
-def _list_to_counts(vals):
-    ret = {}
-    for v in vals:
-        ret[v] = ret.get(v, 0) + 1
-    return ret
-
 @dataclass
 class Rule:
     lhs_pat: Pattern
     rhs_pat: Pattern
-    lhs_ids: tp.List[int]
-    rhs_ids: tp.List[int]
-    def __post_init__(self):
-        self.lhs_cnt = _list_to_counts(self.lhs_ids)
-        self.rhs_cnt = _list_to_counts(self.rhs_ids)
-        self.comb_type = self.lhs_comb.get_type()
+    #lhs_ids: tp.List[int]
+    #rhs_ids: tp.List[int]
+    #def __post_init__(self):
+    #    self.comb_type = self.lhs_comb.get_type()
 
     def __str__(self):
-        ret = str(self.lhs_comb)
+        ret = str(self.lhs_pat)
         ret += "\n ----->\n"
-        ret += str(self.rhs_comb)
+        ret += str(self.lhs_pat)
         return ret
 
     #def to_pattern(self) -> tp.Tuple[Pattern]:
@@ -144,9 +138,11 @@ class SymSelSynth:
                         sol = ss.cegis(opts)
                         if sol is None:
                             break
-                        lhs_comb = ss.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
-                        rhs_comb = ss.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
-                        rule = Rule(lhs_comb, rhs_comb, lhs_ids, rhs_ids)
+                        #lhs_comb = ss.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
+                        #rhs_comb = ss.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
+                        lhs_pat = ss.lhs_cs.pattern_from_solved(sol)
+                        rhs_pat = ss.rhs_cs.pattern_from_solved(sol)
+                        rule = Rule(lhs_pat, rhs_pat)
                         yield rule
                         cur_cover = [(rule, 1)]
                         ss.add_rule_cover(cur_cover)
