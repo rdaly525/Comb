@@ -71,16 +71,19 @@ def test_foo():
     am_mul = am_obj.get('am.mul')
     am_mul.commutative = True
     lhs = [
+        #am_obj.get('am.add1')[N],
         am_mul[N],
         am_add[N],
     ]
     rhs = [
+        #sm_obj.get('sm.add1')[N],
         sm_obj.get('sm.mul')[N],
         sm_obj.get('sm.sub')[N],
         #sm_obj.get('sm.C')[N, 0],
         #sm_obj.get('sm.C')[N, 2**N-1],
         #sm_obj.get('sm.C')[N, 1],
     ]
+    #TODO UNCOMMENT
     rhs[0].commutative = True
     rhs[1].commutative = True
     maxL = 2

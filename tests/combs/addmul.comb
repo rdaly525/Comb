@@ -11,3 +11,10 @@ In a: BV[N]
 In b: BV[N]
 Out o: BV[N]
 o = bv.mul[N](a, b)
+
+Comb am.add1
+Param N: Int
+In a: BV[N]
+Out o: BV[N]
+one = bv.const[N](1)
+o = bv.add[N](a, one)

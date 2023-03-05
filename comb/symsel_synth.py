@@ -124,7 +124,7 @@ class SymSelSynth:
                 op_strs = ["[" + ", ".join(str(op.name) for op in ops) + "]" for ops in (lhs_ops, rhs_ops)]
                 print(f"{op_strs[0]} -> {op_strs[1]}")
 
-                covers = self.all_rule_covers(lhs_ids, rhs_ids)
+                covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
 
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
                     print("iT:", [str(t) for t in iT])
@@ -154,4 +154,4 @@ class SymSelSynth:
                         #Recalculate the covers generator for other Types
                         cur_cover = [(rule, 1)]
                         ss.add_rule_cover(cur_cover)
-                        covers = self.all_rule_covers(lhs_ids, rhs_ids)
+                        covers.append(cur_cover)
