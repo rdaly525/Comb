@@ -94,55 +94,42 @@ def match_pattern(p: Pattern, cs: CombSynth, ri_op_cnts):
 def enum_dags(goal_T, rules):
     from .symsel_synth import Rule
     rules: tp.List[Rule] = rules
-    if len(rules) != 1:
-        raise NotImplementedError()
     goal_iT = comb_type_to_sT(goal_T[0])
     goal_oT = comb_type_to_sT(goal_T[1])
-    rule_iTs = [comb_type_to_sT(r.lhs_pat.comb_type[0]) for r in rules]
-    rule_oTs = [comb_type_to_sT(r.lhs_pat.comb_type[1]) for r in rules]
-
-    rule_iT = rule_iTs[0]
-    rule_oT = rule_oTs[0]
+    rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r in rules]
+    rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r in rules]
 
     if len(goal_iT) != 1:
         raise NotImplementedError()
 
+    #Create a set of all sources/snks sorted by type
+    srcs = {n:[("In", i) for i in ids] for n, ids in goal_iT.items()}
+    for ri, rule_oT in enumerate(rule_oTs):
+        for n, ids in rule_oT.items():
+            srcs.setdefault(n, []).extend((ri, i) for i in ids)
+    snks = {n:[("Out", i) for i in ids] for n, ids in goal_oT.items()}
+    for ri, rule_iT in enumerate(rule_iTs):
+        for n, ids in rule_iT.items():
+            snks.setdefault(n, []).extend((ri, i) for i in ids)
+
+    snk_list = []
+    src_poss = []
+    for n, n_snks in snks.items():
+        snk_list += n_snks
+        src_poss += [srcs[n] for _ in n_snks]
+
+
     #This strategy will produce invalid graphs
-    poss_src = [("In", i) for i in goal_iT[3]] + [(0, i) for i in rule_oT[3]]
-    snks = [("Out", i) for i in goal_oT[3]] + [(0, i) for i in rule_iT[3]]
-    snk_srcs = [poss_src for _ in snks]
-    for srcs in it.product(*snk_srcs):
-        d = list(zip(srcs, snks))
+    #Easy filter to remove most of the bad connections
+    def invalid_edge(src, snk):
+        return ((src[0] == snk[0])) or ((src[0], snk[0]) == ("In", "Out"))
+    def invalid_edges(src_list):
+        return any(invalid_edge(src, snk) for src, snk in zip(src_list, snk_list))
+
+    for src_list in it.filterfalse(invalid_edges, it.product(*src_poss)):
+        d = zip(src_list, snk_list)
         yield d
 
-
-
-    #This represents the 'serial' dag
-    #connections
-    ds = [
-        [
-            (("In",0), (0, 0)),
-            (("In",1), (0, 0)),
-            ((0,0), ("Out", 0)),
-        ],
-        [
-            (("In",0), (0, 0)),
-            (("In",1), (0, 1)),
-            ((0,0), ("Out", 0)),
-        ],
-        [
-            (("In",0), (0, 1)),
-            (("In",1), (0, 0)),
-            ((0,0), ("Out", 0)),
-        ],
-        [
-            (("In",0), (0, 1)),
-            (("In",1), (0, 1)),
-            ((0,0), ("Out", 0)),
-        ],
-    ]
-    #for d in ds:
-    #    yield d
 
 
 class Strat2Synth(Cegis):
@@ -239,7 +226,7 @@ class Strat2Synth(Cegis):
                             pat = fc.And([l_inside, r_inside, fc.And(ios)])
                             matches.append(pat)
         f_matches = fc.Or(matches)
-        print(f_matches.serialize())
+        print("MATCHES:", len(matches))
         self.query = self.query & ~(f_matches.to_hwtypes())
 
 
