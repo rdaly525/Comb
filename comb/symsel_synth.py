@@ -2,7 +2,7 @@ from . import Comb
 from .ast import QSym, TypeCall, BVType, IntValue
 from .double_synth import Strat2Synth
 from .synth import Cegis, CombSynth, SolverOpts, smt_solve_all, Pattern
-from .utils import _list_to_counts, flat, _to_int, print_model
+from .utils import _list_to_counts, flat, _to_int, print_model, comb_type_to_sT
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht
@@ -107,11 +107,53 @@ class SymSelSynth:
 
     #TODO this should be a more intelligent enumeration in terms of the typing of each op
     def gen_all_T(self, lhs_ops, rhs_ops):
-        BVN = TypeCall(BVType(), [IntValue(3)])
-        for iN in reversed(range(1, 4)):
-            iT = [BVN for _ in range(iN)]
-            oT = [BVN for _ in range(1)]
-            yield (iT, oT)
+        def get_cnt(op, k):
+            return {n:len(ids) for n, ids in comb_type_to_sT(op.get_type()[k]).items()}
+
+        def count(l):
+            ret = {}
+            for d in l:
+                for n, v in d.items():
+                    ret[n] = ret.get(n, 0) + v
+            return ret
+
+        lhs_iTs = count([get_cnt(op, 0) for op in lhs_ops])
+        lhs_oTs = count([get_cnt(op, 1) for op in lhs_ops])
+        rhs_iTs = count([get_cnt(op, 0) for op in rhs_ops])
+        rhs_oTs = count([get_cnt(op, 1) for op in rhs_ops])
+        if len(lhs_oTs) > 1 or len(rhs_oTs) > 1:
+            raise NotImplementedError()
+        max_lhs_oT = {n:1 for n in lhs_oTs.keys()}
+        max_lhs_iT = {n:(cnt-(lhs_oTs.get(n,0) - max_lhs_oT.get(n, 0))) for n,cnt in lhs_iTs.items()}
+        max_rhs_oT = {n:1 for n in rhs_oTs.keys()}
+        max_rhs_iT = {n:(cnt-(rhs_oTs.get(n,0) - max_rhs_oT.get(n, 0))) for n,cnt in rhs_iTs.items()}
+
+        i_keys = set(max_lhs_iT.keys()) | set(max_rhs_iT.keys())
+        o_keys = set(max_lhs_oT.keys()) | set(max_rhs_oT.keys())
+        max_iT = {n: min(max_lhs_iT.get(n, 0), max_rhs_iT.get(n, 0)) for n in i_keys}
+        max_oT = {n: min(max_lhs_oT.get(n, 0), max_rhs_oT.get(n, 0)) for n in o_keys}
+
+
+        def to_BVN(n):
+            if n ==0:
+                raise NotImplementedError()
+            else:
+                BVN = TypeCall(BVType(), [IntValue(n)])
+            return BVN
+        i_poss = {n:list(reversed(range(1,m+1))) for n,m in max_iT.items()}
+        o_poss = {n:list(reversed(range(1,m+1))) for n,m in max_oT.items()}
+        for ivs in it.product(*list(i_poss.values())):
+            iT = []
+            for n, v in zip(i_poss.keys(), ivs):
+                BVN = to_BVN(n)
+                iT += [BVN for _ in range(v)]
+            for ovs in it.product(*list(o_poss.values())):
+                oT = []
+                for n, v in zip(o_poss.keys(), ovs):
+                    BVN = to_BVN(n)
+                    oT += [BVN for _ in range(v)]
+                assert len(oT) == 1
+                yield (iT, oT)
 
     def gen_all(self, opts=SolverOpts()):
         for lN, rN, in smart_iter(self.maxL, self.maxR):

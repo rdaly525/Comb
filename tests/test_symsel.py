@@ -83,7 +83,6 @@ def test_foo():
         #sm_obj.get('sm.C')[N, 2**N-1],
         #sm_obj.get('sm.C')[N, 1],
     ]
-    #TODO UNCOMMENT
     rhs[0].commutative = True
     rhs[1].commutative = True
     maxL = 2

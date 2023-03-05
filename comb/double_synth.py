@@ -226,7 +226,7 @@ class Strat2Synth(Cegis):
                             pat = fc.And([l_inside, r_inside, fc.And(ios)])
                             matches.append(pat)
         f_matches = fc.Or(matches)
-        print("MATCHES:", len(matches))
+        print(f"Excluded {len(matches)} Patterns")
         self.query = self.query & ~(f_matches.to_hwtypes())
 
 
