@@ -73,15 +73,22 @@ def test_foo():
     sm_sub = sm_obj.get('sm.sub')
     sm_sub.commutative = True
     sm_mul = sm_obj.get('sm.mul')
+    sm_addc = sm_obj.get('sm.addC')
     sm_mul.commutative = True
     lhs = [
+        sm_addc[N,1],
+        sm_addc[N,2],
         #am_obj.get('am.add1')[N],
-        am_mul[N],
+        #am_mul[N],
         #am_add[N],
     ]
     rhs = [
-        #sm_obj.get('sm.add1')[N],
-        sm_mul[N],
+        sm_addc[N,1],
+        sm_addc[N,2],
+        #am_mul[N],
+        #am_add[N],
+         #sm_obj.get('sm.add1')[N],
+        #sm_mul[N],
         #sm_sub[N],
         #sm_obj.get('sm.C')[N, 0],
         #sm_obj.get('sm.C')[N, 2**N-1],

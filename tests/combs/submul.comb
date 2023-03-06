@@ -18,9 +18,10 @@ Param val: Int
 Out o: BV[N]
 o = bv.const[N](val)
 
-Comb sm.add1
+Comb sm.addC
 Param N: Int
+Param val: Int
 In a: BV[N]
 Out o: BV[N]
-one = bv.const[N](1)
-o = bv.add[N](a, one)
+c = bv.const[N](val)
+o = bv.add[N](a, c)
