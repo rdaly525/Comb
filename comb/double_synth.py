@@ -32,6 +32,8 @@ def enum_pattern_partitions(p: Pattern, partitions):
     #
     #I need another level of enumeration
     #I currently have a set of matching ops. Now i need to assign each of those ops to each pattern idx
+    if set(p.op_dict.keys()) != set(partitions.keys()):
+        raise ValueError()
     assert set(p.op_dict.keys()) == set(partitions.keys())
     product_ids = []
     for op, p_ids in p.op_dict.items():
@@ -39,9 +41,10 @@ def enum_pattern_partitions(p: Pattern, partitions):
         assert len(p_ids) == len(cs_ids)
         product_ids.append(it.permutations(cs_ids))
     for op_perms in it.product(*product_ids):
+        pid_to_csid = {}
         for cs_ids, (op, p_ids) in zip(op_perms, p.op_dict.items()):
-            pid_to_csid = {p_id:cs_id for p_id, cs_id in zip(p_ids, cs_ids)}
-            yield pid_to_csid
+            pid_to_csid = {**pid_to_csid, **{p_id:cs_id for p_id, cs_id in zip(p_ids, cs_ids)}}
+        yield pid_to_csid
 
 
 def enum_rule_partitions(op_list, rule_op_cnts):
@@ -71,17 +74,23 @@ def match_one_pattern(p: Pattern, cs: CombSynth, pid_to_csid: tp.Mapping[int, in
     interior_edges = []
     for (li, lai), (ri, rai) in p.interior_edges:
         l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
-        r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
+        if ri not in pid_to_csid:
+            raise ValueError()
+        r_csid = pid_to_csid[ri]
+        r_lvars = cs.op_in_lvars[r_csid]
+        r_lvar = r_lvars[rai]
         interior_edges.append(l_lvar==r_lvar)
     #Exterior edges
     in_lvars = {}
     for (li, lai), (ri, rai) in p.in_edges:
         assert li == "In"
+        assert ri != "Out"
         r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
         in_lvars[lai] = r_lvar
     out_lvars = {}
     for (li, lai), (ri, rai) in p.out_edges:
         assert ri == "Out"
+        assert li != "In"
         l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
         out_lvars[lai] = l_lvar
     return fc.And(interior_edges), in_lvars, out_lvars
@@ -126,11 +135,11 @@ def enum_dags(goal_T, rules):
     def invalid_edges(src_list):
         return any(invalid_edge(src, snk) for src, snk in zip(src_list, snk_list))
 
-    for src_list in it.filterfalse(invalid_edges, it.product(*src_poss)):
-        d = zip(src_list, snk_list)
-        yield d
-
-
+    ds = []
+    for src_list in it.product(*src_poss):
+        if not invalid_edges(src_list):
+            ds.append(list(zip(src_list, snk_list)))
+    return ds
 
 class Strat2Synth(Cegis):
     def __init__(
@@ -167,6 +176,7 @@ class Strat2Synth(Cegis):
                 )
             )
         ])
+        #print(lhs_cs.P_wfp.serialize())
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 
@@ -199,32 +209,39 @@ class Strat2Synth(Cegis):
         matches = []
         for lhs_rule_partions in enum_rule_partitions(lhs_op_list, lhs_rule_op_cnts):
             for rhs_rule_partions in enum_rule_partitions(rhs_op_list, rhs_rule_op_cnts):
-                for dag in enum_dags(self.lhs_cs.comb_type, rules):
-                    for ri, rule in enumerate(rules):
-                        lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items()}
-                        rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items()}
-                        lhs_matcher = match_pattern(rule.lhs_pat, self.lhs_cs, lhs_ri_op_cnts)
-                        rhs_matcher = match_pattern(rule.rhs_pat, self.rhs_cs, rhs_ri_op_cnts)
-                        for lhs_match, rhs_match in it.product(lhs_matcher, rhs_matcher):
-                            l_inside, l_in, l_out = lhs_match
-                            r_inside, r_in, r_out = rhs_match
-                            ios = []
-                            for (src, src_i), (snk, snk_i) in dag:
-                                if src=="In":
-                                    l_src_lvar = src_i
-                                    r_src_lvar = src_i
-                                else:
-                                    l_src_lvar = l_out[src_i]
-                                    r_src_lvar = r_out[src_i]
-                                if snk == "Out":
-                                    l_snk_lvar = self.lhs_cs.output_lvars[snk_i]
-                                    r_snk_lvar = self.rhs_cs.output_lvars[snk_i]
-                                else:
-                                    l_snk_lvar = l_in[snk_i]
-                                    r_snk_lvar = r_in[snk_i]
-                                ios.append((l_src_lvar == l_snk_lvar) & (r_src_lvar == r_snk_lvar))
-                            pat = fc.And([l_inside, r_inside, fc.And(ios)])
-                            matches.append(pat)
+                r_matchers = []
+                for ri, rule in enumerate(rules):
+                    lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items()}
+                    rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items()}
+                    lhs_matcher = match_pattern(rule.lhs_pat, self.lhs_cs, lhs_ri_op_cnts)
+                    rhs_matcher = match_pattern(rule.rhs_pat, self.rhs_cs, rhs_ri_op_cnts)
+                    r_matchers.append(it.product(lhs_matcher, rhs_matcher))
+                for r_matches in it.product(*r_matchers):
+                    l_insides = [m[0][0] for m in r_matches]
+                    l_ins = [m[0][1] for m in r_matches]
+                    l_outs = [m[0][2] for m in r_matches]
+                    r_insides = [m[1][0] for m in r_matches]
+                    r_ins = [m[1][1] for m in r_matches]
+                    r_outs = [m[1][2] for m in r_matches]
+                    for dag in enum_dags(self.lhs_cs.comb_type, rules):
+                        ios = []
+                        for d in dag:
+                            (src, src_i), (snk, snk_i) = d
+                            if src=="In":
+                                l_src_lvar = src_i
+                                r_src_lvar = src_i
+                            else:
+                                l_src_lvar = l_outs[src][src_i]
+                                r_src_lvar = r_outs[src][src_i]
+                            if snk == "Out":
+                                l_snk_lvar = self.lhs_cs.output_lvars[snk_i]
+                                r_snk_lvar = self.rhs_cs.output_lvars[snk_i]
+                            else:
+                                l_snk_lvar = l_ins[snk][snk_i]
+                                r_snk_lvar = r_ins[snk][snk_i]
+                            ios.append(fc.And([l_src_lvar == l_snk_lvar, r_src_lvar == r_snk_lvar]))
+                        pat = fc.And([fc.And(l_insides), fc.And(r_insides), fc.And(ios)])
+                        matches.append(pat)
         f_matches = fc.Or(matches)
         print(f"Excluded {len(matches)} Patterns")
         self.query = self.query & ~(f_matches.to_hwtypes())

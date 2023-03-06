@@ -12,7 +12,7 @@ from pysmt.logics import QF_BV, Logic
 from .stdlib import make_bv_const
 import networkx as nx
 
-from .utils import flat, _to_int
+from .utils import flat, _to_int, type_to_N
 
 
 #import more_itertools as mit
@@ -59,7 +59,8 @@ class Pattern:
         return cnt
 
     def __str__(self):
-        return "\n".join(f"{l} -> {r}" for l,r in self.edges)
+        ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
+        return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
 
 @dataclass
 class SolverOpts:
@@ -173,6 +174,26 @@ class Cegis:
                 exclude_list.append(sol)
             yield sol
 
+_vars = {}
+def get_var(name, n_or_T):
+    if isinstance(n_or_T, int):
+        n = n_or_T
+    else:
+        T = n_or_T
+        n = type_to_N(T)
+    assert n >= 0
+    key = (name, n)
+    var_name = f"{name}%{n}"
+    if key in _vars:
+        return _vars[key]
+    if n==0:
+        var = ht.SMTBit(name=var_name)
+    else:
+        var= ht.SMTBitVector[n](name=var_name)
+    _vars[key] = var
+    return var
+
+
 @dataclass
 class CombSynth:
     comb_type: tp.Tuple[tp.Iterable[Type], tp.Iterable[Type]]
@@ -189,26 +210,28 @@ class CombSynth:
         iTs, oTs = self.comb_type
 
         # Structure
-        input_vars = [T.free_var(f"{self.prefix}__VI_{i}") for i, T in enumerate(iTs)]
+        input_vars = [get_var(f"{self.prefix}_V_In{i}", T) for i, T in enumerate(iTs)]
         self.input_vars = input_vars
 
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
         #const_vars = []
-        output_vars = [T.free_var(f"{self.prefix}__VO_{i}") for i, T in enumerate(oTs)]
+        output_vars = [get_var(f"{self.prefix}_V_Out{i}", T) for i, T in enumerate(oTs)]
         self.output_vars = output_vars
         op_out_vars = []
         op_in_vars = []
         tot_locs = Ninputs + Nconsts
-        for i, op in enumerate(self.op_list):
+        for opi, op in enumerate(self.op_list):
             assert isinstance(op, Comb)
-            op_in_vars.append(op.create_symbolic_inputs(prefix=f"{self.prefix}__V_op{i}"))
-            op_out_vars.append(op.create_symbolic_outputs(prefix=f"{self.prefix}__V_op{i}"))
+            op_iTs, op_oTs = op.get_type()
+            op_in_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_in[{i}]", T) for i, T in enumerate(op_iTs)])
+            op_out_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_out[{i}]", T) for i, T in enumerate(op_oTs)])
             tot_locs += op.num_outputs
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
         self.tot_locs = tot_locs
-        lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[tot_locs]
+        lvar_t_width = tot_locs
+        lvar_t = ht.SMTInt if self.loc_type_int and hasattr(ht, "SMTInt") else SBV[lvar_t_width]
 
         #These can be hardcoded
         input_lvars = list(range(len(input_vars)))
@@ -216,10 +239,11 @@ class CombSynth:
         hard_const_lvars = list(range(Ninputs, Ninputs +len(hard_consts)))
         op_out_lvars = []
         op_in_lvars = []
-        for i, op in enumerate(self.op_list):
-            op_out_lvars.append([lvar_t(prefix=f"{self.prefix}__Lt[{i},{j}]") for j in range(op.num_outputs)])
-            op_in_lvars.append([lvar_t(prefix=f"{self.prefix}__Li[{i},{j}]") for j in range(op.num_inputs)])
-        output_lvars = [lvar_t(prefix=f"{self.prefix}__Lo{i}") for i in range(len(output_vars))]
+        for opi, op in enumerate(self.op_list):
+            op_iTs, op_oTs = op.get_type()
+            op_in_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_in[{i}]", lvar_t_width) for i, T in enumerate(op_iTs)])
+            op_out_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width) for i, T in enumerate(op_oTs)])
+        output_lvars = [get_var(f"{self.prefix}_L_out[{i}]", lvar_t_width) for i in range(len(output_vars))]
         self.op_in_lvars = op_in_lvars
         self.op_out_lvars = op_out_lvars
         self.output_lvars = output_lvars

@@ -50,7 +50,15 @@ Issue:
 
 
 
-
+TODO Issues to deal with
+    (mul, mul) -> (mul, mul) does not get properly excluded
+    add1 -> (sub, sub, sub, -1) creates a weird Rule
+    I should try out better filtering methods.
+      What if I literally used the solver to show that it is false?
+    QOL: Cache the variables in the Synth query. Do not create new ones ever new class
+    Given certain rules I can safely not search for certain other 'bigger' rules
+    QOL: discover and assign commutative rules
+    QOL: print rules to DOT
 
 
 

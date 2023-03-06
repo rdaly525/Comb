@@ -30,19 +30,20 @@ def bucket_combinations(vals: tp.Iterable[tp.Any], buckets: tp.List[int]):
 def flat(l: tp.Iterable[tp.List[tp.Any]]) -> tp.List[tp.Any]:
     return [l__ for l_ in l for l__ in l_]
 
-def comb_type_to_sT(T):
-    Ns = []
-    for i, t in enumerate(T):
-        if isinstance(t, BoolType):
-            n = 0
-        else:
-            assert isinstance(t, TypeCall)
-            assert isinstance(t.type, BVType)
-            n = t.pargs[0].value
-            assert isinstance(n, int)
-        Ns.append(n)
-    return _list_to_dict(Ns)
 
+def type_to_N(T: Type):
+    if isinstance(T, BoolType):
+        n = 0
+    else:
+        assert isinstance(T, TypeCall)
+        assert isinstance(T.type, BVType)
+        n = T.pargs[0].value
+        assert isinstance(n, int)
+    return n
+
+def comb_type_to_sT(Ts):
+    Ns = [type_to_N(t) for t in Ts]
+    return _list_to_dict(Ns)
 
 def _to_int(x):
     assert x.is_constant()

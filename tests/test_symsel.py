@@ -70,26 +70,28 @@ def test_foo():
     am_add.commutative = True
     am_mul = am_obj.get('am.mul')
     am_mul.commutative = True
+    sm_sub = sm_obj.get('sm.sub')
+    sm_sub.commutative = True
+    sm_mul = sm_obj.get('sm.mul')
+    sm_mul.commutative = True
     lhs = [
         #am_obj.get('am.add1')[N],
         am_mul[N],
-        am_add[N],
+        #am_add[N],
     ]
     rhs = [
         #sm_obj.get('sm.add1')[N],
-        sm_obj.get('sm.mul')[N],
-        sm_obj.get('sm.sub')[N],
+        sm_mul[N],
+        #sm_sub[N],
         #sm_obj.get('sm.C')[N, 0],
         #sm_obj.get('sm.C')[N, 2**N-1],
         #sm_obj.get('sm.C')[N, 1],
     ]
-    rhs[0].commutative = True
-    rhs[1].commutative = True
     maxL = 2
     maxR = 2
     ss = SymSelSynth(lhs, rhs, maxL, maxR)
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
-    for rule in ss.gen_all(opts):
-        print("RULE")
+    for ri, rule in enumerate(ss.gen_all(opts)):
+        print("RULE", ri)
         print(rule)
         print("ENDRULE")

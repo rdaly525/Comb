@@ -35,7 +35,7 @@ class Rule:
     def __str__(self):
         ret = str(self.lhs_pat)
         ret += "\n ----->\n"
-        ret += str(self.lhs_pat)
+        ret += str(self.rhs_pat)
         return ret
 
     #def to_pattern(self) -> tp.Tuple[Pattern]:
@@ -182,9 +182,6 @@ class SymSelSynth:
                         sol = ss.cegis(opts)
                         if sol is None:
                             break
-                        print_model(sol)
-                        if i==2:
-                            assert 0
                         #lhs_comb = ss.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
                         #rhs_comb = ss.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
                         lhs_pat = ss.lhs_cs.pattern_from_solved(sol)
