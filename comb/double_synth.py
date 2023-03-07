@@ -20,6 +20,7 @@ import itertools as it
 #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
 
 
+#Within a single pattern, match all the patterns
 #Yields a map from pattern index to CombSynth index
 def enum_pattern_partitions(p: Pattern, partitions):
     #Pattern: [A, A, B, C, C, C]
@@ -74,8 +75,6 @@ def match_one_pattern(p: Pattern, cs: CombSynth, pid_to_csid: tp.Mapping[int, in
     interior_edges = []
     for (li, lai), (ri, rai) in p.interior_edges:
         l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
-        if ri not in pid_to_csid:
-            raise ValueError()
         r_csid = pid_to_csid[ri]
         r_lvars = cs.op_in_lvars[r_csid]
         r_lvar = r_lvars[rai]
@@ -211,8 +210,8 @@ class Strat2Synth(Cegis):
             for rhs_rule_partions in enum_rule_partitions(rhs_op_list, rhs_rule_op_cnts):
                 r_matchers = []
                 for ri, rule in enumerate(rules):
-                    lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items()}
-                    rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items()}
+                    lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items() if len(cnts[ri]) > 0}
+                    rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items() if len(cnts[ri]) > 0}
                     lhs_matcher = match_pattern(rule.lhs_pat, self.lhs_cs, lhs_ri_op_cnts)
                     rhs_matcher = match_pattern(rule.rhs_pat, self.rhs_cs, rhs_ri_op_cnts)
                     r_matchers.append(it.product(lhs_matcher, rhs_matcher))

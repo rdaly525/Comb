@@ -154,8 +154,20 @@ class SymSelSynth:
                     oT += [BVN for _ in range(v)]
                 assert len(oT) == 1
                 yield (iT, oT)
+    def num_ss_calls(self):
+        for lN, rN, in smart_iter(self.maxL, self.maxR):
+            lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
+            rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
+            for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                rhs_ops = [self.rhss[i] for i in rhs_ids]
+                for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
+                    yield None
+
 
     def gen_all(self, opts=SolverOpts()):
+        print("TOT:", sum(1 for _ in self.num_ss_calls()))
+        assert 0
         for lN, rN, in smart_iter(self.maxL, self.maxR):
             lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
             rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
@@ -163,13 +175,13 @@ class SymSelSynth:
                 lhs_ops = [self.lhss[i] for i in lhs_ids]
                 rhs_ops = [self.rhss[i] for i in rhs_ids]
                 print("*"*80)
-                op_strs = ["[" + ", ".join(str(op.name) for op in ops) + "]" for ops in (lhs_ops, rhs_ops)]
+                op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
                 print(f"{op_strs[0]} -> {op_strs[1]}")
 
                 covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
 
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                    print("iT:", [str(t) for t in iT])
+                    print("iT:", tuple(str(t) for t in iT))
                     #How to determine the Input/Output Types??
                     ss = Strat2Synth(
                         comb_type=(iT, oT),
