@@ -1,7 +1,8 @@
 import typing as tp
 from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
     IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, ASTObj, Node, _list_to_str
-from .ir import CombProgram, AssignStmt, CallExpr, _flat, _make_list, Obj
+from .ir import CombProgram, AssignStmt, CallExpr, _flat, Obj
+from .utils import _make_list
 from DagVisitor import Visitor
 from .stdlib import GlobalModules
 class SymRes(Visitor):

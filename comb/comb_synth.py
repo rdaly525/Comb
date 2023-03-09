@@ -9,10 +9,10 @@ from hwtypes import smt_utils as fc
 
 from . import Comb
 from .ast import Type, QSym, Sym, TypeCall, BVType, InDecl, OutDecl
-from .ir import _make_list, AssignStmt, CombProgram
+from .ir import AssignStmt, CombProgram
 from .stdlib import make_bv_const
 from .synth import PatternSynth, get_var, SBV, Pattern
-from .utils import flat, _to_int
+from .utils import flat, _to_int, _make_list
 
 
 class CombSynth(PatternSynth):

@@ -1,3 +1,4 @@
+import functools
 import typing as tp
 import itertools as it
 
@@ -54,3 +55,23 @@ def print_model(sol):
     for k, v in sol.items():
         print(f"{k}: {_to_int(v)}")
 
+
+def _make_list(v):
+    if not isinstance(v, (list, tuple)):
+        return [v]
+    else:
+        return list(v)
+
+
+def _unwrap_list(v):
+    if isinstance(v, (list, tuple)) and len(v)==1:
+        return v[0]
+    else:
+        return v
+
+
+def ret_list(f):
+    @functools.wraps(f)
+    def dec(*args, **kwargs):
+        return _make_list(f(*args, **kwargs))
+    return dec

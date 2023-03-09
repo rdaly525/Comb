@@ -3,8 +3,16 @@ from .synth import PatternSynth, get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT
+from .utils import comb_type_to_sT, _make_list
 import itertools as it
+
+#Very similar to Buchwald:
+#   Instead of using a straightline program to represent a graph I use an adjacency Matrix which literally represents the graph
+#   #Each query has a set of inputs, a set of outputs, and a set of ops. Each op has inputs and outputs
+#   #Each of these (inputs, outputs, op inputs, op outputs) are 'nodes' in the adjacency matrix
+#   #The values of the matrix are filled so that it represents a directed connection between some source and sink node
+#   #All that match the type and the 'source' and 'sink' have a boolean variable representing if it is connected or not
+#   #
 
 class DagSynth(PatternSynth):
     def __init__(self, *args):
@@ -93,7 +101,6 @@ class DagSynth(PatternSynth):
 
 
         #Well formed program (P_wfp)
-        flat_op_out_lvars = flat(op_out_lvars)
 
         # Temp locs and output locs are in range of temps
         P_in_range = []

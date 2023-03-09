@@ -2,12 +2,12 @@ import hwtypes.smt_utils as fc
 import hwtypes as ht
 from dataclasses import dataclass
 from .ast import Comb, Type
-from .ir import QSym, _make_list
+from .ir import QSym
 import typing as tp
 import pysmt.shortcuts as smt
 from pysmt.logics import QF_BV, Logic
 
-from .utils import flat, type_to_N
+from .utils import flat, type_to_N, _make_list
 
 
 #import more_itertools as mit

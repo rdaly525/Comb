@@ -74,11 +74,15 @@ BV = GlobalModules['bv']
     (padd3, tuple(it.repeat(BV.add[16], 2)), 12),
     #(padd4, tuple(it.repeat(BV.add[16], 3)), 144),
 ])
-def test_add(p, ops, num_sols):
+@pytest.mark.parametrize("solver", [
+    RossSynth,
+    #BuckSynth,
+])
+def test_add(p, ops, num_sols, solver):
     obj = compile_program(p)
     comb = list(obj.comb_dict.values())[0]
     #sq = BuckSynth(comb, ops, loc_type_int=False)
-    sq = RossSynth(comb, ops)
+    sq = solver(comb, ops)
     #comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
     combs = sq.gen_all_sols(
         permutations=True,

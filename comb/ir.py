@@ -9,27 +9,6 @@ import pysmt.shortcuts as smt
 import functools
 
 
-
-def _make_list(v):
-    if not isinstance(v, (list, tuple)):
-        return [v]
-    else:
-        return list(v)
-
-def _unwrap_list(v):
-    if isinstance(v, (list, tuple)) and len(v)==1:
-        return v[0]
-    else:
-        return v
-
-
-def ret_list(f):
-    @functools.wraps(f)
-    def dec(*args, **kwargs):
-        return _make_list(f(*args, **kwargs))
-    return dec
-
-
 @dataclass
 class CallExpr(_CallExpr):
     comb: Comb
