@@ -178,7 +178,7 @@ def get_var(name, n_or_T):
         n = type_to_N(T)
     assert n >= 0
     key = (name, n)
-    var_name = f"{name}%{n}"
+    var_name = f"{name}@{n}"
     if key in _vars:
         return _vars[key]
     if n==0:
@@ -236,6 +236,17 @@ class RossSynth(Cegis):
         ])
         E_vars = self.ds.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
+
+    def gen_all_sols(self, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
+        sols = self.cegis_all(opts)
+        for sol in sols:
+            print(sol)
+        assert 0
+        combs = [self.cs.comb_from_solved(sol, name=QSym('Solved', f"v{i}")) for i, sol in enumerate(sols)]
+        return combs
+
+
+
 
 class BuckSynth(Cegis):
     def __init__(

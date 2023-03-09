@@ -1,9 +1,11 @@
+import pysmt.shortcuts
+
 from . import Comb
 from .synth import PatternSynth, get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list
+from .utils import comb_type_to_sT, _make_list, flat
 import itertools as it
 
 #Very similar to Buchwald:
@@ -12,7 +14,43 @@ import itertools as it
 #   #Each of these (inputs, outputs, op inputs, op outputs) are 'nodes' in the adjacency matrix
 #   #The values of the matrix are filled so that it represents a directed connection between some source and sink node
 #   #All that match the type and the 'source' and 'sink' have a boolean variable representing if it is connected or not
-#   #
+#   #For each op the outputs depend on the inputs.
+#   Connection constraints are obvious. the adjacency matrix
+import pysmt.shortcuts as smt
+
+def exactly_one(*args):
+    return ht.SMTBit(smt.ExactlyOne(*[arg.value for arg in args]))
+
+def matmul(x, y):
+    N = len(x)
+    z = [[None for _ in range(N)] for _ in range(N)]
+    for r in range(N):
+        for c in range(N):
+            z[r][c] = ht.SMTBit(0)
+            for i in range(N):
+                z[r][c] |= x[r][i] & y[i][c]
+    return z
+
+def mator(x, y):
+    N = len(x)
+    return [[x[r][c] | y[r][c] for c in range(N)] for r in range(N)]
+
+def exp(x, n):
+    if n == 1:
+        return x, x
+    else:
+        x_nm1, x_or = exp(x, n-1)
+        x_n = matmul(x_nm1, x)
+        return x_n, mator(x_n, x_or)
+        #return matmul(x, exp(x, n - 1))
+
+def p(x):
+    n = len(x)
+    print()
+    print("\n".join([f"{i}: {x[i][i].value.simplify()}" for i in range(n)]))
+    print("\n".join([" ".join([str(v.value) for v in vs]) for vs in x]))
+
+
 
 class DagSynth(PatternSynth):
     def __init__(self, *args):
@@ -25,22 +63,22 @@ class DagSynth(PatternSynth):
         iTs, oTs = self.comb_type
 
         # Structure
-        input_vars = [get_var(f"{self.prefix}_V_In{i}", T) for i, T in enumerate(iTs)]
+        input_vars = [get_var(f"{self.prefix}_In[{i}]", T) for i, T in enumerate(iTs)]
         self.input_vars = input_vars
 
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
         #const_vars = []
-        output_vars = [get_var(f"{self.prefix}_V_Out{i}", T) for i, T in enumerate(oTs)]
+        output_vars = [get_var(f"{self.prefix}_Out[{i}]", T) for i, T in enumerate(oTs)]
         self.output_vars = output_vars
         op_out_vars = []
         op_in_vars = []
         for opi, op in enumerate(self.op_list):
             assert isinstance(op, Comb)
             op_iTs, op_oTs = op.get_type()
-            op_in_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_in[{i}]", T) for i, T in enumerate(op_iTs)])
-            op_out_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_out[{i}]", T) for i, T in enumerate(op_oTs)])
+            op_in_vars.append([get_var(f"{self.prefix}_OpIn[{opi}][{i}]", T) for i, T in enumerate(op_iTs)])
+            op_out_vars.append([get_var(f"{self.prefix}_OpOut[{opi}][{i}]", T) for i, T in enumerate(op_oTs)])
 
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
 
@@ -83,16 +121,18 @@ class DagSynth(PatternSynth):
         for src_list in it.product(*src_poss):
             if not invalid_edges(src_list):
                 for src, snk in zip(src_list, snk_list):
-                    edges[(src, snk)] = get_var(f"{src}->{snk}", 0)
+                    vname = f"({src[0]},{src[1]})->({snk[0]},{snk[1]})"
+                    edges[(src, snk)] = get_var(vname, 0)
         for e, ev in edges.items():
             print(e, ev)
 
         #get list of lvars (existentially quantified in final query)
-        self.E_vars = ()
+        self.E_vars = list(edges.values())
+
 
         And = fc.And
+
         #Lib Spec (P_lib)
-        #   temp_var[i] = OP(*op_in_vars[i])
         P_lib = []
         for i, op in enumerate(self.op_list):
             ovars = _make_list(op.evaluate(*op_in_vars[i]))
@@ -100,123 +140,96 @@ class DagSynth(PatternSynth):
                 P_lib.append(op_out_vars[i][j] == op_out_var)
 
 
+        def get_v_var(node, src=True):
+            kind, idx = node
+            if kind == "In":
+                return input_vars[idx]
+            elif kind == "Out":
+                return output_vars[idx]
+            elif src:
+                return op_out_vars[kind][idx]
+            else:
+                return op_in_vars[kind][idx]
+
+        #Connection constraints
+        P_conn = []
+        for (src_node, snk_node), v_pred in edges.items():
+            src_v = get_v_var(src_node, src=True)
+            snk_v = get_v_var(snk_node, src=False)
+            P_conn.append(fc.Implies(v_pred, src_v==snk_v))
+
+        print(fc.And(P_conn).serialize())
+
         #Well formed program (P_wfp)
 
-        # Temp locs and output locs are in range of temps
-        P_in_range = []
-        for lvar in flat_op_out_lvars:
-            P_in_range.append(And([lvar>=Ninputs+Nconsts, lvar < tot_locs]))
+        #Snks have exactly one source
+        P_unique_sink = []
+        for n, snk_list in snks.items():
+            for snk in snk_list:
+                vs = [v for (e_src, e_snk), v in edges.items() if e_snk==snk]
+                P_unique_sink.append(exactly_one(*vs))
 
-        #op in locs and outputs are in range(0,tot)
+        #Srcs have more than 0 sinks
+        #either op output can be used. (one can be unused iff the other is used)
+        P_used_source = []
+        for opi, op in enumerate(self.op_list):
+            op_out_vs = []
+            for i in range(op.num_outputs):
+                vs = [v for (e_src, e_snk), v in edges.items() if e_src==(opi, i)]
+                op_out_vs.extend(vs)
+            P_used_source.append(fc.Or(op_out_vs))
+        for src in (('In', i) for i, _ in enumerate(input_vars)):
+            vs = [v for (e_src, e_snk), v in edges.items() if e_src==src]
+            P_used_source.append(fc.Or(vs))
 
-        for lvar in self.rhs_lvars:
-            P_in_range.append(lvar < tot_locs)
+        #ACYC Constraint
+        #First construct adjacency matrix A
+        #ACYC iff each power of A has 0s on the digonal
+        # op0_out0
+        # op0_out1
+        # op1_out0
+        # op1_out1
+        # op0_in0
+        # op0_in1
+        # ...
+        op_outs = []
+        op_ins = []
+        for opi, op in enumerate(self.op_list):
+            op_iTs, op_oTs = op.get_type()
+            op_outs.extend((opi, i) for i, _ in enumerate(op_oTs))
+            op_ins.extend((opi, i) for i, _ in enumerate(op_iTs))
+        nodes = op_outs + op_ins
+        Nout = len(op_outs)
+        def get(src, snk, srci, snki):
+            if (src, snk) in edges:
+                return edges[(src, snk)]
+            if (srci >= Nout) and (snki < Nout) and (src[0]==snk[0]):
+                return ht.SMTBit(1)
+            return ht.SMTBit(0)
 
-        #Ints are >= 0
-        #BitVectors do not need this check
-        if lvar_t is ht.SMTInt:
-            for lvars in (
-                    output_lvars,
-                    flat(op_out_lvars),
-                    flat(op_in_lvars),
-            ):
-                for lvar in lvars:
-                    assert isinstance(lvar, lvar_t)
-                    P_in_range.append(lvar >= 0)
+        #Create the adjacency matrix
+        adj = [[get(src, snk, srci, snki) for snki, snk in enumerate(nodes)] for srci, src in enumerate(nodes)]
+        p(adj)
+        #Only need 2 times number of ops as that is the max path through all the ops
+        _, adj_N = exp(adj, 2*len(self.op_list))
 
-        #TODO flag?
-        #output loc cannot be inputs
-        #for lvar in output_lvars:
-        #    P_in_range.append(lvar >= Ninputs+Nconsts)
+        P_acyc = [~(adj_N[i][i]) for i in range(Nout)]
 
-        # Temp locs are unique
-        #Could simplify to only the first lhs of each stmt
-        P_loc_unique = []
-        for i in range(len(flat_op_out_lvars)):
-            for j in range(i+1, len(flat_op_out_lvars)):
-                P_loc_unique.append(flat_op_out_lvars[i] != flat_op_out_lvars[j])
-
-        # multi outputs are off by 1
-        P_multi_out = []
-        for lvars in op_out_lvars:
-            for lv0, lv1 in zip(lvars, lvars[1:]):
-                P_multi_out.append(lv0+1==lv1)
-
-        P_acyc = []
-        # ACYC Constraint
-        #  op_out_lvars[i] > op_in_lvars[i]
-        for o_lvars, i_lvars in zip(op_out_lvars, op_in_lvars):
-            P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
-
-        #Same operations have a strict order
-        op_to_i = {}
-        for i, op in enumerate(self.op_list):
-            op_to_i.setdefault(op.qualified_name, []).append(i)
-
-        P_same_op = []
-        for op, ilist in op_to_i.items():
-            if len(ilist) > 1:
-                for i, j in zip(ilist[:-1], ilist[1:]):
-                    assert i < j
-                    P_same_op.append(op_out_lvars[i][0] < op_out_lvars[j][0])
 
         #Strict ordering on arguments of commutative ops
-        P_comm = []
-        #TODO Re-enable
-        for i, op in enumerate(self.op_list):
-            if op.commutative:
-                for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
-                    P_comm.append(lv0 <= lv1)
-
-        def rhss():
-            for lvar in flat(op_in_lvars):
-                yield lvar
-            for lvar in output_lvars:
-                yield lvar
-
-        #All vars are used
-        used = lvar_t(0)
-        for lvar_rhs in rhss():
-            used |= (lvar_t(1) << lvar_rhs)
-        P_used = (used == (2**tot_locs)-1)
-
+        #P_comm = []
+        #for i, op in enumerate(self.op_list):
+        #    if op.commutative:
+        #        for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
+        #            P_comm.append(lv0 <= lv1)
         P_wfp = [
-            And(P_in_range),
-            And(P_loc_unique),
-            And(P_multi_out),
+            And(P_unique_sink),
+            And(P_used_source),
             And(P_acyc),
-            And(P_same_op),
-            And(P_comm),
-            P_used,
         ]
 
-        #Locations correspond to vars (P_conn)
-        # (Lx == Ly) => (X==Y)
-        pairs = []
-        for lvars, vars in (
-            (input_lvars, input_vars),
-            (output_lvars, output_vars),
-            (hard_const_lvars, hard_consts),
-            (flat(op_out_lvars), flat(op_out_vars)),
-            (flat(op_in_lvars), flat(op_in_vars)),
-        ):
-            for lvar, var in zip(lvars, vars):
-                pairs.append((lvar, var))
-        P_conn = []
-        for i in range(len(pairs)):
-            for j in range(i+1, len(pairs)):
-                lv0, v0 = pairs[i]
-                lv1, v1 = pairs[j]
-                #Types need to match
-                #Type is allowed to be an int
-                if type(v0) != type(v1) and not isinstance(v0, int) and  not isinstance(v1, int):
-                    continue
-                #skip if both loc vars are int
-                if isinstance(lv0, int) and isinstance(lv1, int):
-                    continue
-                P_conn.append(fc.Implies(lv0==lv1, v0==v1))
-
         self.P_wfp = And(P_wfp)
+        print(self.P_wfp.serialize())
         self.P_lib = And(P_lib)
         self.P_conn = And(P_conn)
 

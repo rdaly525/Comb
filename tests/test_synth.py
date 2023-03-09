@@ -85,7 +85,7 @@ def test_add(p, ops, num_sols, solver):
     sq = solver(comb, ops)
     #comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
     combs = sq.gen_all_sols(
-        permutations=True,
+        #permutations=True,
         opts=SolverOpts(
             logic=None,
             max_iters=1000,
