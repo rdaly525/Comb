@@ -1,5 +1,5 @@
 from comb.compiler import compile_program
-from comb.synth import BuckSynth, verify, SolverOpts
+from comb.synth import BuckSynth, verify, SolverOpts, RossSynth
 import pytest
 
 
@@ -77,7 +77,8 @@ BV = GlobalModules['bv']
 def test_add(p, ops, num_sols):
     obj = compile_program(p)
     comb = list(obj.comb_dict.values())[0]
-    sq = BuckSynth(comb, ops, loc_type_int=False)
+    #sq = BuckSynth(comb, ops, loc_type_int=False)
+    sq = RossSynth(comb, ops)
     #comb_sols = sq.gen_all_sols(logic=None, max_iters=1000, permutations=True, verbose=False)
     combs = sq.gen_all_sols(
         permutations=True,
@@ -89,5 +90,56 @@ def test_add(p, ops, num_sols):
     )
     assert len(combs) == num_sols
     for comb_sol in combs:
+        print(comb)
         res = verify(comb_sol, comb)
         assert res is None
+
+
+import numpy as np
+import hwtypes as ht
+B = ht.SMTBit
+def test_fun():
+
+    x = [
+        [B(0), B(0), B(0), B(0), B( ), B( ), B( ), B( ), B( )],
+        [B(0), B(0), B(0), B(0), B( ), B( ), B( ), B( ), B( )],
+        [B(0), B(0), B(0), B(0), B(0), B(0), B( ), B( ), B( )],
+        [B(0), B(0), B(0), B(0), B( ), B( ), B(0), B(0), B( )],
+        [B(0), B(0), B(1), B(0), B(0), B(0), B(0), B(0), B(0)],
+        [B(0), B(0), B(1), B(0), B(0), B(0), B(0), B(0), B(0)],
+        [B(0), B(0), B(0), B(1), B(0), B(0), B(0), B(0), B(0)],
+        [B(0), B(0), B(0), B(1), B(0), B(0), B(0), B(0), B(0)],
+        [B(0), B(0), B(0), B(0), B(0), B(0), B(0), B(0), B(0)],
+    ]
+    x_n, x_or = exp(x, 4)
+    p(x_n)
+    p(x_or)
+
+def p(x):
+    n = len(x)
+    print()
+    print("\n".join([f"{i}: {x[i][i].value.simplify()}" for i in range(n)]))
+    print("\n".join([" ".join([str(v.value) for v in vs]) for vs in x]))
+
+def matmul(x, y):
+    N = len(x)
+    z = [[None for _ in range(N)] for _ in range(N)]
+    for r in range(N):
+        for c in range(N):
+            z[r][c] = B(0)
+            for i in range(N):
+                z[r][c] |= x[r][i] & y[i][c]
+    return z
+
+def mator(x, y):
+    N = len(x)
+    return [[x[r][c] | y[r][c] for c in range(N)] for r in range(N)]
+
+def exp(x, n):
+    if n == 1:
+        return x, x
+    else:
+        x_nm1, x_or = exp(x, n-1)
+        x_n = matmul(x_nm1, x)
+        return x_n, mator(x_n, x_or)
+        #return matmul(x, exp(x, n - 1))

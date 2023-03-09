@@ -51,13 +51,11 @@ Issue:
 
 
 TODO Issues to deal with
-    BUGs:
-    -add1 -> (sub, sub, sub, -1) creates a weird Rule
+    -Create the adjancency graph
     -I should try out better filtering methods.
       What if I literally used the solver to show that it is false?
     -Given certain rules I can safely not search for certain other 'bigger' rules
     -Discover and assign commutative rules
-
     -QOL: print rules to DOT
     -QOL: Verify rewrite rules after creation
     -Allow for rewrite rules like: (A-A)+A -> (A)

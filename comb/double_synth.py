@@ -1,6 +1,7 @@
 from . import Comb
 from .ast import QSym
-from .synth import Cegis, CombSynth, SolverOpts, Pattern
+from .synth import Cegis, SolverOpts, Pattern
+from .comb_synth import CombSynth
 from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
 
 import hwtypes.smt_utils as fc

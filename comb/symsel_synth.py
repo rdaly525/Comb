@@ -1,7 +1,8 @@
 from . import Comb
 from .ast import QSym, TypeCall, BVType, IntValue
 from .double_synth import Strat2Synth
-from .synth import Cegis, CombSynth, SolverOpts, smt_solve_all, Pattern
+from .synth import Cegis, SolverOpts, smt_solve_all, Pattern
+from .comb_synth import CombSynth
 from .utils import _list_to_counts, flat, _to_int, print_model, comb_type_to_sT
 
 import hwtypes.smt_utils as fc
@@ -167,7 +168,6 @@ class SymSelSynth:
 
     def gen_all(self, opts=SolverOpts()):
         print("TOT:", sum(1 for _ in self.num_ss_calls()))
-        assert 0
         for lN, rN, in smart_iter(self.maxL, self.maxR):
             lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
             rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])

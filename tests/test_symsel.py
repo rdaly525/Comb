@@ -64,53 +64,32 @@ def test_foo():
     with open(sm_file, 'r') as f:
         sm_obj = compile_program(f.read())
 
-    N = 4
-
+    N = 8
     am_add = am_obj.get('am.add')
     am_add.commutative = True
     am_mul = am_obj.get('am.mul')
     am_mul.commutative = True
+    am_add1 = am_obj.get('am.add1')
     sm_sub = sm_obj.get('sm.sub')
     sm_sub.commutative = True
     sm_mul = sm_obj.get('sm.mul')
-    sm_addc = sm_obj.get('sm.addC')
+    sm_C = sm_obj.get('sm.C')
     sm_mul.commutative = True
+
+
     lhs = [
-        #sm_addc[N,1],
-        #sm_addc[N,2],
-        #am_obj.get('am.add1')[N],
-        am_mul[N],
-        am_add[N],
-        am_add[N],
-        am_add[N],
-        am_add[N],
-        am_add[N],
-        am_add[N],
-        am_add[N],
+        am_add1[N],
     ]
     rhs = [
-        #sm_addc[N,1],
-        #sm_addc[N,2],
-        #am_mul[N],
-        #am_add[N],
-         #sm_obj.get('sm.add1')[N],
-        sm_mul[N],
+        #sm_mul[N],
         sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        sm_sub[N],
-        #sm_obj.get('sm.C')[N, 0],
-        #sm_obj.get('sm.C')[N, 2**N-1],
-        #sm_obj.get('sm.C')[N, 1],
+        #sm_sub[N],
+        #sm_C[N, 0],
+        sm_C[N, 2**N-1],
+        #sm_C[N, 1],
     ]
-    maxL = 3
-    maxR = 3
+    maxL = 1
+    maxR = 4
     ss = SymSelSynth(lhs, rhs, maxL, maxR)
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
     rules = []
