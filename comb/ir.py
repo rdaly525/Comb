@@ -89,7 +89,7 @@ class CombSpecialized(Comb):
         raise NotImplementedError()
 
     def __str__(self):
-        return str(self.name)
+        return f"{self.qualified_name} ->\n{str(self.comb)}"
 
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program

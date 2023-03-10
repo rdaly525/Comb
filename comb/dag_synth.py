@@ -5,7 +5,7 @@ from .synth import PatternSynth, get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list, flat
+from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict
 import itertools as it
 
 #Very similar to Buchwald:
@@ -123,8 +123,8 @@ class DagSynth(PatternSynth):
                 for src, snk in zip(src_list, snk_list):
                     vname = f"({src[0]},{src[1]})->({snk[0]},{snk[1]})"
                     edges[(src, snk)] = get_var(vname, 0)
-        for e, ev in edges.items():
-            print(e, ev)
+        #for e, ev in edges.items():
+        #    print(e, ev)
 
         #get list of lvars (existentially quantified in final query)
         self.E_vars = list(edges.values())
@@ -157,8 +157,6 @@ class DagSynth(PatternSynth):
             src_v = get_v_var(src_node, src=True)
             snk_v = get_v_var(snk_node, src=False)
             P_conn.append(fc.Implies(v_pred, src_v==snk_v))
-
-        print(fc.And(P_conn).serialize())
 
         #Well formed program (P_wfp)
 
@@ -209,27 +207,28 @@ class DagSynth(PatternSynth):
 
         #Create the adjacency matrix
         adj = [[get(src, snk, srci, snki) for snki, snk in enumerate(nodes)] for srci, src in enumerate(nodes)]
-        p(adj)
         #Only need 2 times number of ops as that is the max path through all the ops
         _, adj_N = exp(adj, 2*len(self.op_list))
 
         P_acyc = [~(adj_N[i][i]) for i in range(Nout)]
 
-
-        #Strict ordering on arguments of commutative ops
-        #P_comm = []
-        #for i, op in enumerate(self.op_list):
-        #    if op.commutative:
-        #        for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
-        #            P_comm.append(lv0 <= lv1)
+        #Strict ordering of identical ops:
+        #(currently) Only works when each op has only 1 output
+        assert all(len(op.get_type()[1])==1 for op in self.op_list)
+        op_dict = _list_to_dict([op.qualified_name for op in self.op_list])
+        P_op_order = []
+        for op, ids in op_dict.items():
+            for id_i, src_i in enumerate(ids[:-1]):
+                for snk_i in ids[id_i+1:]:
+                    P_op_order.append(~adj_N[src_i][snk_i])
         P_wfp = [
             And(P_unique_sink),
             And(P_used_source),
             And(P_acyc),
+            And(P_op_order),
         ]
 
         self.P_wfp = And(P_wfp)
-        print(self.P_wfp.serialize())
         self.P_lib = And(P_lib)
         self.P_conn = And(P_conn)
 

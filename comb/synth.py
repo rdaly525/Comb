@@ -92,6 +92,10 @@ def print_e(e):
     for k, v in e.items():
         print(f"  {k}: {v}")
 
+def equals(var, val):
+    if isinstance(val, bool):
+        pass
+
 @dataclass
 class Cegis:
     query: ht.SMTBit
@@ -113,7 +117,7 @@ class Cegis:
         for sol in exclude_list:
             sol_term = smt.Bool(True)
             for var, val in sol.items():
-                sol_term = smt.And(sol_term, smt.Equals(var, val))
+                sol_term = smt.And(sol_term, smt.EqualsOrIff(var, val))
             query = smt.And(query, smt.Not(sol_term))
 
         #get exist vars:
@@ -239,11 +243,9 @@ class RossSynth(Cegis):
 
     def gen_all_sols(self, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:
         sols = self.cegis_all(opts)
-        for sol in sols:
-            print(sol)
-        assert 0
-        combs = [self.cs.comb_from_solved(sol, name=QSym('Solved', f"v{i}")) for i, sol in enumerate(sols)]
-        return combs
+        yield from sols
+        #combs = [self.cs.comb_from_solved(sol, name=QSym('Solved', f"v{i}")) for i, sol in enumerate(sols)]
+        #return combs
 
 
 

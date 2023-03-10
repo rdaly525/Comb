@@ -70,7 +70,53 @@ DONE:
         This is because I am not leveraging multiplication properties
 
 
+How to handle commutative ops:
+Idea:
+    Treat mul as only having 1 input for the sake of the edges.
+    Problem is how I execute the library functions
+
+    Also another idea to think through: Do a similar thing with the inputs. Treat them as 1 'weighted edge' perhaps
+    z0 = in[0]
+    z1 = in[2]
+    z2 = in[3]
+    z3 = Mul(x0, x1)
+    z4 = Add(x2, x3)
+    out(z4)
+
+    Edges: z0->x01
+    Edges: z1->x01
+    Edges: z2->x01
+    Edges: z4->x01
+
+I can encode the input issue
+   No, A, B, C
+I0 |1  0  0  0
+I1 |0  0  1  0
+...|
+IN |1  0  0  0
+
+I need to canonicalize so that the upper right triangle is 0
+This will be a series of column swaps (A<->B) followd by (B<->C)
+
+#Now how to solve the same op issue
+#Problem: If I have the same op, the issue is 'similar'
+# I can use the adjacency matrix to exclude not only looping paths, but paths where ops need to be before other ops
+
+
+#I have an issue with filtering multiple matches to rewrite rules. I need to make sure iff Rule1 occurs earlier than rule 2,
+Then all indices of rule1 occurs before all indices of rule 2 (for like ops)
+
 
 
 
 (I had this idea while 15mg high + 2 beers deep)
+
+#Current issue:
+    I am not able to match up the number of matches for dag_synth and comb_synth
+        This now works.
+    I should actually go from dag_synth sols to pattern/comb
+    I should encode the generic comm conditions for both Dag_synth and comb_synth.
+       As in this should actually do all the possible commutative proving things and create the commutative dict generically.
+            If I do that, I could probably add in 'all' the comm stuff
+
+
