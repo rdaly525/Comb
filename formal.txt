@@ -1,0 +1,68 @@
+Trying to figure out the formal definition of a pattern, and a rewrite rule, etc...
+
+--
+data Pat = Input Integer
+         | Op_i Pat Pat
+         | Var Integer
+         | Let Integer Pat Pat  -- let var = pat1 in pat2
+
+-- Given the index of the op, counts the number of that op in the term
+CntOp :: Integer -> Pat -> Integer
+CntOp _ (Input _) = 0
+CntOp Var = 0
+CntOp i (Op0 p1 p2) =
+    if (i == 0) then 1 else 0
+    + (CntOp i p1) + (CntOp0 i p2)
+...
+CntOp i (Let v p_v p_in) = (CntOp p_v) + (CntOp1 p_in)
+
+--Makes sure the let expressions only contain defined Vars
+ValidLet :: Pat -> (Set Var) -> Bool
+-- TODO
+
+-- For the example of using 2 op1 and 2 op2
+ValidCnt :: Pat -> Bool
+ValidCnt e = && (== (CntOp1 e) 2) (== (CntOp2 e) 2)
+
+--
+Valid :: Pat -> Bool
+Valid e = && (ValidLet e) (ValidCnt e)
+
+-- 'Structural Equality'
+-- TODO Many different ways to write the same Term. Need to reduce to a canonical form.
+instance Eq Pat
+(==) p1 p2 = ...
+
+
+data Rule = Rule Pat Pat
+
+
+Closed Cartesian category
+
+Function Application
+Function Composution
+
+I can translate Lets with variables into 'Lambdas/Combinators'
+
+Adding definitions of functions
+And applications of functions
+Each term in the Let ADT is awlays a function
+This could probably
+
+Add o swap == add
+flip o add == Add (Combinators)
+
+Structural Induction fdsasdfasf
+
+
+
+
+
+
+
+
+
+
+
+
+
