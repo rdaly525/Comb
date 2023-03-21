@@ -1,7 +1,7 @@
 from comb.ast import BVType, IntValue, TypeCall
 from comb.compiler import compile_program
 from comb.synth import verify as synth_verify, SolverOpts
-from comb.double_synth import Strat2Synth
+from comb.rule_synth import RuleSynth
 
 from comb.stdlib import GlobalModules
 BV = GlobalModules['bv']
@@ -43,7 +43,7 @@ def test_mul_dis():
     iT = [BVN for _ in range(3)]
 
     oT = [BVN for _ in range(1)]
-    ss = Strat2Synth(
+    ss = RuleSynth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,
@@ -71,7 +71,7 @@ def test_add_sub():
     rhs = [BV.add[N], BV.add[N], BV.not_[N], C[N, 1]]
     iT = [BVN for _ in range(2)]
     oT = [BVN for _ in range(1)]
-    ss = Strat2Synth(
+    ss = RuleSynth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,
@@ -108,7 +108,7 @@ def test_iswap():
     lhs = [BV.add[N], BV.mul[N], BV.and_[N]]
     iT = [BVN for _ in range(3)]
     oT = [BVN for _ in range(1)]
-    ss = Strat2Synth(
+    ss = RuleSynth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,
@@ -139,7 +139,7 @@ def test_dag():
     lhs = [BV.sub[N], BV.mul[N], BV.and_[N]]
     iT = [BVN for _ in range(2)]
     oT = [BVN for _ in range(1)]
-    ss = Strat2Synth(
+    ss = RuleSynth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,
@@ -156,7 +156,7 @@ def test_addsub():
     iT = [BVN for _ in range(2)]
 
     oT = [BVN for _ in range(1)]
-    ss = Strat2Synth(
+    ss = RuleSynth(
         comb_type=(iT, oT),
         lhs_op_list=lhs,
         rhs_op_list=rhs,

@@ -1,6 +1,6 @@
 from . import Comb
 from .ast import QSym, TypeCall, BVType, IntValue
-from .double_synth import Strat2Synth
+from .rule_synth import RuleSynth
 from .synth import Cegis, SolverOpts, smt_solve_all, Pattern
 from .comb_synth import CombSynth
 from .utils import _list_to_counts, flat, _to_int, print_model, comb_type_to_sT
@@ -183,7 +183,7 @@ class SymSelSynth:
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
                     print("iT:", tuple(str(t) for t in iT))
                     #How to determine the Input/Output Types??
-                    ss = Strat2Synth(
+                    ss = RuleSynth(
                         comb_type=(iT, oT),
                         lhs_op_list=lhs_ops,
                         rhs_op_list=rhs_ops,

@@ -1,5 +1,7 @@
+from comb.comb_synth import CombSynth
 from comb.compiler import compile_program
-from comb.synth import BuckSynth, verify, SolverOpts, RossSynth
+from comb.dag_synth import AdjSynth
+from comb.synth import SpecSynth, verify, SolverOpts, SymOpts
 import pytest
 
 
@@ -43,6 +45,13 @@ In i1 : BV[N]
 Out o0 : BV[N]
 o0 = bv.add[N](i0, i1)
 
+Comb test.sub2
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+Out o0 : BV[N]
+o0 = bv.sub[N](i0, i1)
+
 Comb test.add3
 Param N: Int
 In i0 : BV[N]
@@ -73,16 +82,19 @@ BV = GlobalModules['bv']
     ('add3', 2, 3),
     #('add4', 3, 18),
 ])
-@pytest.mark.parametrize("solver", [
-    RossSynth,
-    #BuckSynth,
+@pytest.mark.parametrize("pat_synth_t", [
+    AdjSynth,
+    #CombSynth,
 ])
-def test_add(p, num_adds, num_sols, solver):
+def test_add(p, num_adds, num_sols, pat_synth_t):
     N = 32
     obj = compile_program(add_file)
-    comb = obj.comb_dict[f"test.{p}"][N]
+    spec = obj.comb_dict[f"test.{p}"][N]
     ops = list(it.repeat(BV.add[N], num_adds))
-    sq = solver(comb, ops)
+    #ops = [BV.add[N] for _ in range(3)] + [BV.sub[N] for _ in range(3)]
+    #ops = list(it.repeat(BV.sub[N], 1))
+    sym_opts = SymOpts(comm=True, same_op=True)
+    sq = SpecSynth(spec, ops, pat_synth_t=pat_synth_t, sym_opts=sym_opts)
     combs = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=1000,
@@ -97,3 +109,47 @@ def test_add(p, num_adds, num_sols, solver):
         #res = verify(comb_sol, comb)
         #assert res is None
     assert len(combs) == num_sols
+
+
+sub_file = '''
+Comb test.add1
+Param N: Int
+In x: BV[N]
+Out z: BV[N]
+z = bv.add[N](x, [N]'b1)
+
+Comb test.sub
+Param N: Int
+In x: BV[N]
+In y: BV[N]
+Out z: BV[N]
+t0 = test.add1[N](x)
+t1 = test.add1[N](y)
+z = bv.mul[N](t0, t1)
+'''
+
+@pytest.mark.parametrize("pat_synth_t", [
+    AdjSynth,
+    #CombSynth,
+])
+def test_op_sym(pat_synth_t):
+    N = 32
+    obj = compile_program(sub_file)
+    spec = obj.comb_dict[f"test.sub"][N]
+    ops = [BV.not_[N] for _ in range(2)] + [BV.mul[N]]
+    sym_opts = SymOpts(comm=False, same_op=True)
+    sq = SpecSynth(spec, ops, pat_synth_t=pat_synth_t, sym_opts=sym_opts)
+    combs = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=1000,
+            verbose=1,
+        ),
+    )
+    combs = list(combs)
+    print("SOLS:", len(combs))
+    for comb_sol in combs:
+        print(comb_sol)
+        #res = verify(comb_sol, comb)
+        #assert res is None
+    assert len(combs) == 2
+

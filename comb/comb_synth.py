@@ -12,45 +12,23 @@ from .ast import Type, QSym, Sym, TypeCall, BVType, InDecl, OutDecl
 from .ir import AssignStmt, CombProgram
 from .stdlib import make_bv_const
 from .synth import PatternSynth, get_var, SBV, Pattern
-from .utils import flat, _to_int, _make_list
+from .utils import flat, _to_int, _make_list, _list_to_dict
 
 
+#This is the Gulwani Encoding
 class CombSynth(PatternSynth):
-    def __init__(self, *args):
-        super().__init__(*args)
-
-        #Spec, and ops cannot have params
-        if any(comb.has_params for comb in self.op_list):
-            raise ValueError("Cannot synth with non-concrete parameters")
-        iTs, oTs = self.comb_type
-
-        # Structure
-        input_vars = [get_var(f"{self.prefix}_V_In{i}", T) for i, T in enumerate(iTs)]
-        self.input_vars = input_vars
-
-        Ninputs = len(input_vars)
-        hard_consts = self.const_list
-        Nconsts = len(hard_consts)
-        #const_vars = []
-        output_vars = [get_var(f"{self.prefix}_V_Out{i}", T) for i, T in enumerate(oTs)]
-        self.output_vars = output_vars
-        op_out_vars = []
-        op_in_vars = []
-        tot_locs = Ninputs + Nconsts
-        for opi, op in enumerate(self.op_list):
-            assert isinstance(op, Comb)
-            op_iTs, op_oTs = op.get_type()
-            op_in_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_in[{i}]", T) for i, T in enumerate(op_iTs)])
-            op_out_vars.append([get_var(f"{self.prefix}_V_Op[{opi}]_out[{i}]", T) for i, T in enumerate(op_oTs)])
-            tot_locs += op.num_outputs
-        self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
-        self.tot_locs = tot_locs
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        hard_consts = []
+        tot_locs = len(self.input_vars) + len(hard_consts) + sum([len(ovs) for ovs in self.op_out_vars])
         lvar_t_width = tot_locs
-        lvar_t = SBV[lvar_t_width]
+        self.lvar_t = SBV[lvar_t_width]
 
         #These can be hardcoded
-        input_lvars = list(range(len(input_vars)))
-        Ninputs = len(input_vars)
+        self.input_lvars = list(range(len(self.input_vars)))
+        Ninputs = len(self.input_vars)
+
+        #hard_const_lvars = list(range(Ninputs, Ninputs +len(self.hard_consts)))
         hard_const_lvars = list(range(Ninputs, Ninputs +len(hard_consts)))
         op_out_lvars = []
         op_in_lvars = []
@@ -58,127 +36,31 @@ class CombSynth(PatternSynth):
             op_iTs, op_oTs = op.get_type()
             op_in_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_in[{i}]", lvar_t_width) for i, T in enumerate(op_iTs)])
             op_out_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width) for i, T in enumerate(op_oTs)])
-        output_lvars = [get_var(f"{self.prefix}_L_out[{i}]", lvar_t_width) for i in range(len(output_vars))]
+        output_lvars = [get_var(f"{self.prefix}_L_out[{i}]", lvar_t_width) for i in range(len(self.output_vars))]
         self.op_in_lvars = op_in_lvars
         self.op_out_lvars = op_out_lvars
         self.output_lvars = output_lvars
 
         #get list of lvars (existentially quantified in final query)
         self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars)
-        self.lvars = (input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
-
+        self.lvars = (self.input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
         self.rhs_lvars = flat(op_in_lvars) + output_lvars
+        self.Ninputs = Ninputs
+        self.Nconsts = 0
+        self.tot_locs = tot_locs
 
-        And = fc.And
-        #Lib Spec (P_lib)
-        #   temp_var[i] = OP(*op_in_vars[i])
-        P_lib = []
-        for i, op in enumerate(self.op_list):
-            ovars = _make_list(op.evaluate(*op_in_vars[i]))
-            for j, op_out_var in enumerate(ovars):
-                P_lib.append(op_out_vars[i][j] == op_out_var)
-
-
-        #Well formed program (P_wfp)
-        flat_op_out_lvars = flat(op_out_lvars)
-
-        # Temp locs and output locs are in range of temps
-        P_in_range = []
-        for lvar in flat_op_out_lvars:
-            P_in_range.append(And([lvar>=Ninputs+Nconsts, lvar < tot_locs]))
-
-        #op in locs and outputs are in range(0,tot)
-
-        for lvar in self.rhs_lvars:
-            P_in_range.append(lvar < tot_locs)
-
-        #Ints are >= 0
-        #BitVectors do not need this check
-        if lvar_t is ht.SMTInt:
-            for lvars in (
-                    output_lvars,
-                    flat(op_out_lvars),
-                    flat(op_in_lvars),
-            ):
-                for lvar in lvars:
-                    assert isinstance(lvar, lvar_t)
-                    P_in_range.append(lvar >= 0)
-
-        #TODO flag?
-        #output loc cannot be inputs
-        #for lvar in output_lvars:
-        #    P_in_range.append(lvar >= Ninputs+Nconsts)
-
-        # Temp locs are unique
-        #Could simplify to only the first lhs of each stmt
-        P_loc_unique = []
-        for i in range(len(flat_op_out_lvars)):
-            for j in range(i+1, len(flat_op_out_lvars)):
-                P_loc_unique.append(flat_op_out_lvars[i] != flat_op_out_lvars[j])
-
-        # multi outputs are off by 1
-        P_multi_out = []
-        for lvars in op_out_lvars:
-            for lv0, lv1 in zip(lvars, lvars[1:]):
-                P_multi_out.append(lv0+1==lv1)
-
-        P_acyc = []
-        # ACYC Constraint
-        #  op_out_lvars[i] > op_in_lvars[i]
-        for o_lvars, i_lvars in zip(op_out_lvars, op_in_lvars):
-            P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
-
-        #Same operations have a strict order
-        op_to_i = {}
-        for i, op in enumerate(self.op_list):
-            op_to_i.setdefault(op.qualified_name, []).append(i)
-
-        P_same_op = []
-        for op, ilist in op_to_i.items():
-            if len(ilist) > 1:
-                for i, j in zip(ilist[:-1], ilist[1:]):
-                    assert i < j
-                    P_same_op.append(op_out_lvars[i][0] < op_out_lvars[j][0])
-
-        #Strict ordering on arguments of commutative ops
-        P_comm = []
-        #TODO Re-enable
-        for i, op in enumerate(self.op_list):
-            if op.commutative:
-                for lv0, lv1 in  zip(op_in_lvars[i][:-1], op_in_lvars[i][1:]):
-                    P_comm.append(lv0 <= lv1)
-
-        def rhss():
-            for lvar in flat(op_in_lvars):
-                yield lvar
-            for lvar in output_lvars:
-                yield lvar
-
-        #All vars are used
-        used = lvar_t(0)
-        for lvar_rhs in rhss():
-            used |= (lvar_t(1) << lvar_rhs)
-        P_used = (used == (2**tot_locs)-1)
-
-        P_wfp = [
-            And(P_in_range),
-            And(P_loc_unique),
-            And(P_multi_out),
-            And(P_acyc),
-            And(P_same_op),
-            And(P_comm),
-            P_used,
-        ]
-
+    @property
+    def P_conn(self):
+        #TODO: This should be encoded as only source/sink pairs
         #Locations correspond to vars (P_conn)
         # (Lx == Ly) => (X==Y)
         pairs = []
         for lvars, vars in (
-            (input_lvars, input_vars),
-            (output_lvars, output_vars),
-            (hard_const_lvars, hard_consts),
-            (flat(op_out_lvars), flat(op_out_vars)),
-            (flat(op_in_lvars), flat(op_in_vars)),
+            (self.input_lvars, self.input_vars),
+            (self.output_lvars, self.output_vars),
+            #(hard_const_lvars, hard_consts),
+            (flat(self.op_out_lvars), flat(self.op_out_vars)),
+            (flat(self.op_in_lvars), flat(self.op_in_vars)),
         ):
             for lvar, var in zip(lvars, vars):
                 pairs.append((lvar, var))
@@ -195,11 +77,108 @@ class CombSynth(PatternSynth):
                 if isinstance(lv0, int) and isinstance(lv1, int):
                     continue
                 P_conn.append(fc.Implies(lv0==lv1, v0==v1))
+        return fc.And(P_conn)
 
-        self.P_wfp = And(P_wfp)
-        self.P_lib = And(P_lib)
-        self.P_conn = And(P_conn)
+    @property
+    def P_in_range(self):
+        # Temp locs and output locs are in range of temps
+        flat_op_out_lvars = flat(self.op_out_lvars)
+        P_in_range = []
+        for lvar in flat_op_out_lvars:
+            P_in_range.append(fc.And([lvar>=self.Ninputs + self.Nconsts, lvar < self.tot_locs]))
 
+        #op in locs and outputs are in range(0,tot)
+
+        for lvar in self.rhs_lvars:
+            P_in_range.append(lvar < self.tot_locs)
+        return fc.And(P_in_range)
+
+
+        #TODO flag?
+        #output loc cannot be inputs
+        #for lvar in output_lvars:
+        #    P_in_range.append(lvar >= Ninputs+Nconsts)
+
+    @property
+    def P_loc_unique(self):
+        # Temp locs are unique
+        #Could simplify to only the first lhs of each stmt
+        out_lvars = [lvars[0] for lvars in self.op_out_lvars]
+        P_loc_unique = []
+        for lvar_a, lvar_b in it.combinations(out_lvars, 2):
+            P_loc_unique.append(lvar_a != lvar_b)
+        return fc.And(P_loc_unique)
+
+    @property
+    def P_multi_out(self):
+        # multi outputs are off by 1
+        P_multi_out = []
+        for lvars in self.op_out_lvars:
+            for i, lv1 in enumerate(lvars[1:]):
+                P_multi_out.append(lvars[0]+1+i == lv1)
+        return fc.And(P_multi_out)
+
+    @property
+    def P_acyc(self):
+        P_acyc = []
+        # ACYC Constraint
+        #  op_out_lvars[i] > op_in_lvars[i]
+        for o_lvars, i_lvars in zip(self.op_out_lvars, self.op_in_lvars):
+            P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
+        return fc.And(P_acyc)
+
+    @property
+    def P_used_source(self):
+        def rhss():
+            for lvar in flat(self.op_in_lvars):
+                yield lvar
+            for lvar in self.output_lvars:
+                yield lvar
+
+        #All vars are used
+        used = self.lvar_t(0)
+        for lvar_rhs in rhss():
+            used |= (self.lvar_t(1) << lvar_rhs)
+        P_used = (used == (2**self.tot_locs)-1)
+        return P_used
+
+    @property
+    def P_sym_same_op(self):
+        #Same operations have a strict order
+        op_to_i = _list_to_dict([op.qualified_name for op in self.op_list])
+
+        P_same_op = []
+        for op, ilist in op_to_i.items():
+            if len(ilist) > 1:
+                for i, j in zip(ilist[:-1], ilist[1:]):
+                    assert i < j
+                    P_same_op.append(self.op_out_lvars[i][0] < self.op_out_lvars[j][0])
+        return fc.And(P_same_op)
+
+    @property
+    def P_sym_comm(self):
+        #Strict ordering on arguments of commutative ops
+        P_comm = []
+        for i, op in enumerate(self.op_list):
+            if op.commutative:
+                for lv0, lv1 in  zip(self.op_in_lvars[i][:-1], self.op_in_lvars[i][1:]):
+                    P_comm.append(lv0 <= lv1)
+        return fc.And(P_comm)
+
+    @property
+    def P_sym_input_perm(self):
+        raise NotImplementedError()
+
+    @property
+    def P_wfp(self):
+        P_wfp = [
+            self.P_in_range,
+            self.P_loc_unique,
+            self.P_multi_out,
+            self.P_acyc,
+            self.P_used_source,
+        ]
+        return fc.And(P_wfp)
 
     def fix_comm(self, sol):
         comm_ids = [i for i, op in enumerate(self.op_list) if op.commutative]

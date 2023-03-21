@@ -17,7 +17,7 @@ def test_bucket_comb():
     for combs in bucket_combinations(vals, buckets):
         print(combs)
 
-from comb.double_synth import enum_rule_partitions
+from comb.rule_synth import enum_rule_partitions
 def test_enum_rule_partitions():
     op_list = ['A']*3+['B'] + ['C']*2
     rule_op_cnts = [dict(A=1,B=1,C=1), dict(A=2,C=1)]

@@ -1,6 +1,6 @@
 from . import Comb
 from .ast import QSym
-from .synth import Cegis, SolverOpts, Pattern
+from .synth import Cegis, SolverOpts, Pattern, SymOpts, PatternSynth
 from .comb_synth import CombSynth
 from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
 
@@ -141,38 +141,47 @@ def enum_dags(goal_T, rules):
             ds.append(list(zip(src_list, snk_list)))
     return ds
 
-class Strat2Synth(Cegis):
+class RuleSynth(Cegis):
     def __init__(
         self,
         comb_type,
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
+        pat_synth_t: tp.Type[PatternSynth],
+        sym_opts: SymOpts = SymOpts(),
     ):
         self.comb_type = comb_type
-        lhs_cs = CombSynth(comb_type, lhs_op_list, prefix="l")
-        rhs_cs = CombSynth(comb_type, rhs_op_list, prefix="r")
+        lhs_cs = pat_synth_t(comb_type, lhs_op_list, prefix="l", sym_opts=sym_opts)
+        rhs_cs = pat_synth_t(comb_type, rhs_op_list, prefix="r", sym_opts=sym_opts)
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
 
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
         P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-        And = fc.And
+
+        P_input_perm = []
+        if sym_opts.input_perm:
+            P_input_perm.append(lhs_cs.P_sym)
+
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-        query = And([
+        query = fc.And([
+            fc.And(P_input_perm),
+            lhs_cs.P_sym,
+            rhs_cs.P_sym,
             lhs_cs.P_wfp,
             rhs_cs.P_wfp,
             fc.Implies(
-                And([
+                fc.And([
                     lhs_cs.P_lib,
                     lhs_cs.P_conn,
                     rhs_cs.P_lib,
                     rhs_cs.P_conn,
                 ]),
                 fc.Implies(
-                    And(P_inputs),
-                    And(P_outputs),
+                    fc.And(P_inputs),
+                    fc.And(P_outputs),
                 )
             )
         ])

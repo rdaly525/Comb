@@ -2,7 +2,7 @@ from comb.ast import BVType, IntValue, TypeCall
 from comb.compiler import compile_program
 from comb.synth import verify as synth_verify, SolverOpts
 from comb.discover import discover_strat2
-from comb.double_synth import Strat2Synth
+from comb.rule_synth import RuleSynth
 
 from comb.stdlib import GlobalModules
 BV = GlobalModules['bv']

@@ -50,11 +50,9 @@ def _to_int(x):
     assert x.is_constant()
     return int(x.constant_value())
 
-def print_model(sol):
-    print("MODEL")
-    for k, v in sol.items():
-        print(f"{k}: {_to_int(v)}")
-
+def model_to_str(sol):
+    sol_str = [f"{k}: {_to_int(v)}" for k,v in sol.items()]
+    return "(" + ", ".join(sol_str) + ")"
 
 def _make_list(v):
     if not isinstance(v, (list, tuple)):

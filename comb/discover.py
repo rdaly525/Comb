@@ -1,9 +1,9 @@
 import dataclasses
 
 from .ast import QSym, Comb, TypeCall, BVType, IntValue
-from .double_synth import Strat2Synth
+from .rule_synth import RuleSynth
 from .stdlib import BitVectorModule
-from .synth import BuckSynth, verify, SolverOpts
+from .synth import SpecSynth, verify, SolverOpts
 from .utils import flat
 import typing as tp
 import itertools as it
@@ -30,7 +30,7 @@ def discover(spec: Comb, N: int, op_list: tp.List[Comb], const_list = (), opts=S
         print("*"*80)
         op_str = "(" + ", ".join(str(op) for op in ops) + ")"
         print(f"Ops:{op_str}")
-        sq = BuckSynth(spec, ops, const_list=const_list)
+        sq = SpecSynth(spec, ops, const_list=const_list)
         combs = sq.gen_all_sols(permutations=False, opts=opts)
         all_combs += combs
     return all_combs
@@ -71,7 +71,7 @@ def _discover_strat2(
         op_strs = ["[" + ", ".join(str(op.name) for op in ops) + "]" for ops in (lhs_ops, rhs_ops)]
         print(f"{op_strs[0]} -> {op_strs[1]}")
 
-        ss = Strat2Synth(
+        ss = RuleSynth(
             comb_type=(iT, oT),
             lhs_op_list=lhs_ops,
             rhs_op_list=rhs_ops,
