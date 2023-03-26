@@ -1,56 +1,56 @@
+from comb.ast import TypeCall, BVType, IntValue
 from comb.compiler import compile_program
-from comb.discover import discover_up_to_N
-from comb.stdlib import GlobalModules
+from comb.symsel_synth import smart_iter, SymSelSynth
+from comb.synth import smt_solve_all, SolverOpts
+from comb.utils import bucket_combinations
+import hwtypes as ht
+import os
 
-sub = '''
-Comb test.sub
-Param N : Int
-In a : BV[N]
-In b : BV[N]
-Out o : BV[N]
-o = bv.sub[N](a, b)
-'''
+dir_path = os.path.dirname(os.path.realpath(__file__))
+am_file = f"{dir_path}/combs/addmul.comb"
+sm_file = f"{dir_path}/combs/submul.comb"
 
-inc = '''
-Comb test.inc
-Param N : Int
-In a : BV[N]
-Out o : BV[N]
-o = bv.add[N](a, [N]'h1)
-'''
+with open(am_file, 'r') as f:
+    am_obj = compile_program(f.read())
+with open(sm_file, 'r') as f:
+    sm_obj = compile_program(f.read())
 
-one = '''
-Comb test.one
-Param N : Int
-In a : BV[N]
-Out o : BV[N]
-o = [N]'h1
-'''
-
-bigadd = '''
-Comb test.bigadd
-Param N: Int
-In x0 : BV[N]
-In x1 : BV[N]
-In y0 : BV[N]
-In y1 : BV[N]
-out z0 : BV[N]
-out z1 : BV[N]
-'''
+N = 4
+am_add = am_obj.get('am.add')
+am_add.commutative = True
+am_mul = am_obj.get('am.mul')
+am_mul.commutative = True
+sm_sub = sm_obj.get('sm.sub')
+sm_sub.commutative = True
+sm_mul = sm_obj.get('sm.mul')
+sm_C = sm_obj.get('sm.C')
+sm_mul.commutative = True
 
 
-BV = GlobalModules['bv']
-width = 4
-op_list = [BV.add[width]]
-maxN=5
 
-spec = compile_program(sub)
-#spec = compile_program(inc)
-#spec = compile_program(one)
-
-N_, combs = discover_up_to_N(spec[width], maxN, op_list)
-assert N_ > 0
-for i, comb in enumerate(combs):
-    print("*" * 80)
-    print(i)
-    print(comb.serialize())
+lhs = [
+    am_mul[N],
+    am_add[N],
+]
+rhs = [
+    sm_mul[N],
+    sm_sub[N],
+    sm_C[N, 1],
+]
+maxL = 2
+maxR = 3
+ss = SymSelSynth(lhs, rhs, maxL, maxR)
+opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
+rules = []
+for ri, rule in enumerate(ss.gen_all(opts)):
+    print("RULE", ri)
+    print(rule)
+    print("ENDRULE")
+    rules.append(rule)
+print("-"*80)
+print("-"*80)
+print("-"*80)
+for ri, rule in enumerate(rules):
+    print("RULE", ri)
+    print(rule)
+    print("ENDRULE")
