@@ -1,43 +1,13 @@
 from comb.frontend.compiler import compile_program
 from comb.synth.adj_encoding import AdjEncoding
+from comb.synth.comb_encoding import CombEncoding
 from comb.synth.pattern import SymOpts
 from comb.synth.spec_synth import SpecSynth
 from comb.synth.solver_utils import SolverOpts
 from comb.synth.verify import verify
 import pytest
 
-
-file1 = '''
-Comb test.dist1
-Param N: Int
-In a : BV[N]
-In b : BV[N]
-In c : BV[N]
-Out o : BV[N]
-ab = bv.mul[N](a,b)
-ac = bv.mul[N](a,c)
-o = bv.add[N](ab, ac)
-
-Comb test.dist2
-Param N: Int
-In a : BV[N]
-In b : BV[N]
-In c : BV[N]
-Out o : BV[N]
-b_p_c = bv.add[N](b, c)
-o = bv.mul[N](a, b_p_c)
-'''
-
 # A*(B+C) == A*B + A*C
-def test_dist():
-    obj1 = compile_program(file1)
-    c1 = obj1.comb_dict['test.dist1']
-    c2 = obj1.comb_dict['test.dist2']
-    N = 16
-    res = verify(c1[N], c2[N])
-    assert res is None
-
-
 
 add_file = '''
 Comb test.add2
@@ -79,38 +49,45 @@ import itertools as it
 from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
-@pytest.mark.parametrize("p,num_adds,num_sols", [
-    #('add2', 1, 1),
-    ('add3', 2, 3),
-    #('add4', 3, 18),
-])
-@pytest.mark.parametrize("pat_synth_t", [
+
+@pytest.mark.parametrize("pat_en_t", [
     AdjEncoding,
-    #CombSynth,
+    CombEncoding,
 ])
-def test_add(p, num_adds, num_sols, pat_synth_t):
+@pytest.mark.parametrize("num_adds,comm,same_op,num_sols", [
+    (1, False, False, 2),
+    (1, True, False, 1),
+    (2, False, False, 24),
+    (2, True, False, 6),
+    #(1, True, False, 1),
+])
+def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     N = 32
     obj = compile_program(add_file)
-    spec = obj.comb_dict[f"test.{p}"][N]
+    spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
     ops = list(it.repeat(BV.add[N], num_adds))
     #ops = [BV.add[N] for _ in range(3)] + [BV.sub[N] for _ in range(3)]
     #ops = list(it.repeat(BV.sub[N], 1))
-    sym_opts = SymOpts(comm=False, same_op=False)
-    sq = SpecSynth(spec, ops, pat_synth_t=pat_synth_t, sym_opts=sym_opts)
-    combs = sq.gen_all_sols(
+    sym_opts = SymOpts(comm=comm, same_op=same_op)
+    sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    pats = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=1000,
             verbose=1,
         ),
     )
-    combs = list(combs)
-    print("SOLS:", len(combs))
+    pats = list(pats)
+    print("SOLS:", len(pats))
 
-    for comb_sol in combs:
-        print(comb_sol)
-        #res = verify(comb_sol, comb)
-        #assert res is None
-    assert len(combs) == num_sols
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        print(pat)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, spec)
+        assert res is None
+    assert len(pats) == num_sols
+    assert all(pats[0] != pat for pat in pats[1:])
 
 
 sub_file = '''
@@ -140,7 +117,7 @@ def test_op_sym(pat_synth_t):
     spec = obj.comb_dict[f"test.sub"][N]
     ops = [BV.not_[N] for _ in range(2)] + [BV.mul[N]]
     sym_opts = SymOpts(comm=False, same_op=True)
-    sq = SpecSynth(spec, ops, pat_synth_t=pat_synth_t, sym_opts=sym_opts)
+    sq = SpecSynth(spec, ops, pat_en_t=pat_synth_t, sym_opts=sym_opts)
     combs = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=1000,

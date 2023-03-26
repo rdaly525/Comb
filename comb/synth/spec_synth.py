@@ -5,7 +5,7 @@ from hwtypes import smt_utils as fc
 from comb import Comb
 from .pattern import PatternEncoding, SymOpts, Pattern
 from .solver_utils import SolverOpts, Cegis
-from .utils import _make_list
+from .utils import _make_list, type_to_N
 
 
 class SpecSynth(Cegis):
@@ -13,37 +13,40 @@ class SpecSynth(Cegis):
         self,
         spec: Comb,
         op_list: tp.List[Comb],
-        pat_synth_t: tp.Type[PatternEncoding],
+        pat_en_t: tp.Type[PatternEncoding],
         sym_opts: SymOpts = SymOpts(),
         const_list: tp.Tuple[int] = (),
     ):
-        assert issubclass(pat_synth_t, PatternEncoding)
-        self.ps = pat_synth_t(spec.get_type(), op_list, const_list, sym_opts=sym_opts)
+        assert issubclass(pat_en_t, PatternEncoding)
+        iT, oT = spec.get_type()
+        iT = [type_to_N(t) for t in iT]
+        oT = [type_to_N(t) for t in oT]
+        self.pat_en = pat_en_t(iT, oT, op_list, const_list, sym_opts=sym_opts)
         self.spec = spec
         #Formal Spec (P_spec)
         P_spec = []
-        for (i, ov) in enumerate(_make_list(self.spec.evaluate(*self.ps.input_vars))):
-            P_spec.append(self.ps.output_vars[i] == ov)
+        for (i, ov) in enumerate(_make_list(self.spec.evaluate(*self.pat_en.input_vars))):
+            P_spec.append(self.pat_en.output_vars[i] == ov)
 
         And = fc.And
         #Final query:
         #  Exists(L) Forall(V) P_wfp(L) & (P_lib & P_conn) => P_spec
 
         query = And([
-            self.ps.P_sym,
-            self.ps.P_wfp,
+            self.pat_en.P_sym,
+            self.pat_en.P_wfp,
             fc.Implies(
-                And([self.ps.P_lib, self.ps.P_conn]),
+                And([self.pat_en.P_lib, self.pat_en.P_conn]),
                 And(P_spec)
             )
         ])
-        print(query.serialize())
-        E_vars = self.ps.E_vars
+        #print(query.serialize())
+        E_vars = self.pat_en.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
 
-
     def gen_all_sols(self, opts: SolverOpts = SolverOpts()) -> tp.List[Pattern]:
-        pass
+        for sol in self.cegis_all(opts):
+            yield self.pat_en.pattern_from_sol(sol)
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations
     #def gen_all_sols(self, permutations=False, opts: SolverOpts=SolverOpts()) -> tp.List[Comb]:

@@ -327,7 +327,6 @@ class Comb(Node):
 
 
 
-#@dataclass(unsafe_hash=True)
 @dataclass
 class ASTCombProgram(Comb):
     name: QSym

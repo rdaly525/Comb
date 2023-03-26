@@ -1,10 +1,10 @@
 
-from .pattern import PatternEncoding
+from .pattern import PatternEncoding, Pattern
 from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict
+from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int
 import itertools as it
 
 import pysmt.shortcuts as smt
@@ -52,9 +52,8 @@ class AdjEncoding(PatternEncoding):
         # (kind, idx) -> (kind, idx)
         num_ops = len(self.op_list)
         self.num_ops = num_ops
-        iTs, oTs = self.comb_type
-        input_T = comb_type_to_sT(iTs)
-        output_T = comb_type_to_sT(oTs)
+        input_T = _list_to_dict(self.iT)
+        output_T = _list_to_dict(self.oT)
         op_iTs = [comb_type_to_sT(op.get_type()[0]) for op in self.op_list]
         op_oTs = [comb_type_to_sT(op.get_type()[1]) for op in self.op_list]
 
@@ -76,8 +75,8 @@ class AdjEncoding(PatternEncoding):
             src_poss += [srcs[n] for _ in n_snks]
 
 
-        idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
-        idx_to_op.update({-1:'In', self.num_ops:'Out'})
+        #idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
+        #idx_to_op.update({-1:'In', self.num_ops:'Out'})
 
         #Invalid edges are non-type matched
         # source and destination are same op
@@ -88,6 +87,7 @@ class AdjEncoding(PatternEncoding):
             if src_i == -1 and snk_i == num_ops:
                 return True
             if self.sym_opts.same_op:
+                raise NotImplementedError()
                 if idx_to_op[src_i] == idx_to_op[snk_i]:
                     return src_i >= snk_i
             return False
@@ -109,9 +109,9 @@ class AdjEncoding(PatternEncoding):
                         edges[(src, snk)] = get_var(vname, 0)
 
         self.edges = edges
-        print("\nNE", len(self.edges))
-        for e, ev in edges.items():
-            print(e, str(ev.value))
+        #print("\nNE", len(self.edges))
+        #for e, ev in edges.items():
+        #    print(e, str(ev.value))
 
     @property
     def E_vars(self):
@@ -195,7 +195,7 @@ class AdjEncoding(PatternEncoding):
                 vs = [v for ((_src_i, _), (_snk_i, _)), v in self.edges.items() if (src_i==_src_i and snk_i==_snk_i)]
                 adj[src_i][snk_i] = fc.Or(vs).to_hwtypes()
 
-        p(adj)
+        #p(adj)
         terms = []
         def exp(x, n):
             if n == 1:
@@ -213,7 +213,7 @@ class AdjEncoding(PatternEncoding):
 
         #I only need to check the op outputs (As all the op inputs will be in the cycle)
         ret = fc.And(terms)
-        print(ret.serialize())
+        #print(ret.serialize())
         return ret
 
     @property
@@ -280,8 +280,7 @@ class AdjEncoding(PatternEncoding):
     @property
     def P_sym_input_perm(self):
         assert self.sym_opts.input_perm
-        iTs, oTs = self.comb_type
-        input_T = comb_type_to_sT(iTs)
+        input_T = _list_to_dict(self.iT)
 
         # Create a set of all sources/snks sorted by type
         P_perms = []
@@ -305,9 +304,11 @@ class AdjEncoding(PatternEncoding):
             P_perms.append(fc.And(P_perm))
         return fc.And(P_perms)
 
-    def pattern_from_solved(self, sol):
-        raise NotImplementedError()
+    def pattern_from_sol(self, sol):
+        p = Pattern(self.iT, self.oT, self.op_list)
+        for (src, snk), pred in self.edges.items():
+            if _to_int(sol[pred.value]):
+                p.add_edge(src, snk)
+        return p
 
-    def comb_from_solved(self, sol, name):
-        return None
-        #raise NotImplementedError()
+

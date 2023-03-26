@@ -2,7 +2,7 @@ import functools
 import typing as tp
 import itertools as it
 
-from comb.frontend.ast import Type, BoolType, TypeCall, BVType
+from comb.frontend.ast import Type, BoolType, TypeCall, BVType, IntValue
 
 
 def _list_to_counts(vals):
@@ -14,7 +14,7 @@ def _list_to_counts(vals):
 def _list_to_dict(vals):
     d = {}
     for i, v in enumerate(vals):
-        d.setdefault(v,[]).append(i)
+        d.setdefault(v, []).append(i)
     return d
 
 def bucket_combinations(vals: tp.Iterable[tp.Any], buckets: tp.List[int]):
@@ -41,6 +41,13 @@ def type_to_N(T: Type):
         n = T.pargs[0].value
         assert isinstance(n, int)
     return n
+
+def N_to_type(n: int):
+    if n==0:
+        return BoolType()
+    else:
+        return TypeCall(BVType(), [IntValue(n)])
+
 
 def comb_type_to_sT(Ts):
     Ns = [type_to_N(t) for t in Ts]

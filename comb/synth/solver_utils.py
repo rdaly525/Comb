@@ -99,6 +99,7 @@ class Cegis:
             yield sol
 
 
+_vars = {}
 def get_var(name, n_or_T):
     if isinstance(n_or_T, int):
         n = n_or_T
@@ -117,8 +118,6 @@ def get_var(name, n_or_T):
     _vars[key] = var
     return var
 
-
-_vars = {}
 
 
 def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
