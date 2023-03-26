@@ -1,7 +1,7 @@
-from . import Comb
-from .ast import QSym
-from .synth import Cegis, SolverOpts, Pattern, SymOpts, PatternSynth
-from .comb_synth import CombSynth
+from comb import Comb
+from comb.frontend.ast import QSym
+from comb.synth import Cegis, SolverOpts, Pattern, SymOpts, PatternSynth
+from .comb_encoding import CombEncoding
 from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
 
 import hwtypes.smt_utils as fc
@@ -71,7 +71,7 @@ def enum_rule_partitions(op_list, rule_op_cnts):
         yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
 
 
-def match_one_pattern(p: Pattern, cs: CombSynth, pid_to_csid: tp.Mapping[int, int]):
+def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int, int]):
     #Interior edges
     interior_edges = []
     for (li, lai), (ri, rai) in p.interior_edges:
@@ -96,12 +96,12 @@ def match_one_pattern(p: Pattern, cs: CombSynth, pid_to_csid: tp.Mapping[int, in
     return fc.And(interior_edges), in_lvars, out_lvars
 
 
-def match_pattern(p: Pattern, cs: CombSynth, ri_op_cnts):
+def match_pattern(p: Pattern, cs: CombEncoding, ri_op_cnts):
     for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
         yield match_one_pattern(p, cs, pid_to_csid)
 
 def enum_dags(goal_T, rules):
-    from .symsel_synth import Rule
+    from comb.frontend.symsel_synth import Rule
     rules: tp.List[Rule] = rules
     goal_iT = comb_type_to_sT(goal_T[0])
     goal_oT = comb_type_to_sT(goal_T[1])
@@ -191,7 +191,7 @@ class RuleSynth(Cegis):
 
 
     def add_rule_cover(self, cover):
-        from .symsel_synth import Rule
+        from comb.frontend.symsel_synth import Rule
         cover: tp.List[tp.Tuple[Rule, int]] = cover
         rules = flat([[r for _ in range(cnt)] for r, cnt in cover])
         #Need to get type info for everthing

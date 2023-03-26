@@ -1,9 +1,7 @@
-from comb.compiler import compile_program
-from comb.discover import discover, discover_up_to_N
-from comb.ast import QSym
-from comb.stdlib import BitVectorModule, GlobalModules
+from comb.frontend.compiler import compile_program
+from comb.synth.discover import discover_up_to_N
+from comb.frontend.stdlib import GlobalModules
 import pytest
-import hwtypes as ht
 
 p_or32 = '''
 Comb test.id

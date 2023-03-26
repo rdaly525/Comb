@@ -1,8 +1,7 @@
-from comb.compiler import  compile_program
+from comb.frontend.compiler import  compile_program
 import pytest
 import hwtypes as ht
-from comb.ast import BVValue, IntValue, TypeCall
-from comb.ir import Obj
+from comb.frontend.ast import BVValue, IntValue, TypeCall
 
 iadd = '''
 Comb test.iadd

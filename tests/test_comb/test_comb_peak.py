@@ -1,8 +1,8 @@
 import hwtypes as ht
 from peak import family_closure, Peak
 
-from comb.ast import QSym
-from comb.comb_peak import CombPeak
+from comb.frontend.ast import QSym
+from comb.frontend.comb_peak import CombPeak
 import pytest
 
 SBV = ht.SMTBitVector

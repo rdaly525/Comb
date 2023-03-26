@@ -1,10 +1,8 @@
-import dataclasses
-
-from .ast import QSym, Comb, TypeCall, BVType, IntValue
-from .rule_synth import RuleSynth
-from .stdlib import BitVectorModule
-from .synth import SpecSynth, verify, SolverOpts
-from .utils import flat
+from comb.frontend.ast import Comb, TypeCall, BVType, IntValue
+from comb.synth.rule_synth import RuleSynth
+from comb.synth.spec_synth import SpecSynth
+from comb.synth.solver_utils import SolverOpts
+from comb.synth.utils import flat
 import typing as tp
 import itertools as it
 

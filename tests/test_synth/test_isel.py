@@ -1,10 +1,9 @@
-from comb.ast import BVType, IntValue, TypeCall
-from comb.compiler import compile_program
-from comb.synth import verify as synth_verify, SolverOpts
-from comb.discover import discover_strat2
-from comb.rule_synth import RuleSynth
+from comb.frontend.compiler import compile_program
+from comb.synth.solver_utils import SolverOpts
+from comb.synth.verify import verify as synth_verify
+from comb.synth.discover import discover_strat2
 
-from comb.stdlib import GlobalModules
+from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
 #Need to figure out how to load

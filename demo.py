@@ -1,9 +1,6 @@
-from comb.ast import TypeCall, BVType, IntValue
-from comb.compiler import compile_program
-from comb.symsel_synth import smart_iter, SymSelSynth
-from comb.synth import smt_solve_all, SolverOpts
-from comb.utils import bucket_combinations
-import hwtypes as ht
+from comb.frontend.compiler import compile_program
+from comb.frontend.symsel_synth import SymSelSynth
+from comb.synth.solver_utils import SolverOpts
 import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))

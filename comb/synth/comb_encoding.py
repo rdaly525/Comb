@@ -1,22 +1,19 @@
 import collections
 import itertools as it
-import typing as tp
-from dataclasses import dataclass
 
-import hwtypes as ht
 import networkx as nx
 from hwtypes import smt_utils as fc
 
-from . import Comb
-from .ast import Type, QSym, Sym, TypeCall, BVType, InDecl, OutDecl
-from .ir import AssignStmt, CombProgram
-from .stdlib import make_bv_const
-from .synth import PatternSynth, get_var, SBV, Pattern
-from .utils import flat, _to_int, _make_list, _list_to_dict
+from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
+from ..frontend.ir import AssignStmt, CombProgram
+from ..frontend.stdlib import make_bv_const
+from .pattern import PatternEncoding, SBV, Pattern
+from .solver_utils import get_var
+from .utils import flat, _to_int, _list_to_dict
 
 
 #This is the Gulwani Encoding
-class CombSynth(PatternSynth):
+class CombEncoding(PatternSynth):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         hard_consts = []

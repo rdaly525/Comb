@@ -1,10 +1,9 @@
-import typing as tp
-from .ast import Comb, Expr, Sym, QSym, Stmt, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
-    IntType, InDecl, Type, OutDecl, ASTCallExpr, IntValue, _CallExpr, BoolType, ASTObj, Node, _list_to_str
-from .ir import CombProgram, AssignStmt, CallExpr, _flat, Obj
-from .utils import _make_list
+from comb.frontend.ast import Expr, Sym, QSym, DeclStmt, ASTCombProgram, ASTAssignStmt, ParamDecl, TypeCall, \
+    IntType, InDecl, OutDecl, ASTCallExpr, IntValue, BoolType, ASTObj, Node
+from comb.frontend.ir import CombProgram, AssignStmt, CallExpr, _flat, Obj
+from comb.synth.utils import _make_list
 from DagVisitor import Visitor
-from .stdlib import GlobalModules
+from comb.frontend.stdlib import GlobalModules
 class SymRes(Visitor):
 
     def __init__(self, modules):

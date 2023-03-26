@@ -1,21 +1,12 @@
-import pysmt.shortcuts
 
-from . import Comb
-from .synth import PatternSynth, get_var
+from .pattern import PatternEncoding
+from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
 from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict
 import itertools as it
 
-#Very similar to Buchwald:
-#   Instead of using a straightline program to represent a graph I use an adjacency Matrix which literally represents the graph
-#   #Each query has a set of inputs, a set of outputs, and a set of ops. Each op has inputs and outputs
-#   #Each of these (inputs, outputs, op inputs, op outputs) are 'nodes' in the adjacency matrix
-#   #The values of the matrix are filled so that it represents a directed connection between some source and sink node
-#   #All that match the type and the 'source' and 'sink' have a boolean variable representing if it is connected or not
-#   #For each op the outputs depend on the inputs.
-#   Connection constraints are obvious. the adjacency matrix
 import pysmt.shortcuts as smt
 
 def exactly_one(*args):
@@ -49,7 +40,7 @@ def simp(v):
     return type(v)(v.value.simplify())
 
 #This is the adjacency encoding
-class AdjSynth(PatternSynth):
+class AdjEncoding(PatternEncoding):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

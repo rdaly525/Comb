@@ -1,9 +1,9 @@
-from . import Comb
-from .ast import QSym, TypeCall, BVType, IntValue
-from .rule_synth import RuleSynth
-from .synth import Cegis, SolverOpts, smt_solve_all, Pattern
-from .comb_synth import CombSynth
-from .utils import _list_to_counts, flat, _to_int, print_model, comb_type_to_sT
+from comb import Comb
+from comb.frontend.ast import TypeCall, BVType, IntValue
+from comb.synth.rule_synth import RuleSynth
+from comb.synth.pattern import Pattern
+from comb.synth.solver_utils import SolverOpts, smt_solve_all
+from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_sT
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht

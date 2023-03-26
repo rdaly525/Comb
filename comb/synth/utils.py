@@ -2,7 +2,7 @@ import functools
 import typing as tp
 import itertools as it
 
-from comb.ast import Type, BoolType, TypeCall, BVType
+from comb.frontend.ast import Type, BoolType, TypeCall, BVType
 
 
 def _list_to_counts(vals):

@@ -1,7 +1,9 @@
-from comb.comb_synth import CombSynth
-from comb.compiler import compile_program
-from comb.dag_synth import AdjSynth
-from comb.synth import SpecSynth, verify, SolverOpts, SymOpts
+from comb.frontend.compiler import compile_program
+from comb.synth.adj_encoding import AdjEncoding
+from comb.synth.pattern import SymOpts
+from comb.synth.spec_synth import SpecSynth
+from comb.synth.solver_utils import SolverOpts
+from comb.synth.verify import verify
 import pytest
 
 
@@ -74,7 +76,7 @@ o0 = bv.add[N](t0, t1)
 '''
 
 import itertools as it
-from comb.stdlib import GlobalModules
+from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
 @pytest.mark.parametrize("p,num_adds,num_sols", [
@@ -83,7 +85,7 @@ BV = GlobalModules['bv']
     #('add4', 3, 18),
 ])
 @pytest.mark.parametrize("pat_synth_t", [
-    AdjSynth,
+    AdjEncoding,
     #CombSynth,
 ])
 def test_add(p, num_adds, num_sols, pat_synth_t):
@@ -93,7 +95,7 @@ def test_add(p, num_adds, num_sols, pat_synth_t):
     ops = list(it.repeat(BV.add[N], num_adds))
     #ops = [BV.add[N] for _ in range(3)] + [BV.sub[N] for _ in range(3)]
     #ops = list(it.repeat(BV.sub[N], 1))
-    sym_opts = SymOpts(comm=True, same_op=True)
+    sym_opts = SymOpts(comm=False, same_op=False)
     sq = SpecSynth(spec, ops, pat_synth_t=pat_synth_t, sym_opts=sym_opts)
     combs = sq.gen_all_sols(
         opts=SolverOpts(
@@ -129,7 +131,7 @@ z = bv.mul[N](t0, t1)
 '''
 
 @pytest.mark.parametrize("pat_synth_t", [
-    AdjSynth,
+    AdjEncoding,
     #CombSynth,
 ])
 def test_op_sym(pat_synth_t):

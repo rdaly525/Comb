@@ -1,8 +1,7 @@
-from comb.ast import TypeCall, BVType, IntValue
-from comb.compiler import compile_program
-from comb.symsel_synth import smart_iter, SymSelSynth
-from comb.synth import smt_solve_all, SolverOpts
-from comb.utils import bucket_combinations
+from comb.frontend.compiler import compile_program
+from comb.frontend.symsel_synth import smart_iter, SymSelSynth
+from comb.synth.solver_utils import SolverOpts, smt_solve_all
+from comb.synth.utils import bucket_combinations
 import hwtypes as ht
 import os
 
@@ -17,7 +16,7 @@ def test_bucket_comb():
     for combs in bucket_combinations(vals, buckets):
         print(combs)
 
-from comb.rule_synth import enum_rule_partitions
+from comb.synth.rule_synth import enum_rule_partitions
 def test_enum_rule_partitions():
     op_list = ['A']*3+['B'] + ['C']*2
     rule_op_cnts = [dict(A=1,B=1,C=1), dict(A=2,C=1)]

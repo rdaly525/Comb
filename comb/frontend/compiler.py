@@ -1,7 +1,7 @@
-from .ast import ASTObj, QSym, Module
-from .lexer import get_parser, lexer
-from .passes import SymRes, VerifyNoAST
-from .stdlib import GlobalModules
+from comb.frontend.ast import ASTObj, QSym, Module
+from comb.frontend.lexer import get_parser, lexer
+from comb.frontend.passes import SymRes, VerifyNoAST
+from comb.frontend.stdlib import GlobalModules
 
 
 def compile_program(program: str, debug=False):

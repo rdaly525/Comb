@@ -1,6 +1,6 @@
-from .ast import IntType, Expr, TypeCall, BVType, IntValue, BVValue, QSym
+from .ast import IntType, Expr, TypeCall, BVType, IntValue, BVValue
 from .ir import CombPrimitive, CallExpr
-from .utils import _make_list
+from comb.synth.utils import _make_list
 
 
 class CombPeak(CombPrimitive):

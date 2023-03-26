@@ -1,9 +1,10 @@
-from comb.ast import BVType, IntValue, TypeCall
-from comb.compiler import compile_program
-from comb.synth import verify as synth_verify, SolverOpts
-from comb.rule_synth import RuleSynth
+from comb.frontend.ast import BVType, IntValue, TypeCall
+from comb.frontend.compiler import compile_program
+from comb.synth.solver_utils import SolverOpts
+from comb.synth.verify import verify as synth_verify
+from comb.synth.rule_synth import RuleSynth
 
-from comb.stdlib import GlobalModules
+from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
 def verify(ss, opts, gold, debug=False):
