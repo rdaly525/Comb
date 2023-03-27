@@ -68,15 +68,15 @@ class AdjEncoding(PatternEncoding):
                 snks.setdefault(n, []).extend((opi, i) for i in ids)
         self.srcs = srcs
         self.snks = snks
-        snk_list = []
-        src_poss = []
-        for n, n_snks in snks.items():
-            snk_list += n_snks
-            src_poss += [srcs[n] for _ in n_snks]
+        #snk_list = []
+        #src_poss = []
+        #for n, n_snks in snks.items():
+        #    snk_list += n_snks
+        #    src_poss += [srcs[n] for _ in n_snks]
 
 
         #idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
-        #idx_to_op.update({-1:'In', self.num_ops:'Out'})
+        #idx_to_op.update({-1:'io', self.num_ops:'io'})
 
         #Invalid edges are non-type matched
         # source and destination are same op
@@ -86,10 +86,10 @@ class AdjEncoding(PatternEncoding):
                 return True
             if src_i == -1 and snk_i == num_ops:
                 return True
-            if self.sym_opts.same_op:
-                raise NotImplementedError()
-                if idx_to_op[src_i] == idx_to_op[snk_i]:
-                    return src_i >= snk_i
+            #TODO
+            #if self.sym_opts.same_op:
+            #    if idx_to_op[src_i] == idx_to_op[snk_i]:
+            #        return src_i >= snk_i
             return False
 
 
@@ -100,13 +100,18 @@ class AdjEncoding(PatternEncoding):
                 return 'Out'
             return f"Op{v}"
 
+        #TODO What if you put in all the edges but made the invalid ones 0
+
         edges = {}
         for n, n_snks in snks.items():
             for snk in n_snks:
                 for src in srcs[n]:
-                    if not invalid_edge(src[0], snk[0]):
-                        vname = f"({kind_name(src[0])},{src[1]})->({kind_name(snk[0])},{snk[1]})"
-                        edges[(src, snk)] = get_var(vname, 0)
+                    key = (src, snk)
+                    if invalid_edge(src[0], snk[0]):
+                        edges[key] = ht.SMTBit(0)
+                    else:
+                        vname = f"{self.prefix}({kind_name(src[0])},{src[1]})->({kind_name(snk[0])},{snk[1]})"
+                        edges[key] = get_var(vname, 0)
 
         self.edges = edges
         #print("\nNE", len(self.edges))
@@ -180,19 +185,11 @@ class AdjEncoding(PatternEncoding):
         #ACYC Constraint
         #First construct adjacency matrix A
         #ACYC iff each power of A has 0s on the digonal
-        # op0_out0
-        # op0_out1
-        # op1_out0
-        # op1_out1
-        # op0_in0
-        # op0_in1
-        # ...
-        nodes = []
         #adj[src][snk]
         adj = [[None for _ in self.op_list] for _ in self.op_list]
         for src_i, src_op in enumerate(self.op_list):
             for snk_i, snk_op in enumerate(self.op_list):
-                vs = [v for ((_src_i, _), (_snk_i, _)), v in self.edges.items() if (src_i==_src_i and snk_i==_snk_i)]
+                vs = [v for ((_src_i, _), (_snk_i, _)), v in self.edges.items() if (src_i == _src_i and snk_i == _snk_i)]
                 adj[src_i][snk_i] = fc.Or(vs).to_hwtypes()
 
         #p(adj)
@@ -213,7 +210,6 @@ class AdjEncoding(PatternEncoding):
 
         #I only need to check the op outputs (As all the op inputs will be in the cycle)
         ret = fc.And(terms)
-        #print(ret.serialize())
         return ret
 
     @property
@@ -229,21 +225,59 @@ class AdjEncoding(PatternEncoding):
     @property
     def P_sym_same_op(self):
         assert self.sym_opts.same_op
-        #Tactic: for each same op, add a custom directed edge in the adj matrix
-        #Add constraints that all edges from a later same op to an early same op is 0
+        #Tactic: Same as the input_perm tactic
 
-        #P_op_order = []
-        #idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
-        #for (src, snk), v in self.edges.items():
-        #    src_i = src[0]
-        #    snk_i = snk[0]
-        #    if not all(isinstance(i, int) for i in (src_i, snk_i)):
-        #        continue
-        #    if idx_to_op[src_i] != idx_to_op[snk_i]:
-        #        continue
-        #    if snk_i <= src_i:
-        #        P_op_order.append(~v)
-        return fc.And([])
+        idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
+        idx_to_op.update({-1:'io', self.num_ops:'io'})
+
+        P_backedges = []
+
+        #For each op kind
+        ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        P_same_op = []
+        for op, op_ids in ops.items():
+            print(op)
+            #disable backedges?
+            assert all(op_ids[0] <= opi for opi in op_ids)
+            backedges = []
+            for i, opi in enumerate(op_ids):
+                for opj in op_ids[i+1:]:
+                    for lvar in [lvar for (src, snk), lvar in self.edges.items() if (src[0]==opj and snk[0]==opi)]:
+                        backedges.append(~lvar)
+            P_backedges.append(fc.And(backedges))
+            #TODO I think all these backedges are implied. by the used formulation. I could verify that
+
+            ens = []
+            for opi in op_ids:
+                num_outs = len(self.op_out_vars[opi])
+                if num_outs > 1:
+                    raise NotImplementedError()
+                lvars = [{snk:v for (src, snk), v in self.edges.items() if src==(opi, i)} for i in range(num_outs)][0]
+                ens.append(lvars)
+            assert all(en.keys() == ens[0].keys() for en in ens)
+            snks = sorted(ens[0].keys())
+            conds = []
+            used = [ht.SMTBit(0) for _ in op_ids]
+            for snk in snks:
+                lvars = [ens[opi][snk] for opi in range(len(op_ids))]
+                op_conds = []
+                for ui, u in enumerate(used[:-1]):
+                    op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
+                #print(snk, "*"*80)
+                #print(snk, "*"*80)
+                #print(", ".join([str(u.value) for u in used]))
+                #print("-"*80)
+                #for cond in op_conds:
+                #    print(cond.serialize())
+                used = [u | lvars[ui] for ui, u in enumerate(used)]
+                conds.append(fc.And(op_conds))
+            P_same_op.append(fc.And(conds))
+        ret = fc.And([
+            fc.And(P_backedges),
+            fc.And(P_same_op),
+        ])
+        return ret
+
 
     @property
     def P_sym_comm(self):
@@ -253,13 +287,7 @@ class AdjEncoding(PatternEncoding):
         for i, op in enumerate(self.op_list):
             if op.commutative:
                 comm_op_ids.append(i)
-        def in_to_int(src):
-            if src[0]=='In':
-                return (-1, src[1])
-            return src
         def gt(src_a, src_b):
-            src_a = in_to_int(src_a)
-            src_b = in_to_int(src_b)
             if src_a[0] == src_b[0]:
                 return src_a[1] > src_b[1]
             return src_a[0] > src_b[0]
@@ -285,16 +313,16 @@ class AdjEncoding(PatternEncoding):
         # Create a set of all sources/snks sorted by type
         P_perms = []
         for n, ids in input_T.items():
-            # in_lvars[in_idx][...]
-            in_lvars = []
-            for id in ids:
-                in_lvars.append([lvar for (src, _), lvar in self.edges.items() if src==('In', id)])
-            assert all(len(in_lvars[0]) == len(lvars) for lvars in in_lvars)
+            in_lvars = [{snk:lvar for (src, snk), lvar in self.edges.items() if src==(-1, ids[0])}]
+            snks = sorted(in_lvars[0].keys())
+            for id in ids[1:]:
+                src = (-1, id)
+                in_lvars.append({snk:self.edges[(src, snk)] for snk in snks})
 
             P_perm = []
             used = [ht.SMTBit(0) for _ in in_lvars]
-            for i in range(len(in_lvars[0])):
-                lvars = [in_lvars[in_i][i] for in_i in range(len(ids))]
+            for snk in snks:
+                lvars = [in_lvars[in_i][snk] for in_i in range(len(ids))]
                 assert len(used) == len(lvars)
                 i_perm = []
                 for ui, u in enumerate(used[:-1]):
@@ -302,7 +330,8 @@ class AdjEncoding(PatternEncoding):
                 used = [u | lvars[ui] for ui, u in enumerate(used)]
                 P_perm.append(fc.And(i_perm))
             P_perms.append(fc.And(P_perm))
-        return fc.And(P_perms)
+        ret = fc.And(P_perms)
+        return ret
 
     def pattern_from_sol(self, sol):
         p = Pattern(self.iT, self.oT, self.op_list)

@@ -211,6 +211,8 @@ class PatternEncoding:
             P_sym.append(self.P_sym_comm)
         if self.sym_opts.same_op:
             P_sym.append(self.P_sym_same_op)
+        if self.sym_opts.input_perm:
+            P_sym.append(self.P_sym_input_perm)
         return fc.And(P_sym)
 
     @cached_property

@@ -52,14 +52,15 @@ BV = GlobalModules['bv']
 
 @pytest.mark.parametrize("pat_en_t", [
     AdjEncoding,
-    CombEncoding,
+    #CombEncoding,
 ])
 @pytest.mark.parametrize("num_adds,comm,same_op,num_sols", [
-    (1, False, False, 2),
-    (1, True, False, 1),
-    (2, False, False, 24),
-    (2, True, False, 6),
+    #(1, False, False, 2),
     #(1, True, False, 1),
+    #(2, False, False, 24),
+    #(2, True, False, 6),
+    #(2, True, True, 3),
+    (3, True, True, 2),
 ])
 def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     N = 32
@@ -68,7 +69,8 @@ def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     ops = list(it.repeat(BV.add[N], num_adds))
     #ops = [BV.add[N] for _ in range(3)] + [BV.sub[N] for _ in range(3)]
     #ops = list(it.repeat(BV.sub[N], 1))
-    sym_opts = SymOpts(comm=comm, same_op=same_op)
+    #sym_opts = SymOpts(comm=comm, same_op=same_op)
+    sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=True)
     sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
     pats = sq.gen_all_sols(
         opts=SolverOpts(

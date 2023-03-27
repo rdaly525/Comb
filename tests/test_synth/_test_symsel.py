@@ -1,5 +1,5 @@
 from comb.frontend.compiler import compile_program
-from comb.frontend.symsel_synth import smart_iter, SymSelSynth
+from comb.synth.rule_discover import smart_iter, SymSelSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all
 from comb.synth.utils import bucket_combinations
 import hwtypes as ht

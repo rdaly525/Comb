@@ -1,5 +1,5 @@
 from comb.frontend.compiler import compile_program
-from comb.synth.discover import discover_up_to_N
+from comb.synth.synth_discover import discover_up_to_N
 from comb.frontend.stdlib import GlobalModules
 from comb.synth.solver_utils import SolverOpts
 import pytest

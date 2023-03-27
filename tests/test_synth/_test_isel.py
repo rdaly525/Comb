@@ -1,7 +1,7 @@
 from comb.frontend.compiler import compile_program
 from comb.synth.solver_utils import SolverOpts
 from comb.synth.verify import verify as synth_verify
-from comb.synth.discover import discover_strat2
+from comb.synth.synth_discover import discover_strat2
 
 from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']

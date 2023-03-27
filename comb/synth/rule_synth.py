@@ -1,6 +1,6 @@
-from comb import Comb
-from comb.frontend.ast import QSym
-from comb.synth import Cegis, SolverOpts, Pattern, SymOpts, PatternSynth
+from ..frontend.ast import Comb
+from .solver_utils import Cegis, SolverOpts
+from .pattern import Pattern, SymOpts, PatternEncoding
 from .comb_encoding import CombEncoding
 from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
 
@@ -101,7 +101,7 @@ def match_pattern(p: Pattern, cs: CombEncoding, ri_op_cnts):
         yield match_one_pattern(p, cs, pid_to_csid)
 
 def enum_dags(goal_T, rules):
-    from comb.frontend.symsel_synth import Rule
+    from comb.synth.rule_discover import Rule
     rules: tp.List[Rule] = rules
     goal_iT = comb_type_to_sT(goal_T[0])
     goal_oT = comb_type_to_sT(goal_T[1])
@@ -144,15 +144,17 @@ def enum_dags(goal_T, rules):
 class RuleSynth(Cegis):
     def __init__(
         self,
-        comb_type,
+        iT: tp.List[int],
+        oT: tp.List[int],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
-        pat_synth_t: tp.Type[PatternSynth],
+        pat_en_t: tp.Type[PatternEncoding],
         sym_opts: SymOpts = SymOpts(),
     ):
-        self.comb_type = comb_type
-        lhs_cs = pat_synth_t(comb_type, lhs_op_list, prefix="l", sym_opts=sym_opts)
-        rhs_cs = pat_synth_t(comb_type, rhs_op_list, prefix="r", sym_opts=sym_opts)
+        self.iT = iT
+        self.oT = oT
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=sym_opts)
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=sym_opts)
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
 
@@ -162,7 +164,7 @@ class RuleSynth(Cegis):
 
         P_input_perm = []
         if sym_opts.input_perm:
-            P_input_perm.append(lhs_cs.P_sym)
+            P_input_perm.append(lhs_cs.P_sym_input_perm)
 
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
@@ -185,13 +187,37 @@ class RuleSynth(Cegis):
                 )
             )
         ])
-        #print(lhs_cs.P_wfp.serialize())
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 
+    def gen_all_sols(self, opts=SolverOpts()):
+        #iTs, oTs = self.lhs_cs.comb_type
+        #def enum_fun(sol):
+        #    #for sol in gen_input_perms(iTs, sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
+        #    #    sol = self.lhs_cs.fix_comm(sol)
+        #    #    sol = self.rhs_cs.fix_comm(sol)
+        #    #    yield sol
+        #    for lhs_t_sol in self.lhs_cs.gen_all_program_orders(sol):
+        #        for t_sol in self.rhs_cs.gen_all_program_orders(lhs_t_sol):
+        #            for sol in gen_input_perms(iTs, t_sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
+        #                sol = self.lhs_cs.fix_comm(sol)
+        #                sol = self.rhs_cs.fix_comm(sol)
+        #                yield sol
+        #for i, sol in enumerate(self.cegis_all(opts, enum_fun=enum_fun)):
+        #    #sols = flat([self.cs.gen_op_permutations(sol) for sol in sols])
+        #    lhs_comb = self.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
+        #    rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
+        #    yield (lhs_comb, rhs_comb)
+
+        for sol in self.cegis_all(opts):
+            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
+            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
+            yield (lhs_pat, rhs_pat)
+
+
 
     def add_rule_cover(self, cover):
-        from comb.frontend.symsel_synth import Rule
+        from comb.synth.rule_discover import Rule
         cover: tp.List[tp.Tuple[Rule, int]] = cover
         rules = flat([[r for _ in range(cnt)] for r, cnt in cover])
         #Need to get type info for everthing
@@ -262,28 +288,6 @@ class RuleSynth(Cegis):
             self.lhs_cs.gen_all_program_orders(sol),
             self.rhs_cs.gen_all_program_orders(sol),
         )
-
-    # Tactic. Generate all the non-permuted solutions.
-    # For each of those solutions, generate all the permutations
-    def gen_all_sols(self, opts=SolverOpts()):
-        iTs, oTs = self.lhs_cs.comb_type
-        def enum_fun(sol):
-            #for sol in gen_input_perms(iTs, sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
-            #    sol = self.lhs_cs.fix_comm(sol)
-            #    sol = self.rhs_cs.fix_comm(sol)
-            #    yield sol
-            for lhs_t_sol in self.lhs_cs.gen_all_program_orders(sol):
-                for t_sol in self.rhs_cs.gen_all_program_orders(lhs_t_sol):
-                    for sol in gen_input_perms(iTs, t_sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
-                        sol = self.lhs_cs.fix_comm(sol)
-                        sol = self.rhs_cs.fix_comm(sol)
-                        yield sol
-        for i, sol in enumerate(self.cegis_all(opts, enum_fun=enum_fun)):
-            #sols = flat([self.cs.gen_op_permutations(sol) for sol in sols])
-            lhs_comb = self.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
-            rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
-            yield (lhs_comb, rhs_comb)
-
 
 def gen_input_perms(iTs, sol, l_lvars, r_lvars):
 

@@ -1,5 +1,5 @@
 from comb.frontend.compiler import compile_program
-from comb.frontend.symsel_synth import SymSelSynth
+from comb.synth.rule_discover import SymSelSynth
 from comb.synth.solver_utils import SolverOpts
 import os
 
