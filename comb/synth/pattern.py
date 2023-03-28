@@ -14,17 +14,48 @@ import itertools as it
 #Inputs are encoded as -1
 #Outputs are encoded as num_ops
 
-class PNode:
-    def __init__(self, idx, op_name, *args):
-        self.idx = idx
-        self.op_name = op_name
-        self.args = args
-        assert all(isinstance(arg[0], PNode) and arg[1] >=0 for arg in args)
+def matcher(from_pat, from_root, to_pat, to_root):
+    r = from_pat
+    r_root = from_root
+    l = to_pat
+    l_root = to_root
+    def match(l_src, r_src, ctx):
+        l_idx, l_arg = l_src
+        r_idx, r_arg = r_src
+        #Check if already done or if mismatch
+
+        #TODO base case for (-1)
+        if r_idx == -1:
+            ctx = {r_src: l_src, **ctx}
+            return ctx
+        if l_arg != r_arg:
+            return None
+
+        if r_idx in ctx:
+            if ctx[r_idx]==l_idx:
+                return ctx
+            else:
+                return None
+
+        if l.op_names[l_idx] != r.op_names[r_idx]:
+            return None
+
+        for l_src, r_src in zip(l.nodes[l_idx], r.nodes[r_idx]):
+            #Out index must be the same
+            match_ctx = match(l_src, r_src, ctx)
+            if match_ctx is None:
+                return None
+            ctx = {**match_ctx, **ctx}
+        ctx = {r_idx:l_idx, **ctx}
+        return ctx
+    return match(l_root, r_root, {})
 
 class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb]):
         assert all(n >=0 for n in iT)
         assert all(n >=0 for n in oT)
+        if len(oT) > 1:
+            raise NotImplementedError()
         self.iT = iT
         self.oT = oT
         self.ops = ops
@@ -83,51 +114,23 @@ class Pattern:
     def __ne__(self, other):
         return not (self==other)
 
-    #Matching other to self starting at specified self root
-    #Returns a mapping from other -> self
-    def pattern_match(self, root, other: 'Pattern'):
-        l = self
-        r = other
-        def match(l_src, r_src, ctx):
-            l_idx, l_arg = l_src
-            r_idx, r_arg = r_src
-            #Check if already done or if mismatch
-
-            #TODO base case for (-1)
-            if r_idx == -1:
-                ctx = {r_src: l_src, **ctx}
-                return ctx
-            if l_arg != r_arg:
-                return None
-
-            if r_idx in ctx:
-                if ctx[r_idx]==l_idx:
-                    return ctx
-                else:
-                    return None
-
-            if l.op_names[l_idx] != r.op_names[r_idx]:
-                return None
-
-            for l_src, r_src in zip(l.nodes[l_idx], r.nodes[r_idx]):
-                #Out index must be the same
-                match_ctx = match(l_src, r_src, ctx)
-                if match_ctx is None:
-                    return None
-                ctx = {**match_ctx, **ctx}
-            ctx = {r_idx:l_idx, **ctx}
-            return ctx
-        return match(root, other.root, {})
-
 
     def __eq__(self, other):
         if not isinstance(other, Pattern):
             return False
-        matches = self.pattern_match(self.root, other)
+        if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
+            return False
+        matches = matcher(other, other.root, self, self.root)
         if matches is None:
             return False
-        else:
-            return True
+        inputs = [(-1, i) for i in range(len(self.iT))]
+        matched_inputs = (matches[input] for input in inputs)
+        if set(inputs) != set(matched_inputs):
+            return False
+        return True
+
+
+
 
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "

@@ -105,8 +105,8 @@ o0 = bv.sub[N](x, y)
 
 
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
-    #CombEncoding,
+    #AdjEncoding,
+    CombEncoding,
 ])
 @pytest.mark.parametrize("same_op,num_sols", [
     (True, 21),
@@ -125,21 +125,17 @@ def test_same_op(pat_en_t, same_op, num_sols):
         ),
     )
     #pats = list(pats)
-    #print("SOLS:", len(pats))
-
+    pats = list(pats)
+    print("SOLS:", len(pats))
     for pi, pat in enumerate(pats):
-        if pi==0:
-            pat0 = pat
         print(pi, "*"*80)
         print(pat)
         combi = pat.to_comb("t", f"P{pi}")
         print(combi)
         res = verify(combi, spec)
         assert res is None
-        if pi > 1:
-            assert pat != pat0
-    assert len(pats) == num_sols
-    assert all(pats[0] != pat for pat in pats[1:])
+        for patj in pats[pi+1:]:
+            assert pat != patj
 
 
 

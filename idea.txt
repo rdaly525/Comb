@@ -120,3 +120,7 @@ Then all indices of rule1 occurs before all indices of rule 2 (for like ops)
             If I do that, I could probably add in 'all' the comm stuff
 
 
+#Should talk about in paper:
+same_op symmetry is not as simple as string program order. I must do my thing.
+
+
