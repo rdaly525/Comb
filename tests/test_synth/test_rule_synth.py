@@ -32,7 +32,7 @@ def verify(ss, opts, gold, debug=False):
 @pytest.mark.parametrize("comm,same_op,input_perm,num_sols", [
     #(False, False, False, 24*24),
     #(True, False, False, 6*6),
-    (True, True, False, 12),
+    (True, True, True, 12),
     #(True, True, True, 1),
     #(False, False, 24),
     #(True, False, 6),
@@ -42,7 +42,11 @@ def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
     #Synthesize Distributive rule for Multiplication
     lhs = [BV.add[N]]*4
     rhs = [BV.add[N]]*4
-    iT = [N for _ in range(5)]
+    #lhs = [BV.add[N]]*2 + [BV.not_[N]]
+    #rhs = [BV.add[N]]*2 + [BV.not_[N]]
+    lhs = [BV.not_[N]]*2 + [BV.add[N]]*2
+    rhs = [BV.not_[N]]*2 + [BV.add[N]]*2
+    iT = [N for _ in range(3)]
     oT = [N]
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=input_perm)
     ss = RuleSynth(
@@ -53,7 +57,7 @@ def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
         pat_en_t=pat_en_t,
         sym_opts=sym_opts
     )
-    opts = SolverOpts(verbose=0, max_iters=1000, solver_name='z3')
+    opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
     rules = ss.gen_all_sols(opts=opts)
     #rules = list(rules)
     for i, (l, r) in enumerate(rules):

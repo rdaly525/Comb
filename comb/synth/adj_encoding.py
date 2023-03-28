@@ -234,9 +234,12 @@ class AdjEncoding(PatternEncoding):
 
         #For each op kind
         ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        self.op_to_snks = {}
         P_same_op = []
         for op, op_ids in ops.items():
-            print(op)
+            if len(op_ids) == 1:
+                continue
+
             #disable backedges?
             assert all(op_ids[0] <= opi for opi in op_ids)
             backedges = []
@@ -245,7 +248,8 @@ class AdjEncoding(PatternEncoding):
                     for lvar in [lvar for (src, snk), lvar in self.edges.items() if (src[0]==opj and snk[0]==opi)]:
                         backedges.append(~lvar)
             P_backedges.append(fc.And(backedges))
-            #TODO I think all these backedges are implied. by the used formulation. I could verify that
+            #TODO I think all these backedges are implied. by the used formulation. I could verify that...?
+            # I think they are only implied if I order my 'snk' list so that the same ops are first
 
             ens = []
             for opi in op_ids:
@@ -256,6 +260,12 @@ class AdjEncoding(PatternEncoding):
                 ens.append(lvars)
             assert all(en.keys() == ens[0].keys() for en in ens)
             snks = sorted(ens[0].keys())
+            op_snks = []
+            for opi in op_ids:
+                op_snks += [snk for snk in snks if snk[0]==opi]
+            snks = op_snks + [snk for snk in snks if snk not in op_snks]
+            self.op_to_snks[op] = snks
+
             conds = []
             used = [ht.SMTBit(0) for _ in op_ids]
             for snk in snks:
@@ -271,11 +281,15 @@ class AdjEncoding(PatternEncoding):
                 #    print(cond.serialize())
                 used = [u | lvars[ui] for ui, u in enumerate(used)]
                 conds.append(fc.And(op_conds))
+            print(op)
+            print(fc.And(conds).serialize())
             P_same_op.append(fc.And(conds))
-        ret = fc.And([
-            fc.And(P_backedges),
-            fc.And(P_same_op),
-        ])
+        #ret = fc.And([
+        #    fc.And(P_backedges),
+        #    fc.And(P_same_op),
+        #])
+        ret = fc.And(P_same_op)
+        #print(ret.serialize())
         return ret
 
 
