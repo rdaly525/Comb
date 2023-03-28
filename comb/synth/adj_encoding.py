@@ -281,8 +281,8 @@ class AdjEncoding(PatternEncoding):
                 #    print(cond.serialize())
                 used = [u | lvars[ui] for ui, u in enumerate(used)]
                 conds.append(fc.And(op_conds))
-            print(op)
-            print(fc.And(conds).serialize())
+            #print(op)
+            #print(fc.And(conds).serialize())
             P_same_op.append(fc.And(conds))
         #ret = fc.And([
         #    fc.And(P_backedges),

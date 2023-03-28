@@ -51,16 +51,16 @@ BV = GlobalModules['bv']
 
 
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
-    #CombEncoding,
+    #AdjEncoding,
+    CombEncoding,
 ])
 @pytest.mark.parametrize("num_adds,comm,same_op,num_sols", [
     #(1, False, False, 2),
     #(1, True, False, 1),
     #(2, False, False, 24),
-    #(2, True, False, 6),
+    (2, True, False, 6),
     #(2, True, True, 3),
-    (3, True, True, 2),
+    #(3, True, True, 2),
 ])
 def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     N = 32
@@ -70,6 +70,7 @@ def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     #ops = [BV.add[N] for _ in range(3)] + [BV.sub[N] for _ in range(3)]
     #ops = list(it.repeat(BV.sub[N], 1))
     #sym_opts = SymOpts(comm=comm, same_op=same_op)
+    #sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=True)
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=True)
     sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
     pats = sq.gen_all_sols(
@@ -90,6 +91,56 @@ def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
         assert res is None
     assert len(pats) == num_sols
     assert all(pats[0] != pat for pat in pats[1:])
+
+
+
+sameop_f = '''\
+Comb test.sameop
+Param N: Int
+In x : BV[N]
+In y : BV[N]
+Out o0 : BV[N]
+o0 = bv.sub[N](x, y)
+'''
+
+
+@pytest.mark.parametrize("pat_en_t", [
+    AdjEncoding,
+    #CombEncoding,
+])
+@pytest.mark.parametrize("same_op,num_sols", [
+    (True, 21),
+])
+def test_same_op(pat_en_t, same_op, num_sols):
+    N = 32
+    obj = compile_program(sameop_f)
+    spec = obj.comb_dict[f"test.sameop"][N]
+    ops = [BV.not_[N]]*4 + [BV.sub[N]]
+    sym_opts = SymOpts(comm=False, same_op=same_op, input_perm=False)
+    sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=1000,
+            verbose=1,
+        ),
+    )
+    #pats = list(pats)
+    #print("SOLS:", len(pats))
+
+    for pi, pat in enumerate(pats):
+        if pi==0:
+            pat0 = pat
+        print(pi, "*"*80)
+        print(pat)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, spec)
+        assert res is None
+        if pi > 1:
+            assert pat != pat0
+    assert len(pats) == num_sols
+    assert all(pats[0] != pat for pat in pats[1:])
+
 
 
 sub_file = '''

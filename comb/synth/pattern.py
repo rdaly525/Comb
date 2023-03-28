@@ -8,11 +8,18 @@ import typing as tp
 from .solver_utils import get_var
 from .utils import _make_list, type_to_N, _list_to_dict, N_to_type
 from ..frontend.ir import CombProgram, AssignStmt
-
+import itertools as it
 
 #Represnts the raw dag structure of a particular pattern
 #Inputs are encoded as -1
 #Outputs are encoded as num_ops
+
+class PNode:
+    def __init__(self, idx, op_name, *args):
+        self.idx = idx
+        self.op_name = op_name
+        self.args = args
+        assert all(isinstance(arg[0], PNode) and arg[1] >=0 for arg in args)
 
 class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb]):
@@ -21,7 +28,7 @@ class Pattern:
         self.iT = iT
         self.oT = oT
         self.ops = ops
-        self.nodes = list(range(-1, len(ops)+1))
+        self.node_range = range(-1, len(ops)+1)
         self.edges = []
         self.op_iTs = []
         self.op_oTs = []
@@ -29,10 +36,12 @@ class Pattern:
             iT, oT = op.get_type()
             self.op_iTs.append([type_to_N(t) for t in iT])
             self.op_oTs.append([type_to_N(t) for t in oT])
+        self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
+        self.root = (len(ops), 0) #TODO only works for single output
 
     @cached_property
     def op_names(self):
-        return [op.qualified_name for op in self.ops]
+        return [op.qualified_name for op in self.ops] + ["IO"]
 
     @cached_property
     def num_ops(self):
@@ -40,8 +49,8 @@ class Pattern:
 
     def add_edge(self, lhs, rhs):
         assert len(lhs)==2 and len(rhs)==2
-        assert lhs[0] in self.nodes
-        assert rhs[0] in self.nodes
+        assert lhs[0] in self.node_range
+        assert rhs[0] in self.node_range
         if lhs[0] == -1:
             lhs_t = self.iT[lhs[1]]
         else:
@@ -53,29 +62,72 @@ class Pattern:
             rhs_t = self.op_iTs[rhs[0]][rhs[1]]
         assert lhs_t == rhs_t
         self.edges.append((lhs, rhs))
+        self.nodes[rhs[0]][rhs[1]] = lhs
 
-    @property
-    def interior_edges(self):
-        yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
+    #@property
+    #def interior_edges(self):
+    #    yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
 
-    @property
-    def in_edges(self):
-        yield from (e for e in self.edges if e[0][0]==-1)
+    #@property
+    #def in_edges(self):
+    #    yield from (e for e in self.edges if e[0][0]==-1)
 
-    @property
-    def out_edges(self):
-        yield from (e for e in self.edges if e[1][0]==self.num_ops)
+    #@property
+    #def out_edges(self):
+    #    yield from (e for e in self.edges if e[1][0]==self.num_ops)
 
     @cached_property
     def op_dict(self):
         return _list_to_dict(self.op_names)
 
+    def __ne__(self, other):
+        return not (self==other)
+
+    #Matching other to self starting at specified self root
+    #Returns a mapping from other -> self
+    def pattern_match(self, root, other: 'Pattern'):
+        l = self
+        r = other
+        def match(l_src, r_src, ctx):
+            l_idx, l_arg = l_src
+            r_idx, r_arg = r_src
+            #Check if already done or if mismatch
+
+            #TODO base case for (-1)
+            if r_idx == -1:
+                ctx = {r_src: l_src, **ctx}
+                return ctx
+            if l_arg != r_arg:
+                return None
+
+            if r_idx in ctx:
+                if ctx[r_idx]==l_idx:
+                    return ctx
+                else:
+                    return None
+
+            if l.op_names[l_idx] != r.op_names[r_idx]:
+                return None
+
+            for l_src, r_src in zip(l.nodes[l_idx], r.nodes[r_idx]):
+                #Out index must be the same
+                match_ctx = match(l_src, r_src, ctx)
+                if match_ctx is None:
+                    return None
+                ctx = {**match_ctx, **ctx}
+            ctx = {r_idx:l_idx, **ctx}
+            return ctx
+        return match(root, other.root, {})
+
+
     def __eq__(self, other):
-        return True and \
-            self.iT == other.iT and \
-            self.oT == other.oT and \
-            self.op_names == other.op_names and \
-            set(self.edges) ==set(other.edges)
+        if not isinstance(other, Pattern):
+            return False
+        matches = self.pattern_match(self.root, other)
+        if matches is None:
+            return False
+        else:
+            return True
 
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
