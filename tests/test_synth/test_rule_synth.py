@@ -44,9 +44,9 @@ def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
     rhs = [BV.add[N]]*4
     #lhs = [BV.add[N]]*2 + [BV.not_[N]]
     #rhs = [BV.add[N]]*2 + [BV.not_[N]]
-    lhs = [BV.not_[N]]*2 + [BV.add[N]]*2
-    rhs = [BV.not_[N]]*2 + [BV.add[N]]*2
-    iT = [N for _ in range(3)]
+    #lhs = [BV.not_[N]]*2 + [BV.add[N]]*2
+    #rhs = [BV.not_[N]]*2 + [BV.add[N]]*2
+    iT = [N for _ in range(5)]
     oT = [N]
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=input_perm)
     ss = RuleSynth(

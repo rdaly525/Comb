@@ -187,6 +187,7 @@ class RuleSynth(Cegis):
                 )
             )
         ])
+        print(query.serialize())
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 
