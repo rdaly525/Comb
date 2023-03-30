@@ -46,8 +46,8 @@ class Cegis:
             query = smt.And(query, smt.Not(sol_term))
 
         #get exist vars:
-        E_vars = set(var.value for var in self.E_vars)  # forall_vars
-        A_vars = query.get_free_variables() - E_vars  # exist vars
+        E_vars = set(var.value for var in self.E_vars)  # exist_vars
+        A_vars = query.get_free_variables() - E_vars  # forall vars
 
         with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
             solver.add_assertion(smt.Bool(True))

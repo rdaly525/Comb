@@ -124,3 +124,40 @@ Then all indices of rule1 occurs before all indices of rule 2 (for like ops)
 same_op symmetry is not as simple as string program order. I must do my thing.
 
 
+
+Task List:
+	Required:
+		CombEncoding.P_sym_same_op
+		DepthEncoding.P_sym_same_op
+		DepthEncoding.P_sym_input_perm
+		#Starting a Paper Overleaf
+		Rule Synth with Spec Synth:
+		Update Rules to include lists of Patterns
+
+		Composition matching but adhere to syms
+		I also need to actually write the damn paper. When am I going to do that???
+		I should get it done in the next 2 weeks ideally…?
+
+		Read the papers råeferenced in Clarks’ target.
+		Explicity write out the experiments that I want to run.
+		Experiments:
+			Comparison of different methods
+		Main Results:
+			Pre-filtering is more efficient than post-filtering
+				Do for Spec Synth and Rule Synth.
+				Rule
+			Perf comparison between the 3 Encodings:
+			Effect of each symmetry (When you turn them off and on)
+			Actually perform instruction selection on real CoreIR graphs with real rules.
+
+	Features:
+		Update commutativity to be general
+		Determine commutativity of spec automatically
+
+
+
+
+
+
+
+

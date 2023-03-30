@@ -176,7 +176,7 @@ class CombEncoding(PatternEncoding):
             used = [ht.SMTBit(0) for _ in ids]
             for snk in snks:
                 snk_lvar = snk_dict[snk][0]
-                lvars = [snk_lvar==src_dict[(-1, id)][0] for id in ids]
+                lvars = [snk_lvar == src_dict[(-1, id)][0] for id in ids]
                 i_perm = []
                 for ui, u in enumerate(used[:-1]):
                     i_perm.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))

@@ -14,7 +14,15 @@ import itertools as it
 #Inputs are encoded as -1
 #Outputs are encoded as num_ops
 
-def matcher(from_pat, from_root, to_pat, to_root):
+@dataclass
+class SymOpts:
+    comm: bool = False
+    same_op: bool = False
+    input_perm: bool = False
+
+#(canonicalize comm=True means allow ckecing comm
+#(canonicalize same ops means
+def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
     r = from_pat
     r_root = from_root
     l = to_pat
@@ -37,16 +45,34 @@ def matcher(from_pat, from_root, to_pat, to_root):
             else:
                 return None
 
-        if l.op_names[l_idx] != r.op_names[r_idx]:
+        if not opts.same_op:
+            if l.op_names[l_idx] != r.op_names[r_idx]:
+                return None
+        else:
+            if l_idx != r_idx:
+                return None
+        l_nodes = [l.nodes[l_idx]]
+        if l_idx in range(l.num_ops) and not l.ops[l_idx].commutative:
+            l_nodes.append(reversed(l.nodes[l_idx]))
+
+        succ_ctx = None
+        for l_node in l_nodes:
+            cur_succ = True
+            ctx_ = {**ctx}
+            for l_src, r_src in zip(l_node, r.nodes[r_idx]):
+                #Out index must be the same
+                match_ctx = match(l_src, r_src, ctx)
+                if match_ctx is None:
+                    cur_succ = False
+                    break
+                ctx_ = {**match_ctx, **ctx_}
+            if cur_succ:
+                succ_ctx = ctx_
+                break
+        if succ_ctx is None:
             return None
 
-        for l_src, r_src in zip(l.nodes[l_idx], r.nodes[r_idx]):
-            #Out index must be the same
-            match_ctx = match(l_src, r_src, ctx)
-            if match_ctx is None:
-                return None
-            ctx = {**match_ctx, **ctx}
-        ctx = {r_idx:l_idx, **ctx}
+        ctx = {r_idx:l_idx, **ctx_}
         return ctx
     return match(l_root, r_root, {})
 
@@ -111,25 +137,20 @@ class Pattern:
     def op_dict(self):
         return _list_to_dict(self.op_names)
 
-    def __ne__(self, other):
-        return not (self==other)
-
-
-    def __eq__(self, other):
+    def equal(self, other, opts: SymOpts):
         if not isinstance(other, Pattern):
             return False
         if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
             return False
-        matches = matcher(other, other.root, self, self.root)
+        matches = matcher(other, other.root, self, self.root, opts)
         if matches is None:
             return False
-        inputs = [(-1, i) for i in range(len(self.iT))]
-        matched_inputs = (matches[input] for input in inputs)
-        if set(inputs) != set(matched_inputs):
-            return False
-        return True
-
-
+        if not opts.input_perm:
+            inputs = [(-1, i) for i in range(len(self.iT))]
+            matched_inputs = (matches[input] for input in inputs)
+            return set(inputs) == set(matched_inputs)
+        else:
+            return all((-1, i)==matches[(-1,i)] for i in range(len(self.iT)))
 
 
     def __str__(self):
@@ -177,12 +198,6 @@ class Pattern:
         comb = CombProgram(QSym(ns, name), stmts)
         return comb
 
-
-@dataclass
-class SymOpts:
-    comm: bool = False
-    same_op: bool = False
-    input_perm: bool = False
 
 
 class PatternEncoding:
