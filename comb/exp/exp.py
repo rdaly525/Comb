@@ -5,7 +5,7 @@ import typing as tp
 
 from hwtypes.adt import Tuple, Enum, Sum, TaggedUnion
 
-from comb.ir import _flat
+from comb.frontend.ir import _flat
 
 
 class ADTEnum:

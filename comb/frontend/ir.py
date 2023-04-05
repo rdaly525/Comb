@@ -9,27 +9,6 @@ import pysmt.shortcuts as smt
 import functools
 
 
-
-def _make_list(v):
-    if not isinstance(v, (list, tuple)):
-        return [v]
-    else:
-        return list(v)
-
-def _unwrap_list(v):
-    if isinstance(v, (list, tuple)) and len(v)==1:
-        return v[0]
-    else:
-        return v
-
-
-def ret_list(f):
-    @functools.wraps(f)
-    def dec(*args, **kwargs):
-        return _make_list(f(*args, **kwargs))
-    return dec
-
-
 @dataclass
 class CallExpr(_CallExpr):
     comb: Comb
@@ -82,6 +61,12 @@ class CombSpecialized(Comb):
         self.pargs = [IntValue(parg) for parg in pargs]
         self.commutative = comb.commutative
 
+    @property
+    def qualified_name(self):
+        p_str = "[" + ",".join(str(p) for p in self.pargs) + "]"
+        return f"{self.name}{p_str}"
+
+
     def get_type(self):
         return self.comb.get_type(*self.pargs)
 
@@ -104,7 +89,7 @@ class CombSpecialized(Comb):
         raise NotImplementedError()
 
     def __str__(self):
-        return str(self.name)
+        return f"{self.qualified_name} ->\n{str(self.comb)}"
 
 '''
 Symbol resolution goes from ASTCombProgram -> Comb Program
@@ -238,6 +223,9 @@ class Obj(Node):
     def __init__(self, combs):
         super().__init__(*combs)
         self.comb_dict = OrderedDict({str(comb.name): comb for comb in combs})
+
+    def get(self, k):
+        return self.comb_dict.get(k, None)
 
     def __str__(self):
         return "\n\n".join(str(comb) for comb in self.comb_dict.values())

@@ -1,0 +1,171 @@
+How do I find all the rewrite rules given my scheme?
+Only save minimal rewrite rules.
+Exclude all constructive examples of rules or excluide direclty in the formula
+
+Is there a way to detect if a rule is within a program. Basically determine if a rule matches
+I could construct direct "does this match" code embedded in the formula. There absolutely is.
+
+If I added those exclusions, I do not think I need to enumerate either 
+  the input permutations
+  nor the program permutations.
+  nor the commutative permutations 
+As long as it was all 'enumerated' in the matching function
+
+Symbolic pattern matching to construct a constrained search
+
+I cannot merely perform symbolic pattern matching. I need a full covering in order to exclude it.
+
+So the issue I am thinking is:
+Lets say I have a very simple rewrite rule ie a.mul -> b.mul
+    Do I really want to exclude any rewrite rule like a*(b+c) -> a*b + a*c.
+    I do not.
+    In order for this to work, I must do full symbolic instruction selection
+        What this means is find a set of rewrite rules whose sum matches all the ops.a
+        then allocate ops to each pattern.
+        Create the inter-pattern constraints
+
+I need to think how plausable this actually is.
+    I think it actually might be plausable. I should get up early to try and implement it.
+    Doing the constructive version (to create all the exclusions) would probably be very helpful.
+There is an interesting sub problem I also need to solve. Basically how can I use a multi-subset of
+the existing rewrite rules
+I could literally code that up in SMT. That is a pretty simple sub problem.
+
+The real question is how to encode all the matches
+
+a.sub(x, y) -> b.sub(x, y)
+
+In X
+In Y
+a.sub(?,?)
+
+
+The ordering of searching for rules is well defined. Do all (1,1) before any (1,2). Do any (1,2) before (2,2) etc...
+    This can be easily proven
+
+Issue:
+    If the pattern itself contains independent dags?
+        This is technically possible but only when one side is a single dag and the other are independent dags
+        This is only possible if one side is not independent from the other side
+
+
+
+TODO Issues to deal with
+    -Create the adjancency graph
+    -I should try out better filtering methods.
+      What if I literally used the solver to show that it is false?
+    -Given certain rules I can safely not search for certain other 'bigger' rules
+    -Discover and assign commutative rules
+    -QOL: print rules to DOT
+    -QOL: Verify rewrite rules after creation
+    -Allow for rewrite rules like: (A-A)+A -> (A)
+
+
+DONE:
+    using two different rules causes assertion error (mul,add)
+         Fixed
+    -QOL: Cache the variables in the Synth query. Do not create new ones ever new class
+        DONE
+    -(mul, mul) -> (mul, mul) does not get properly excluded
+        This is because I am not leveraging multiplication properties
+
+
+How to handle commutative ops:
+Idea:
+    Treat mul as only having 1 input for the sake of the edges.
+    Problem is how I execute the library functions
+
+    Also another idea to think through: Do a similar thing with the inputs. Treat them as 1 'weighted edge' perhaps
+    z0 = in[0]
+    z1 = in[2]
+    z2 = in[3]
+    z3 = Mul(x0, x1)
+    z4 = Add(x2, x3)
+    out(z4)
+
+    Edges: z0->x01
+    Edges: z1->x01
+    Edges: z2->x01
+    Edges: z4->x01
+
+I can encode the input issue
+   No, A, B, C
+I0 |1  0  0  0
+I1 |0  0  1  0
+...|
+IN |1  0  0  0
+
+I need to canonicalize so that the upper right triangle is 0
+This will be a series of column swaps (A<->B) followd by (B<->C)
+
+#Now how to solve the same op issue
+#Problem: If I have the same op, the issue is 'similar'
+# I can use the adjacency matrix to exclude not only looping paths, but paths where ops need to be before other ops
+
+
+#I have an issue with filtering multiple matches to rewrite rules. I need to make sure iff Rule1 occurs earlier than rule 2,
+Then all indices of rule1 occurs before all indices of rule 2 (for like ops)
+
+
+
+
+(I had this idea while 15mg high + 2 beers deep)
+
+#Current issue:
+    I am not able to match up the number of matches for dag_synth and comb_synth
+        This now works.
+    I should actually go from dag_synth sols to pattern/comb
+    I should encode the generic comm conditions for both Dag_synth and comb_synth.
+       As in this should actually do all the possible commutative proving things and create the commutative dict generically.
+            If I do that, I could probably add in 'all' the comm stuff
+
+
+#Should talk about in paper:
+same_op symmetry is not as simple as string program order. I must do my thing.
+
+
+
+Current:
+    Wrote sym_same_op for comb and adj
+    Want to test it
+    Comm=False, same_op=False broken in spec_synth test
+        Bug in Pattern equality.
+    Fixed pattern Equality
+    Comb.sym_same_op works
+    Adj.sym_same_op works
+    Done on P_sym_same_op
+
+Task List:
+	Required:
+		DepthEncoding.P_sym_input_perm
+		#Starting a Paper Overleaf
+		Rule Synth with Spec Synth:
+		Update Rules to include lists of Patterns
+
+		Composition matching but adhere to syms
+		I also need to actually write the damn paper. When am I going to do that???
+		I should get it done in the next 2 weeks ideally…?
+
+		Read the papers råeferenced in Clarks’ target.
+		Explicity write out the experiments that I want to run.
+		Experiments:
+			Comparison of different methods
+		Main Results:
+			Pre-filtering is more efficient than post-filtering
+				Do for Spec Synth and Rule Synth.
+				Rule
+			Perf comparison between the 3 Encodings:
+			Effect of each symmetry (When you turn them off and on)
+			Actually perform instruction selection on real CoreIR graphs with real rules.
+
+	Features:
+		Update commutativity to be general
+		Determine commutativity of spec automatically
+
+
+
+
+
+
+
+

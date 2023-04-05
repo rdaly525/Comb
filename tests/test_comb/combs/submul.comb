@@ -1,0 +1,27 @@
+Comb sm.sub
+Param N: Int
+In a: BV[N]
+In b: BV[N]
+Out o: BV[N]
+o = bv.sub[N](a, b)
+
+Comb sm.mul
+Param N: Int
+In a: BV[N]
+In b: BV[N]
+Out o: BV[N]
+o = bv.mul[N](a, b)
+
+Comb sm.C
+Param N: Int
+Param val: Int
+Out o: BV[N]
+o = bv.const[N](val)
+
+Comb sm.addC
+Param N: Int
+Param val: Int
+In a: BV[N]
+Out o: BV[N]
+c = bv.const[N](val)
+o = bv.add[N](a, c)

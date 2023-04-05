@@ -1,9 +1,7 @@
-import functools
-
 import hwtypes as ht
-from .ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
-from .comb_peak import CombPeak
-from .ir import CombPrimitive, CallExpr, CombSpecialized
+from comb.frontend.ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
+from comb.frontend.comb_peak import CombPeak
+from comb.frontend.ir import CombPrimitive, CallExpr, CombSpecialized
 
 
 class IntBinaryOp(CombPrimitive):

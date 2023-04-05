@@ -1,9 +1,7 @@
 import hwtypes as ht
 from peak import family_closure, Peak, Const
-from comb.exp import enumerate_peak, enumerate_adt
-from comb.ast import QSym
-from comb.comb_peak import CombPeak
-import pytest
+from comb.exp import enumerate_adt
+
 
 class Op(ht.Enum):
     Add = ht.new_instruction()
