@@ -1,6 +1,6 @@
 import itertools
 
-from comb.synth.pattern import Pattern
+from comb.synth.pattern import Pattern, SymOpts
 
 from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
@@ -38,5 +38,6 @@ def test_pattern_eq():
     for edges, p in zip(edges_list, ps):
         for e in edges:
             p.add_edge(*e)
+    opts = SymOpts(comm=False,same_op=True, input_perm=True)
     for pa, pb in itertools.combinations(ps, 2):
-        assert pa == pb
+        assert pa.equal(pb, opts)
