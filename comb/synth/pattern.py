@@ -28,38 +28,39 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
     l = to_pat
     l_root = to_root
     def match(l_src, r_src, ctx):
-        l_idx, l_arg = l_src
-        r_idx, r_arg = r_src
+        l_opi, l_arg = l_src
+        r_opi, r_arg = r_src
         #Check if already done or if mismatch
 
         #TODO base case for (-1)
-        if r_idx == -1:
+        if r_opi == -1:
             ctx = {r_src: l_src, **ctx}
             return ctx
         if l_arg != r_arg:
             return None
 
-        if r_idx in ctx:
-            if ctx[r_idx]==l_idx:
+        if r_opi in ctx:
+            if ctx[r_opi]==l_opi:
                 return ctx
             else:
                 return None
 
-        if not opts.same_op:
-            if l.op_names[l_idx] != r.op_names[r_idx]:
+        if opts.same_op:
+            if l.op_names[l_opi] != r.op_names[r_opi]:
                 return None
         else:
-            if l_idx != r_idx:
+            if l_opi != r_opi:
                 return None
-        l_nodes = [l.nodes[l_idx]]
-        if l_idx in range(l.num_ops) and not l.ops[l_idx].commutative:
-            l_nodes.append(reversed(l.nodes[l_idx]))
+        l_nodes = [l.nodes[l_opi]]
+        #TODO only works for comm size 2
+        if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].commutative:
+            l_nodes.append(reversed(l.nodes[l_opi]))
 
         succ_ctx = None
         for l_node in l_nodes:
             cur_succ = True
             ctx_ = {**ctx}
-            for l_src, r_src in zip(l_node, r.nodes[r_idx]):
+            for l_src, r_src in zip(l_node, r.nodes[r_opi]):
                 #Out index must be the same
                 match_ctx = match(l_src, r_src, ctx)
                 if match_ctx is None:
@@ -72,7 +73,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         if succ_ctx is None:
             return None
 
-        ctx = {r_idx:l_idx, **ctx_}
+        ctx = {r_opi:l_opi, **ctx_}
         return ctx
     return match(l_root, r_root, {})
 
@@ -104,22 +105,22 @@ class Pattern:
     def num_ops(self):
         return len(self.ops)
 
-    def add_edge(self, lhs, rhs):
-        assert len(lhs)==2 and len(rhs)==2
-        assert lhs[0] in self.node_range
-        assert rhs[0] in self.node_range
-        if lhs[0] == -1:
-            lhs_t = self.iT[lhs[1]]
+    def add_edge(self, src, snk):
+        assert len(src)==2 and len(snk)==2
+        assert src[0] in self.node_range
+        assert snk[0] in self.node_range
+        if src[0] == -1:
+            src_t = self.iT[src[1]]
         else:
-            lhs_t = self.op_oTs[lhs[0]][lhs[1]]
+            src_t = self.op_oTs[src[0]][src[1]]
 
-        if rhs[0] == self.num_ops:
-            rhs_t = self.oT[rhs[1]]
+        if snk[0] == self.num_ops:
+            snk_t = self.oT[snk[1]]
         else:
-            rhs_t = self.op_iTs[rhs[0]][rhs[1]]
-        assert lhs_t == rhs_t
-        self.edges.append((lhs, rhs))
-        self.nodes[rhs[0]][rhs[1]] = lhs
+            snk_t = self.op_iTs[snk[0]][snk[1]]
+        assert src_t == snk_t
+        self.edges.append((src, snk))
+        self.nodes[snk[0]][snk[1]] = src
 
     #@property
     #def interior_edges(self):
@@ -145,7 +146,7 @@ class Pattern:
         matches = matcher(other, other.root, self, self.root, opts)
         if matches is None:
             return False
-        if not opts.input_perm:
+        if opts.input_perm:
             inputs = [(-1, i) for i in range(len(self.iT))]
             matched_inputs = (matches[input] for input in inputs)
             return set(inputs) == set(matched_inputs)

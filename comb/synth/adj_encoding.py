@@ -4,7 +4,7 @@ from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int
+from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int, type_to_N
 import itertools as it
 
 import pysmt.shortcuts as smt
@@ -230,33 +230,23 @@ class AdjEncoding(PatternEncoding):
         idx_to_op = {i:op.qualified_name for i, op in enumerate(self.op_list)}
         idx_to_op.update({-1:'io', self.num_ops:'io'})
 
-        P_backedges = []
-
         #For each op kind
         ops = _list_to_dict([op.qualified_name for op in self.op_list])
-        self.op_to_snks = {}
+        self.op_to_sorted_snks = {}
         P_same_op = []
-        for op, op_ids in ops.items():
+        for op_name, op_ids in ops.items():
             if len(op_ids) == 1:
                 continue
 
-            #disable backedges?
             assert all(op_ids[0] <= opi for opi in op_ids)
-            backedges = []
-            for i, opi in enumerate(op_ids):
-                for opj in op_ids[i+1:]:
-                    for lvar in [lvar for (src, snk), lvar in self.edges.items() if (src[0]==opj and snk[0]==opi)]:
-                        backedges.append(~lvar)
-            P_backedges.append(fc.And(backedges))
-            #TODO I think all these backedges are implied. by the used formulation. I could verify that...?
-            # I think they are only implied if I order my 'snk' list so that the same ops are first
-
-            ens = []
+            op = self.op_list[op_ids[0]]
+            op_iT, op_oT = op.get_type()
+            if len(op_oT) > 1:
+                raise NotImplementedError()
+            n = type_to_N(op_oT[0])
+            ens = [] #ens[opi][snk]
             for opi in op_ids:
-                num_outs = len(self.op_out_vars[opi])
-                if num_outs > 1:
-                    raise NotImplementedError()
-                lvars = [{snk:v for (src, snk), v in self.edges.items() if src==(opi, i)} for i in range(num_outs)][0]
+                lvars = {snk:v for (src, snk), v in self.edges.items() if src==(opi, 0)}
                 ens.append(lvars)
             assert all(en.keys() == ens[0].keys() for en in ens)
             snks = sorted(ens[0].keys())
@@ -264,7 +254,7 @@ class AdjEncoding(PatternEncoding):
             for opi in op_ids:
                 op_snks += [snk for snk in snks if snk[0]==opi]
             snks = op_snks + [snk for snk in snks if snk not in op_snks]
-            self.op_to_snks[op] = snks
+            self.op_to_sorted_snks[op] = snks
 
             conds = []
             used = [ht.SMTBit(0) for _ in op_ids]
@@ -273,21 +263,9 @@ class AdjEncoding(PatternEncoding):
                 op_conds = []
                 for ui, u in enumerate(used[:-1]):
                     op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
-                #print(snk, "*"*80)
-                #print(snk, "*"*80)
-                #print(", ".join([str(u.value) for u in used]))
-                #print("-"*80)
-                #for cond in op_conds:
-                #    print(cond.serialize())
                 used = [u | lvars[ui] for ui, u in enumerate(used)]
                 conds.append(fc.And(op_conds))
-            #print(op)
-            #print(fc.And(conds).serialize())
             P_same_op.append(fc.And(conds))
-        #ret = fc.And([
-        #    fc.And(P_backedges),
-        #    fc.And(P_same_op),
-        #])
         ret = fc.And(P_same_op)
         #print(ret.serialize())
         return ret

@@ -40,7 +40,6 @@ class SpecSynth(Cegis):
                 And(P_spec)
             )
         ])
-        #print(query.serialize())
         E_vars = self.pat_en.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
 

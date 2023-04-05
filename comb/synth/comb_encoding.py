@@ -13,6 +13,8 @@ from .solver_utils import get_var
 from .utils import flat, _to_int, _list_to_dict, type_to_N
 from hwtypes import SMTBitVector as SBV
 
+VarPair = collections.namedtuple('VarPair', 'lvar, var')
+
 #This is the Gulwani Encoding
 class CombEncoding(PatternEncoding):
     def __init__(self, *args, **kwargs):
@@ -47,16 +49,17 @@ class CombEncoding(PatternEncoding):
         self.Nconsts = 0
         self.tot_locs = tot_locs
 
-        self.src_n = {n: {(-1,id):(self.input_lvars[id], self.input_vars[id]) for id in ids} for n, ids in _list_to_dict(self.iT).items()}
-        self.snk_n = {n: {(self.num_ops,id):(self.output_lvars[id], self.output_vars[id]) for id in ids} for n, ids in _list_to_dict(self.oT).items()}
+        self.op_to_sorted_snks = {} #Used to save the symmetry orderings
+        self.src_n = {n: {(-1,id):VarPair(self.input_lvars[id], self.input_vars[id]) for id in ids} for n, ids in _list_to_dict(self.iT).items()}
+        self.snk_n = {n: {(self.num_ops,id):VarPair(self.output_lvars[id], self.output_vars[id]) for id in ids} for n, ids in _list_to_dict(self.oT).items()}
         for opi, op in enumerate(self.op_list):
             iT, oT = op.get_type()
             iT = [type_to_N(t) for t in iT]
             oT = [type_to_N(t) for t in oT]
             for n, ids in _list_to_dict(iT).items():
-                self.snk_n.setdefault(n, {}).update({(opi, id):(self.op_in_lvars[opi][id], self.op_in_vars[opi][id]) for id in ids})
+                self.snk_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_in_lvars[opi][id], self.op_in_vars[opi][id]) for id in ids})
             for n, ids in _list_to_dict(oT).items():
-                self.src_n.setdefault(n, {}).update({(opi, id):(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
+                self.src_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
 
 
@@ -68,8 +71,8 @@ class CombEncoding(PatternEncoding):
         for n, src_dict in self.src_n.items():
             assert n in self.snk_n
             snk_dict = self.snk_n[n]
-            for (src_lvar, src_var), (snk_lvar, snk_var) in it.product(src_dict.values(), snk_dict.values()):
-                P_conn.append(fc.Implies(src_lvar==snk_lvar, src_var==snk_var))
+            for src_v, snk_v in it.product(src_dict.values(), snk_dict.values()):
+                P_conn.append(fc.Implies(src_v.lvar==snk_v.lvar, src_v.var==snk_v.var))
         return fc.And(P_conn)
 
     @property
@@ -137,19 +140,45 @@ class CombEncoding(PatternEncoding):
 
     @property
     def P_sym_same_op(self):
-        #Same operations have a strict order
-        op_to_i = _list_to_dict([op.qualified_name for op in self.op_list])
+        assert self.sym_opts.same_op
+        #Tactic: Same as the input_perm tactic
 
-        #Does not work I think. Try to code up the example. (not(not(x)) + not(not(x)) or something like that
-        # This can have arbitrary interleavings of nots while still obeying
-        #raise NotImplementedError()
+        #For each op kind
+        ops = _list_to_dict([op.qualified_name for op in self.op_list])
         P_same_op = []
-        for op, ilist in op_to_i.items():
-            if len(ilist) > 1:
-                for i, j in zip(ilist[:-1], ilist[1:]):
-                    assert i < j
-                    P_same_op.append(self.op_out_lvars[i][0] < self.op_out_lvars[j][0])
-        return fc.And(P_same_op)
+        for op_name, op_ids in ops.items():
+            if len(op_ids) == 1:
+                continue
+
+            op = self.op_list[op_ids[0]]
+            op_iT, op_oT = op.get_type()
+            if len(op_oT) > 1:
+                raise NotImplementedError()
+            n = type_to_N(op_oT[0])
+            snks = sorted(self.snk_n[n].keys())
+            op_snks = []
+            for opi in op_ids:
+                op_snks += [snk for snk in snks if snk[0]==opi]
+            snks = op_snks + [snk for snk in snks if snk not in op_snks]
+            self.op_to_sorted_snks[op_name] = snks
+            ens = [] #ens[opi][snk]
+            for opi in op_ids:
+                src_lvar = self.op_out_lvars[opi][0]
+                lvars = {snk:self.snk_n[n][snk].lvar==src_lvar for snk in snks}
+                ens.append(lvars)
+
+            conds = []
+            used = [ht.SMTBit(0) for _ in op_ids]
+            for snk in snks:
+                lvars = [ens[opi][snk] for opi in range(len(op_ids))]
+                op_conds = []
+                for ui, u in enumerate(used[:-1]):
+                    op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
+                used = [u | lvars[ui] for ui, u in enumerate(used)]
+                conds.append(fc.And(op_conds))
+            P_same_op.append(fc.And(conds))
+        ret = fc.And(P_same_op)
+        return ret
 
     @property
     def P_sym_comm(self):
@@ -175,8 +204,8 @@ class CombEncoding(PatternEncoding):
             P_perm = []
             used = [ht.SMTBit(0) for _ in ids]
             for snk in snks:
-                snk_lvar = snk_dict[snk][0]
-                lvars = [snk_lvar == src_dict[(-1, id)][0] for id in ids]
+                snk_lvar = snk_dict[snk].lvar
+                lvars = [snk_lvar == src_dict[(-1, id)].lvar for id in ids]
                 i_perm = []
                 for ui, u in enumerate(used[:-1]):
                     i_perm.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))

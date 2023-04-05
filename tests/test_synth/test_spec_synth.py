@@ -64,26 +64,35 @@ from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 
 
+#Note: I know that each spec is completely commutative about all inputs
+#I can therefor test the input_perm symmetry here.
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
     #CombEncoding,
-    #DepthEncoding,
+    #AdjEncoding,
+    DepthEncoding,
 ])
-@pytest.mark.parametrize("num_adds,comm,same_op,num_sols", [
-    (1, False, False, 2),
-    #(1, True, False, 1),
-    #(2, False, False, 24),
-    #(2, True, False, 6),
-    #(2, True, True, 3),
-    #(3, True, True, 2),
+@pytest.mark.parametrize("num_adds,comm,same_op,iperm,num_sols", [
+    (1, False, False, False, 2),
+    (1, False, True, False, 2),
+    (1, True, False, False, 1),
+    (1, True, True, False, 1),
+    (1, False, False, True, 1),
+    (1, False, True, True, 1),
+    (1, True, False, True, 1),
+    (1, True, True, True, 1),
+    (2, False, False, False, 24),
+    (2, True, False, False, 6),
+    (2, True, True, False, 3),
+    (2, True, True, True, 1),
+    (3, True, True, False, 18),
+    (3, True, True, True, 2),
 ])
-def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
+def test_add(pat_en_t, num_adds, comm, same_op, iperm, num_sols):
     N = 32
     obj = compile_program(add_file)
     spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
     ops = [BV.add[N]] * num_adds
-    #sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=False)
-    sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=False)
+    sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=iperm)
     sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -103,7 +112,7 @@ def test_add(pat_en_t, num_adds, comm, same_op, num_sols):
     num_pats = len(pats_)
     print("SOLS:", num_pats)
     if pat_en_t is CombEncoding:
-        assert num_pats >= num_sols
+        assert num_pats == num_sols
     else:
         assert num_pats == num_sols
         opts = SymOpts(comm=comm, same_op=same_op, input_perm=False)

@@ -14,6 +14,7 @@ from hwtypes import SMTBitVector as SBV
 from collections import namedtuple
 
 Lvar = namedtuple('Lvar', 'd, id')
+VarPair = namedtuple('VarPair', 'lvar, var')
 
 #Caleb encoding
 class DepthEncoding(PatternEncoding):
@@ -64,16 +65,17 @@ class DepthEncoding(PatternEncoding):
         self.E_vars = E_vars
         self.tot_ids = tot_ids
 
-        self.src_n = {n: {(-1, id):(src_lvars[-1][id], self.input_vars[id]) for id in ids} for n, ids in _list_to_dict(self.iT).items()}
-        self.snk_n = {n: {(self.num_ops,id):(snk_lvars[self.num_ops][id], self.output_vars[id]) for id in ids} for n, ids in _list_to_dict(self.oT).items()}
+        self.op_to_sorted_snks = {} #Used to save the symmetry orderings
+        self.src_n = {n: {(-1, id):VarPair(src_lvars[-1][id], self.input_vars[id]) for id in ids} for n, ids in _list_to_dict(self.iT).items()}
+        self.snk_n = {n: {(self.num_ops,id):VarPair(snk_lvars[self.num_ops][id], self.output_vars[id]) for id in ids} for n, ids in _list_to_dict(self.oT).items()}
         for opi, op in enumerate(self.op_list):
             iT, oT = op.get_type()
             iT = [type_to_N(t) for t in iT]
             oT = [type_to_N(t) for t in oT]
             for n, ids in _list_to_dict(iT).items():
-                self.snk_n.setdefault(n, {}).update({(opi, id):(snk_lvars[opi][id], self.op_in_vars[opi][id]) for id in ids})
+                self.snk_n.setdefault(n, {}).update({(opi, id):VarPair(snk_lvars[opi][id], self.op_in_vars[opi][id]) for id in ids})
             for n, ids in _list_to_dict(oT).items():
-                self.src_n.setdefault(n, {}).update({(opi, id):(src_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
+                self.src_n.setdefault(n, {}).update({(opi, id):VarPair(src_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
     @property
     def P_conn(self):
@@ -81,8 +83,8 @@ class DepthEncoding(PatternEncoding):
         for n, src_dict in self.src_n.items():
             assert n in self.snk_n
             snk_dict = self.snk_n[n]
-            for (src_lvar, src_var), (snk_lvar, snk_var) in it.product(src_dict.values(), snk_dict.values()):
-                P_conn.append(fc.Implies(src_lvar.id == snk_lvar.id, src_var==snk_var))
+            for src_v, snk_v in it.product(src_dict.values(), snk_dict.values()):
+                P_conn.append(fc.Implies(src_v.lvar.id == snk_v.lvar.id, src_v.var==snk_v.var))
         return fc.And(P_conn)
 
     @property
@@ -92,7 +94,8 @@ class DepthEncoding(PatternEncoding):
         #  Depth of inputs must be less than depth of output
         for opi in range(self.num_ops):
             o_lvars, i_lvars = self.src_lvars[opi], self.snk_lvars[opi]
-            P_acyc.append(fc.And([o_lvar.d > i_lvar.d for o_lvar, i_lvar in zip(o_lvars, i_lvars)]))
+            o_d = o_lvars[0].d
+            P_acyc.append(fc.And([o_d > i_lvar.d for i_lvar in i_lvars]))
         return fc.And(P_acyc)
 
     @property
@@ -102,8 +105,8 @@ class DepthEncoding(PatternEncoding):
         for n, src_dict in self.src_n.items():
             assert n in self.snk_n
             snk_dict = self.snk_n[n]
-            for (src_lvar, _), (snk_lvar, _) in it.product(src_dict.values(), snk_dict.values()):
-                P_depth_conn.append(fc.Implies(src_lvar.id == snk_lvar.id, src_lvar.d==snk_lvar.d))
+            for src_v, snk_v in it.product(src_dict.values(), snk_dict.values()):
+                P_depth_conn.append(fc.Implies(src_v.lvar.id == snk_v.lvar.id, src_v.lvar.d==snk_v.lvar.d))
         return fc.And(P_depth_conn)
 
     @property
@@ -144,14 +147,8 @@ class DepthEncoding(PatternEncoding):
             self.P_used_source,
         ]
         ret = fc.And(P_wfp)
-        print(ret.serialize())
+        #print(ret.serialize())
         return ret
-
-    @property
-    def P_sym_same_op(self):
-        #Same operations have a strict order
-        op_to_i = _list_to_dict([op.qualified_name for op in self.op_list])
-
 
     @property
     def P_sym_comm(self):
@@ -164,8 +161,49 @@ class DepthEncoding(PatternEncoding):
         return fc.And(P_comm)
 
     @property
+    def P_sym_same_op(self):
+        assert self.sym_opts.same_op
+        #Tactic: Same as the input_perm tactic
+
+        #For each op kind
+        ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        P_same_op = []
+        for op_name, op_ids in ops.items():
+            if len(op_ids) == 1:
+                continue
+
+            op = self.op_list[op_ids[0]]
+            op_iT, op_oT = op.get_type()
+            if len(op_oT) > 1:
+                raise NotImplementedError()
+            n = type_to_N(op_oT[0])
+            snks = sorted(self.snk_n[n].keys())
+            op_snks = []
+            for opi in op_ids:
+                op_snks += [snk for snk in snks if snk[0]==opi]
+            snks = op_snks + [snk for snk in snks if snk not in op_snks]
+            self.op_to_sorted_snks[op_name] = snks
+            ens = [] #ens[opi][snk]
+            for opi in op_ids:
+                src_lvar = self.src_lvars[opi][0]
+                lvars = {snk:self.snk_n[n][snk].lvar.id==src_lvar.id for snk in snks}
+                ens.append(lvars)
+
+            conds = []
+            used = [ht.SMTBit(0) for _ in op_ids]
+            for snk in snks:
+                lvars = [ens[opi][snk] for opi in range(len(op_ids))]
+                op_conds = []
+                for ui, u in enumerate(used[:-1]):
+                    op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
+                used = [u | lvars[ui] for ui, u in enumerate(used)]
+                conds.append(fc.And(op_conds))
+            P_same_op.append(fc.And(conds))
+        ret = fc.And(P_same_op)
+        return ret
+
+    @property
     def P_sym_input_perm(self):
-        raise NotImplementedError()
         assert self.sym_opts.input_perm
         input_T = _list_to_dict(self.iT)
 
@@ -175,11 +213,12 @@ class DepthEncoding(PatternEncoding):
             snk_dict = self.snk_n[n]
             src_dict = self.src_n[n]
             snks = sorted(snk_dict.keys())
+            self.op_to_sorted_snks['In'] = snks
             P_perm = []
             used = [ht.SMTBit(0) for _ in ids]
             for snk in snks:
-                snk_lvar = snk_dict[snk][0]
-                lvars = [snk_lvar==src_dict[(-1, id)][0] for id in ids]
+                snk_lvar = snk_dict[snk].lvar
+                lvars = [snk_lvar.id==src_dict[(-1, id)].lvar.id for id in ids]
                 i_perm = []
                 for ui, u in enumerate(used[:-1]):
                     i_perm.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))

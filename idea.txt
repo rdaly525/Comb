@@ -125,10 +125,18 @@ same_op symmetry is not as simple as string program order. I must do my thing.
 
 
 
+Current:
+    Wrote sym_same_op for comb and adj
+    Want to test it
+    Comm=False, same_op=False broken in spec_synth test
+        Bug in Pattern equality.
+    Fixed pattern Equality
+    Comb.sym_same_op works
+    Adj.sym_same_op works
+    Done on P_sym_same_op
+
 Task List:
 	Required:
-		CombEncoding.P_sym_same_op
-		DepthEncoding.P_sym_same_op
 		DepthEncoding.P_sym_input_perm
 		#Starting a Paper Overleaf
 		Rule Synth with Spec Synth:
