@@ -1,3 +1,4 @@
+from collections import namedtuple
 from functools import cache, cached_property
 import networkx as nx
 import hwtypes.smt_utils as fc
@@ -14,11 +15,7 @@ import itertools as it
 #Inputs are encoded as -1
 #Outputs are encoded as num_ops
 
-@dataclass
-class SymOpts:
-    comm: bool = False
-    same_op: bool = False
-    input_perm: bool = False
+SymOpts = namedtuple('SymOpts', ('comm', 'same_op', 'input_perm'), defaults=(False,)*3)
 
 #(canonicalize comm=True means allow ckecing comm
 #(canonicalize same ops means
@@ -192,9 +189,12 @@ class Pattern:
         for (src, _), (snk, _) in self.edges:
             g.add_edge(src, snk)
         order = list(nx.topological_sort(g))
-        assert order[0] == -1
+
+        #Could be a constant
+        #Remove inputs from order
+        order = [i for i in order if i !=-1]
         assert order[-1] == self.num_ops
-        opAssigns = [opi_to_assign[opi] for opi in order[1:-1]]
+        opAssigns = [opi_to_assign[opi] for opi in order[:-1]]
         stmts = [*inDecls, *outDecls, *opAssigns, out_assign]
         comb = CombProgram(QSym(ns, name), stmts)
         return comb

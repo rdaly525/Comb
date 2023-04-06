@@ -75,7 +75,7 @@ class BVConst(CombPrimitive):
         val = pargs[1]
         if isinstance(N, IntValue) and isinstance(N.value, int):
             if isinstance(val, IntValue) and isinstance(val.value, int):
-                return BVValue(ht.SMTBitVector[N.value](val.value))
+                return [BVValue(ht.SMTBitVector[N.value](val.value))]
         return CallExpr(self, pargs, args)
 
 
