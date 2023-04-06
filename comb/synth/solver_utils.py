@@ -119,6 +119,11 @@ def get_var(name, n_or_T):
     return var
 
 
+def smt_is_sat(f, opts: SolverOpts = SolverOpts()):
+    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+        solver.add_assertion(f)
+        res = solver.solve()
+        return (res is not False)
 
 def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
     E_vars = f.get_free_variables()

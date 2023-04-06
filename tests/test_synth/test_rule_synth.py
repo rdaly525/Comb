@@ -87,12 +87,13 @@ def test_add(pat_en_t, num_adds, comm, same_op, input_perm, num_sols):
 ])
 @pytest.mark.parametrize("comm, same_op, input_perm, num_sols", [
     #(False, False, False, 8),
-    (True, True, True, 2),
+    (False, True, True, 2),
 ])
 def test_addsub(pat_en_t, comm, same_op, input_perm, num_sols):
     N = 16
     #Synthesize Distributive rule for Multiplication
     lhs = [BV.add[N]]
+    #lhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
     rhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
     iT = [N]*(2)
     oT = [N]

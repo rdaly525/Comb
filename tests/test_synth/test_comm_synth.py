@@ -2,7 +2,7 @@ import pytest
 
 from comb.frontend.compiler import compile_program
 from comb.frontend.stdlib import GlobalModules
-from comb.synth.comm_synth import CommSynth
+from comb.synth.comm_synth import get_comm_info
 from comb.synth.solver_utils import SolverOpts
 
 BV = GlobalModules['bv']
@@ -69,16 +69,28 @@ o0 = bv.mul[N](t0, t1)
 
 '''
 
-@pytest.mark.parametrize('num_adds',range(1,2))
-def test_comm_synth(num_adds):
+@pytest.mark.parametrize('num_adds', range(1,5))
+def test_add_comm(num_adds):
     N = 16
     obj = compile_program(add_file)
-    #spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
-    spec = obj.comb_dict[f"test.amul"][N]
-    cs = CommSynth(spec)
+    spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
+    #spec = obj.comb_dict[f"test.amul"][N]
     opts=SolverOpts(
         max_iters=1000,
         verbose=2,
     )
-    vals = cs.get_comm(opts)
+    vals = get_comm_info(spec, opts)
+    assert vals == {frozenset(range(num_adds+1))}
+
+
+def test_amul_comm():
+    N = 16
+    obj = compile_program(add_file)
+    spec = obj.comb_dict[f"test.amul"][N]
+    opts=SolverOpts(
+        max_iters=1000,
+        verbose=2,
+    )
+    vals = get_comm_info(spec, opts)
     print(vals)
+    assert vals == {frozenset([0,2]), frozenset([1,3])}
