@@ -61,16 +61,18 @@ class IntModule(Module):
 
 class BVConst(CombPrimitive):
     name = QSym('bv', 'const')
-    param_types = [IntType()]
+    param_types = [IntType(), IntType()]
+    num_inputs = 0
+    num_outputs = 1
 
-    def get_type(self, N: Expr):
+    def get_type(self, N: Expr, val: Expr):
         BVCall = TypeCall(BVType(), [N])
-        return [IntType()], [BVCall]
+        return [], [BVCall]
 
     def eval(self, *args, pargs):
-        assert len(pargs)==1 and len(args)==1
+        assert len(pargs)==2 and len(args)==0
         N = pargs[0]
-        val = args[0]
+        val = pargs[1]
         if isinstance(N, IntValue) and isinstance(N.value, int):
             if isinstance(val, IntValue) and isinstance(val.value, int):
                 return BVValue(ht.SMTBitVector[N.value](val.value))
