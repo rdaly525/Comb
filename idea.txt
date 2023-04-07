@@ -162,8 +162,39 @@ Task List:
 		Update commutativity to be general
 		Determine commutativity of spec automatically
 
+Focus on 1 -> M
+         N -> M
+         N -> 1
+
+Pick 3 titles with 3 abstracts.
 
 
+Program synthesis
+
+
+2 Different papers.
+
+
+Fix CoreIR to be the IR.
+
+
+Pick a Contrived Instruction Set.
+
+
+Real simple PE vs Real complex PE
+
+
+I designed 2 PEs.
+
+
+Making the case for the different encodings
+
+
+
+
+
+TODO
+    Goal vs Technique.
 
 
 

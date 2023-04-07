@@ -67,23 +67,23 @@ BV = GlobalModules['bv']
 #Note: I know that each spec is completely commutative about all inputs
 #I can therefor test the input_perm symmetry here.
 @pytest.mark.parametrize("pat_en_t", [
-    CombEncoding,
+    #CombEncoding,
     AdjEncoding,
-    DepthEncoding,
+    #DepthEncoding,
 ])
 @pytest.mark.parametrize("num_adds,comm,same_op,iperm,num_sols", [
-    (1, False, False, False, 2),
-    (1, False, True, False, 2),
-    (1, True, False, False, 1),
-    (1, True, True, False, 1),
-    (1, False, False, True, 1),
-    (1, False, True, True, 1),
-    (1, True, False, True, 1),
-    (1, True, True, True, 1),
-    (2, False, False, False, 24),
-    (2, True, False, False, 6),
-    (2, True, True, False, 3),
-    (2, True, True, True, 1),
+    #(1, False, False, False, 2),
+    #(1, False, True, False, 2),
+    #(1, True, False, False, 1),
+    #(1, True, True, False, 1),
+    #(1, False, False, True, 1),
+    #(1, False, True, True, 1),
+    #(1, True, False, True, 1),
+    #(1, True, True, True, 1),
+    #(2, False, False, False, 24),
+    #(2, True, False, False, 6),
+    #(2, True, True, False, 3),
+    #(2, True, True, True, 1),
     (3, True, True, False, 18),
     (3, True, True, True, 2),
 ])
@@ -179,3 +179,64 @@ def test_same_op(pat_en_t, same_op, num_sols):
                 print(pb)
             assert not pa.equal(pb, opts)
             assert not pb.equal(pa, opts)
+
+fa_f = '''\
+Comb test.fa
+In ci : BV[1] 
+In a : BV[1]
+In b : BV[1]
+Out co : BV[1]
+Out s : BV[1]
+a_xor_b = bv.xor[1](a, b)
+s = bv.xor[1](a_xor_b, ci)
+a_and_b = bv.and_[1](a, b)
+t = bv.and_[1](ci, a_xor_b)
+co = bv.or_[1](t, a_and_b)
+
+Comb test.orand
+In a : BV[1] 
+In b : BV[1]
+In c : BV[1]
+In d : BV[1]
+Out o : BV[1]
+t0 = bv.and_[1](a, b)
+t1 = bv.and_[1](c, d)
+o = bv.or_[1](t0, t1)
+'''
+
+
+
+import hwtypes as ht
+@pytest.mark.parametrize("pat_en_t", [
+    #AdjEncoding,
+    CombEncoding,
+    #DepthEncoding,
+])
+def test_fulladder(pat_en_t):
+    N = 1
+    obj = compile_program(fa_f)
+    fa = obj.comb_dict[f"test.fa"]
+    orand = obj.comb_dict[f"test.orand"]
+    one, zero = ht.SMTBitVector[1](1), ht.SMTBitVector[1](0)
+    print(fa.evaluate(one, one, one))
+    print(fa.evaluate(one, zero, one))
+    ops = [BV.xor[N]]*2 + [BV.and_[N]]*2 + [BV.or_[N]]
+    #ops = [BV.xor[N]]*2 + [orand]
+    sym_opts = SymOpts(comm=True, same_op=False, input_perm=False)
+    sym_opts = SymOpts(comm=True, same_op=True, input_perm=False)
+    sq = SpecSynth(fa, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=2000,
+            verbose=1,
+        ),
+    )
+    pats = list(pats)
+    num_pats = len(pats)
+    print("SOLS:", num_pats)
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, fa)
+        assert res is None

@@ -38,7 +38,7 @@ class Cegis:
             show_iter = False
         assert opts.max_iters > 0
         query = self.query.value
-
+        print("Query Size:", smt.get_formula_size(query))
         for sol in exclude_list:
             sol_term = smt.Bool(True)
             for var, val in sol.items():

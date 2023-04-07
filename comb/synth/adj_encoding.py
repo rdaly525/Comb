@@ -10,7 +10,8 @@ import itertools as it
 import pysmt.shortcuts as smt
 
 def exactly_one(*args):
-    return ht.SMTBit(smt.ExactlyOne(*[arg.value for arg in args]))
+    ret = ht.SMTBit(smt.ExactlyOne(*[arg.value for arg in args]))
+    return ret
 
 def matmul(x, y):
     N = len(x)
