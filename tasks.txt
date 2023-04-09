@@ -27,21 +27,15 @@ Goal: 4/9: Optimize for results for presentation
         -Write instruction selection:
             - I can just manually write the application in Comb form.
     Issues to handle:
-        How to deal with constants?
-        Booleans: Would be nice to just have BV[0] mean bit... I would get almost everything for free I think.
-        Complications:
-            Everything is written in terms of 'n' and referring to BV, not CBV. I would need to change almost everything in the codebase.
-                How to do this? currently by type is n -> blah. I could simply do (n, is_const) at all those locations. fuck is annoying. Seems best though.
-            I really thing this could be a good result. CBV-> Would be 1 op that is essentialy required. That would give me the N->2 rewrite rules, fuck yeah. I should do it.
-            How does Buchwald deal with compiler constants? I think he doesn't. Confirmed, no distinction
-        Just create a new CBV type and a 'const op that goes from CBV -> BV'
 
     Current work queue:
-        Add support for bool
-        write the ISA by hand for conv
-        Add pound comments in yacc
+        write postfiltering
+        Get prefiltering working
+        add timing decorators for SMT calls
 
     DONE
+        write the ISA by hand for conv
+        Add pound comments in yacc
         Add CBV type. DONE
         Add synth test for CBV
         update CombSynth to use (n, const)

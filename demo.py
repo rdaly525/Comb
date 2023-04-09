@@ -1,5 +1,5 @@
 from comb.frontend.compiler import compile_program
-from comb.synth.rule_discover import SymSelSynth
+from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 import os
 
@@ -36,7 +36,7 @@ rhs = [
 ]
 maxL = 2
 maxR = 3
-ss = SymSelSynth(lhs, rhs, maxL, maxR)
+ss = RuleDiscovery(lhs, rhs, maxL, maxR)
 opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
 rules = []
 for ri, rule in enumerate(ss.gen_all(opts)):

@@ -1,5 +1,5 @@
 from comb.frontend.compiler import compile_program
-from comb.synth.rule_discover import smart_iter, SymSelSynth
+from comb.synth.rule_discover import smart_iter, RuleDiscovery
 from comb.synth.solver_utils import SolverOpts, smt_solve_all
 from comb.synth.utils import bucket_combinations
 import hwtypes as ht
@@ -89,7 +89,7 @@ def test_foo():
     ]
     maxL = 1
     maxR = 4
-    ss = SymSelSynth(lhs, rhs, maxL, maxR)
+    ss = RuleDiscovery(lhs, rhs, maxL, maxR)
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
     rules = []
     for ri, rule in enumerate(ss.gen_all(opts)):

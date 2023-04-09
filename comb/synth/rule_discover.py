@@ -44,7 +44,7 @@ class Rule:
 
 
 @dataclass
-class SymSelSynth:
+class RuleDiscovery:
     lhss: tp.Set[Comb]
     rhss: tp.Set[Comb]
     maxL: int
