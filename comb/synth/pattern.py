@@ -7,7 +7,7 @@ from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
 from .solver_utils import get_var
-from .utils import _make_list, type_to_N, _list_to_dict, N_to_type
+from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -76,8 +76,8 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
 
 class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb]):
-        assert all(n >=0 for n in iT)
-        assert all(n >=0 for n in oT)
+        assert all(T.n >=0 for T in iT)
+        assert all(T.n >=0 for T in oT)
         if len(oT) > 1:
             raise NotImplementedError()
         self.iT = iT
@@ -89,8 +89,8 @@ class Pattern:
         self.op_oTs = []
         for op in ops:
             iT, oT = op.get_type()
-            self.op_iTs.append([type_to_N(t) for t in iT])
-            self.op_oTs.append([type_to_N(t) for t in oT])
+            self.op_iTs.append([type_to_nT(t) for t in iT])
+            self.op_oTs.append([type_to_nT(t) for t in oT])
         self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
         self.root = (len(ops), 0) #TODO only works for single output
 
@@ -172,8 +172,8 @@ class Pattern:
             snk_to_sym[snk] = src_to_sym[src]
         src_to_sym.update({(self.num_ops, i): Sym(f"O{i}") for i in range(len(self.oT))})
 
-        inDecls = [InDecl(src_to_sym[(-1,i)], N_to_type(n)) for i, n in enumerate(self.iT)]
-        outDecls = [OutDecl(src_to_sym[(self.num_ops, i)], N_to_type(n)) for i, n in enumerate(self.oT)]
+        inDecls = [InDecl(src_to_sym[(-1,i)], nT_to_type(n)) for i, n in enumerate(self.iT)]
+        outDecls = [OutDecl(src_to_sym[(self.num_ops, i)], nT_to_type(n)) for i, n in enumerate(self.oT)]
 
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
@@ -204,8 +204,8 @@ class Pattern:
 class PatternEncoding:
     def __init__(
         self,
-        iT: tp.List[int],
-        oT: tp.List[int],
+        iT: tp.List[nT],
+        oT: tp.List[nT],
         op_list: tp.List[Comb],
         const_list: tp.Tuple[int] = (),
         prefix: str = "",
@@ -225,13 +225,13 @@ class PatternEncoding:
             raise ValueError("Cannot synth with non-concrete parameters")
 
         # Structure
-        input_vars = [get_var(f"{prefix}_In[{i}]", n) for i, n in enumerate(iT)]
+        input_vars = [get_var(f"{prefix}_In[{i}]", T) for i, T in enumerate(iT)]
         self.input_vars = input_vars
 
         Ninputs = len(input_vars)
         hard_consts = self.const_list
         Nconsts = len(hard_consts)
-        output_vars = [get_var(f"{prefix}_Out[{i}]", n) for i, n in enumerate(oT)]
+        output_vars = [get_var(f"{prefix}_Out[{i}]", T) for i, T in enumerate(oT)]
         self.output_vars = output_vars
         op_out_vars = []
         op_in_vars = []

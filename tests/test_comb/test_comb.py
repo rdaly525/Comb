@@ -30,6 +30,15 @@ t0, t1 = bv.add[16](i0, i1), i0
 o = bv.add[16](t0, t1)
 '''
 
+add_c = '''
+Comb test.add_c
+In i0 : BV[16]
+In c0 : CBV[16]
+Out o : BV[16]
+t0 = bv.abs_const[16](c0)
+o = bv.add[16](i0, t0)
+'''
+
 inc1 = '''
 Comb test.inc1
 In i0 : BV[16]
@@ -57,6 +66,16 @@ Param N: Int
 In a: BV[N]
 Out o: BV[N]
 o = bv.add[N](a, a)
+'''
+
+p_add_c = '''
+Comb test.p_add_c
+Param N: Int
+In i0 : BV[N]
+In c0 : CBV[N]
+Out o : BV[N]
+t0 = bv.abs_const[N](c0)
+o = bv.add[N](i0, t0)
 '''
 
 p_inc1 = '''
@@ -122,6 +141,8 @@ b = bv.slice[2*N, 0, N](a)
     p_inc2N2,
     p_concat,
     p_slice,
+    add_c,
+    p_add_c,
 ])
 def test_round_trip(p):
     obj = compile_program(p)
@@ -139,6 +160,7 @@ def test_round_trip(p):
     inc1,
     inc2,
     inc3,
+    add_c,
 ])
 def test_eval(p):
     obj = compile_program(p)
@@ -175,6 +197,7 @@ BV = ht.SMTBitVector[16]
 @pytest.mark.parametrize("p, i, o", [
     (iadd, (4, 5), 18),
     (add, (BV(4), BV(5)), BV(18)),
+    (add_c, (BV(4), BV(5)), BV(9)),
     (add2, (BV(4), BV(5)), BV(13)),
     (inc1, (BV(8),), BV(8+35)),
     (inc2, (BV(8),), BV(8+35)),
@@ -195,11 +218,12 @@ BV32 = ht.SMTBitVector[32]
 BV48 = ht.SMTBitVector[48]
 
 @pytest.mark.parametrize("p, i, o", [
-    #(p_add, (16, BV(4)), BV(8)),
-    #(p_inc1, (16, BV(8)), BV(9)),
-    #(p_inc2, (16, BV(8),), BV(24)),
-    #(p_inc2N, (16, BV32(8),), BV32(40)),
-    #(p_inc2N2, (16, BV48(8),), BV48(24)),
+    (p_add, (16, BV(4)), BV(8)),
+    (p_add_c, (16, BV(4), BV(5)), BV(9)),
+    (p_inc1, (16, BV(8)), BV(9)),
+    (p_inc2, (16, BV(8),), BV(24)),
+    (p_inc2N, (16, BV32(8),), BV32(40)),
+    (p_inc2N2, (16, BV48(8),), BV48(24)),
     (p_concat, (16, BV(5),), BV32((5<<16)+5)),
     (p_slice, (16, BV32((5<<16)+5),), BV(5)),
 ])
@@ -213,10 +237,10 @@ def test_evaluate_raw_p(p, i, o):
     #Test partial
     comb_partial = comb.partial_eval(i[0])
     print(comb_partial.call_expr([], []))
-    res = comb_partial.evaluate(i[1])
+    res = comb_partial.evaluate(*i[1:])
     assert (o == res).value.constant_value() is True
 
     #Test partial eval syntax
     comb_partial = comb[i[0]]
-    res = comb_partial.evaluate(i[1])
+    res = comb_partial.evaluate(*i[1:])
     assert (o == res).value.constant_value() is True

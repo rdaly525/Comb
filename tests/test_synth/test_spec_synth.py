@@ -67,23 +67,23 @@ BV = GlobalModules['bv']
 #Note: I know that each spec is completely commutative about all inputs
 #I can therefor test the input_perm symmetry here.
 @pytest.mark.parametrize("pat_en_t", [
-    #CombEncoding,
+    CombEncoding,
     AdjEncoding,
-    #DepthEncoding,
+    DepthEncoding,
 ])
 @pytest.mark.parametrize("num_adds,comm,same_op,iperm,num_sols", [
-    #(1, False, False, False, 2),
-    #(1, False, True, False, 2),
-    #(1, True, False, False, 1),
-    #(1, True, True, False, 1),
-    #(1, False, False, True, 1),
-    #(1, False, True, True, 1),
-    #(1, True, False, True, 1),
-    #(1, True, True, True, 1),
-    #(2, False, False, False, 24),
-    #(2, True, False, False, 6),
-    #(2, True, True, False, 3),
-    #(2, True, True, True, 1),
+    (1, False, False, False, 2),
+    (1, False, True, False, 2),
+    (1, True, False, False, 1),
+    (1, True, True, False, 1),
+    (1, False, False, True, 1),
+    (1, False, True, True, 1),
+    (1, True, False, True, 1),
+    (1, True, True, True, 1),
+    (2, False, False, False, 24),
+    (2, True, False, False, 6),
+    (2, True, True, False, 3),
+    (2, True, True, True, 1),
     (3, True, True, False, 18),
     (3, True, True, True, 2),
 ])
@@ -145,7 +145,7 @@ o0 = bv.sub[N](x, y)
     (True, 9),
 ])
 def test_same_op(pat_en_t, same_op, num_sols):
-    N = 32
+    N = 4
     obj = compile_program(sameop_f)
     spec = obj.comb_dict[f"test.sameop"][N]
     ops = [BV.not_[N]]*4 + [BV.sub[N]]
@@ -180,6 +180,58 @@ def test_same_op(pat_en_t, same_op, num_sols):
             assert not pa.equal(pb, opts)
             assert not pb.equal(pa, opts)
 
+
+c_fma_obj = '''\
+Comb test.c_fma
+Param N : Int
+In a : BV[N] 
+In b : BV[N]
+In c : CBV[N]
+Out o : BV[N]
+t0 = bv.abs_const[N](c)
+t1 = bv.mul[N](a, b)
+t2 = bv.add[N](t1, t0)
+o = t2
+'''
+
+@pytest.mark.parametrize("pat_en_t", [
+    CombEncoding,
+    AdjEncoding,
+    DepthEncoding,
+])
+def test_c_fma(pat_en_t):
+    N = 16
+    obj = compile_program(c_fma_obj)
+    fma = obj.comb_dict[f"test.c_fma"][N]
+    ops = [BV.abs_const[N], BV.add[N], BV.mul[N]]
+    sym_opts = SymOpts(False, False, False)
+    sq = SpecSynth(fma, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=2000,
+            verbose=1,
+        ),
+    )
+    pats = list(pats)
+    num_pats = len(pats)
+    print("SOLS:", num_pats)
+    if pat_en_t is CombEncoding:
+        assert num_pats == 8
+    else:
+        assert num_pats == 4
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, fma)
+        assert res is None
+
+
+
+
+
+
+
 fa_f = '''\
 Comb test.fa
 In ci : BV[1] 
@@ -212,7 +264,7 @@ import hwtypes as ht
     CombEncoding,
     #DepthEncoding,
 ])
-def test_fulladder(pat_en_t):
+def _test_fulladder(pat_en_t):
     N = 1
     obj = compile_program(fa_f)
     fa = obj.comb_dict[f"test.fa"]

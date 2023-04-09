@@ -82,6 +82,30 @@ class BoolType(Type):
 class ParameterizedType(Node):
     param_types = []
 
+
+class CBVType(ParameterizedType):
+    param_types = [IntType()]
+
+    def __str__(self):
+        return "CBV"
+
+    #Still return BV
+    def free_var(self, name, pargs, node: bool=False):
+        if len(pargs) != 1:
+            raise ValueError()
+        N = pargs[0]
+        if not isinstance(N, IntValue):
+            return None
+        if not isinstance(N.value, int):
+            raise NotImplementedError(f"{N}, the param, needs to be a constant")
+        N = N.value
+        ret = ht.SMTBitVector[N](prefix=name)
+        if node:
+            ret = BVValue(ret)
+        return ret
+
+
+
 class BVType(ParameterizedType):
     param_types = [IntType()]
 

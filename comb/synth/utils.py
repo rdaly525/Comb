@@ -1,8 +1,9 @@
+import collections
 import functools
 import typing as tp
 import itertools as it
 
-from comb.frontend.ast import Type, BoolType, TypeCall, BVType, IntValue
+from comb.frontend.ast import Type, BoolType, TypeCall, BVType, IntValue, CBVType
 
 
 def _list_to_counts(vals):
@@ -31,26 +32,25 @@ def bucket_combinations(vals: tp.Iterable[tp.Any], buckets: tp.List[int]):
 def flat(l: tp.Iterable[tp.List[tp.Any]]) -> tp.List[tp.Any]:
     return [l__ for l_ in l for l__ in l_]
 
+nT = collections.namedtuple('nT', 'n, const')
+def type_to_nT(T: TypeCall):
+    assert isinstance(T, TypeCall)
+    n = T.pargs[0].value
+    assert isinstance(n, int)
+    assert isinstance(T.type, (CBVType, BVType))
+    const = isinstance(T.type, CBVType)
+    return nT(n, const)
 
-def type_to_N(T: Type):
-    if isinstance(T, BoolType):
-        n = 0
+def nT_to_type(T: nT):
+    if T.const:
+        t = CBVType()
     else:
-        assert isinstance(T, TypeCall)
-        assert isinstance(T.type, BVType)
-        n = T.pargs[0].value
-        assert isinstance(n, int)
-    return n
-
-def N_to_type(n: int):
-    if n==0:
-        return BoolType()
-    else:
-        return TypeCall(BVType(), [IntValue(n)])
+        t = BVType()
+    return TypeCall(t, [IntValue(T.n)])
 
 
 def comb_type_to_sT(Ts):
-    Ns = [type_to_N(t) for t in Ts]
+    Ns = [type_to_nT(t) for t in Ts]
     return _list_to_dict(Ns)
 
 def _to_int(x):

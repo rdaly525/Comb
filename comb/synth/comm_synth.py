@@ -6,7 +6,7 @@ from hwtypes import smt_utils as fc
 from comb import Comb
 from .pattern import PatternEncoding, SymOpts, Pattern
 from .solver_utils import SolverOpts, Cegis, get_var, smt_is_sat
-from .utils import _make_list, type_to_N, _list_to_dict, _to_int
+from .utils import _make_list, type_to_nT, _list_to_dict, _to_int
 import itertools as it
 
 
@@ -16,7 +16,7 @@ def _swap(vals, ia, ib):
 
 def get_comm_info(spec: Comb, opts: SolverOpts=SolverOpts()):
     iT, oT = spec.get_type()
-    iT = [type_to_N(t) for t in iT]
+    iT = [type_to_nT(t) for t in iT]
 
     in_vars = [get_var(f"I{i}", n) for i, n in enumerate(iT)]
     base_outs = _make_list(spec.evaluate(*in_vars))

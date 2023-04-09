@@ -38,6 +38,7 @@ tokens = (
     'OUTPUT',
     'PARAM',
     'BV',
+    'CBV',
     'INT',
     'BOOL',
     'COLON',
@@ -77,6 +78,7 @@ _reserved = dict(
     Out="OUTPUT",
     Param="PARAM",
     BV="BV",
+    CBV="CBV",
     Int="INT",
     Bool="BOOL",
 )
@@ -213,6 +215,11 @@ def p_type_1(p):
 def p_type_2(p):
     'type : BV LSQB exprs RSQB'
     p[0] = TypeCall(BVType(), p[3])
+
+def p_type_3(p):
+    'type : CBV LSQB exprs RSQB'
+    p[0] = TypeCall(CBVType(), p[3])
+
 
 def p_decl_r_0(p):
     'decl_r : sym COLON type'
