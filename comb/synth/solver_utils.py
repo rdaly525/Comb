@@ -6,7 +6,8 @@ from pysmt import shortcuts as smt
 
 from pysmt.logics import Logic, QF_BV
 
-from comb.synth.utils import type_to_N
+from comb.frontend.ast import Type, TypeCall
+from comb.synth.utils import type_to_nT, nT
 
 
 class IterLimitError(Exception):
@@ -38,7 +39,7 @@ class Cegis:
             show_iter = False
         assert opts.max_iters > 0
         query = self.query.value
-
+        print("Query Size:", smt.get_formula_size(query))
         for sol in exclude_list:
             sol_term = smt.Bool(True)
             for var, val in sol.items():
@@ -100,25 +101,33 @@ class Cegis:
 
 
 _vars = {}
-def get_var(name, n_or_T):
-    if isinstance(n_or_T, int):
-        n = n_or_T
-    else:
-        T = n_or_T
-        n = type_to_N(T)
-    assert n >= 0
-    key = (name, n)
-    var_name = f"{name}@{n}"
+def get_var(name, T):
+    #Translate to n, const
+    if isinstance(T, TypeCall):
+        T = type_to_nT(T)
+    elif isinstance(T, int):
+        T = nT(T, False)
+    assert isinstance(T, nT)
+    assert T.n >= 0
+    key = (name, T)
+    var_name = f"{name}@{T.n}"
+    if T.const:
+        var_name += "C"
     if key in _vars:
         return _vars[key]
-    if n==0:
+    if T.n==0:
         var = ht.SMTBit(name=var_name)
     else:
-        var = ht.SMTBitVector[n](name=var_name)
+        var = ht.SMTBitVector[T.n](name=var_name)
     _vars[key] = var
     return var
 
 
+def smt_is_sat(f, opts: SolverOpts = SolverOpts()):
+    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+        solver.add_assertion(f)
+        res = solver.solve()
+        return (res is not False)
 
 def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
     E_vars = f.get_free_variables()

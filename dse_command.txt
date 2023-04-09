@@ -1,0 +1,5 @@
+
+python dse_graph_analysis.py -f examples/asplos/gaussian_compute.json <num_subgraphs>
+
+outputs/peak_eqs
+

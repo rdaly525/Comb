@@ -1,5 +1,5 @@
 import hwtypes as ht
-from comb.frontend.ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue
+from comb.frontend.ast import Module, QSym, IntType, TypeCall, BVType, Expr, IntValue, BVValue, CBVType
 from comb.frontend.comb_peak import CombPeak
 from comb.frontend.ir import CombPrimitive, CallExpr, CombSpecialized
 
@@ -61,19 +61,21 @@ class IntModule(Module):
 
 class BVConst(CombPrimitive):
     name = QSym('bv', 'const')
-    param_types = [IntType()]
+    param_types = [IntType(), IntType()]
+    num_inputs = 0
+    num_outputs = 1
 
-    def get_type(self, N: Expr):
+    def get_type(self, N: Expr, val: Expr):
         BVCall = TypeCall(BVType(), [N])
-        return [IntType()], [BVCall]
+        return [], [BVCall]
 
     def eval(self, *args, pargs):
-        assert len(pargs)==1 and len(args)==1
+        assert len(pargs)==2 and len(args)==0
         N = pargs[0]
-        val = args[0]
+        val = pargs[1]
         if isinstance(N, IntValue) and isinstance(N.value, int):
             if isinstance(val, IntValue) and isinstance(val.value, int):
-                return BVValue(ht.SMTBitVector[N.value](val.value))
+                return [BVValue(ht.SMTBitVector[N.value](val.value))]
         return CallExpr(self, pargs, args)
 
 
@@ -101,6 +103,27 @@ def create_BVUnary(class_name: str, fun):
 
     BVBin.__name__ = "BV"+class_name.capitalize()
     return BVBin()
+
+#Represents an abstract constant :: CBV -> BV
+class AbsConst(CombPrimitive):
+    name = QSym('bv', 'abs_const')
+    param_types = [IntType()]
+    num_inputs = 1
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        return [TypeCall(CBVType(), [N])], [TypeCall(BVType(), [N])]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==1
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return [args[0]]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
 
 def create_BVBinary(class_name: str, fun, comm):
     class BVBin(CombPrimitive):
@@ -163,6 +186,7 @@ class BVConcat(CombPeak):
     def __init__(self):
         super().__init__(concat_peak, 2, lambda lsbs, msbs: ((lsbs, msbs), lsbs+msbs))
 
+
 def slice_peak(o, l, h):
     BV = ht.BitVector
     @family_closure
@@ -186,6 +210,7 @@ class BitVectorModule(Module):
         super().__init__('bv')
         opdict = dict(
             const=BVConst(),
+            abs_const=AbsConst(),
             concat=BVConcat(),
             slice=BVSlice(),
         )

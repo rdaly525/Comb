@@ -10,7 +10,7 @@ from ..frontend.ir import AssignStmt, CombProgram
 from ..frontend.stdlib import make_bv_const
 from .pattern import PatternEncoding, Pattern
 from .solver_utils import get_var
-from .utils import flat, _to_int, _list_to_dict, type_to_N
+from .utils import flat, _to_int, _list_to_dict, type_to_nT
 from hwtypes import SMTBitVector as SBV
 
 VarPair = collections.namedtuple('VarPair', 'lvar, var')
@@ -54,8 +54,8 @@ class CombEncoding(PatternEncoding):
         self.snk_n = {n: {(self.num_ops,id):VarPair(self.output_lvars[id], self.output_vars[id]) for id in ids} for n, ids in _list_to_dict(self.oT).items()}
         for opi, op in enumerate(self.op_list):
             iT, oT = op.get_type()
-            iT = [type_to_N(t) for t in iT]
-            oT = [type_to_N(t) for t in oT]
+            iT = [type_to_nT(t) for t in iT]
+            oT = [type_to_nT(t) for t in oT]
             for n, ids in _list_to_dict(iT).items():
                 self.snk_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_in_lvars[opi][id], self.op_in_vars[opi][id]) for id in ids})
             for n, ids in _list_to_dict(oT).items():
@@ -154,7 +154,7 @@ class CombEncoding(PatternEncoding):
             op_iT, op_oT = op.get_type()
             if len(op_oT) > 1:
                 raise NotImplementedError()
-            n = type_to_N(op_oT[0])
+            n = type_to_nT(op_oT[0])
             snks = sorted(self.snk_n[n].keys())
             op_snks = []
             for opi in op_ids:

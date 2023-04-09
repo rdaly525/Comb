@@ -151,25 +151,21 @@ class RuleSynth(Cegis):
         pat_en_t: tp.Type[PatternEncoding],
         sym_opts: SymOpts = SymOpts(),
     ):
+        l_sym_opts = sym_opts
+        r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
         self.iT = iT
         self.oT = oT
-        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=sym_opts)
-        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=sym_opts)
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=r_sym_opts)
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
 
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
         P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-
-        P_input_perm = []
-        if sym_opts.input_perm:
-            P_input_perm.append(lhs_cs.P_sym_input_perm)
-
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
         query = fc.And([
-            fc.And(P_input_perm),
             lhs_cs.P_sym,
             rhs_cs.P_sym,
             lhs_cs.P_wfp,
@@ -187,7 +183,7 @@ class RuleSynth(Cegis):
                 )
             )
         ])
-        print(query.serialize())
+        #print(query.serialize())
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 

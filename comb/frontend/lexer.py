@@ -38,6 +38,7 @@ tokens = (
     'OUTPUT',
     'PARAM',
     'BV',
+    'CBV',
     'INT',
     'BOOL',
     'COLON',
@@ -77,6 +78,7 @@ _reserved = dict(
     Out="OUTPUT",
     Param="PARAM",
     BV="BV",
+    CBV="CBV",
     Int="INT",
     Bool="BOOL",
 )
@@ -154,21 +156,21 @@ def p_bvwidth_1(p):
 def p_bvvalue_0(p):
     'bvvalue : bvwidth QHVAL'
     val = IntValue(int(p[2][2:], 16))
-    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
+    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1], val], [])
 
 def p_bvvalue_1(p):
     'bvvalue : bvwidth QDVAL'
     val = IntValue(int(p[2][2:], 10))
-    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
+    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1], val], [])
 
 def p_bvvalue_2(p):
     'bvvalue : bvwidth QBVAL'
     val = IntValue(int(p[2][2:], 2))
-    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [val])
+    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1], val], [])
 
 def p_bvvalue_3(p):
     'bvvalue : bvwidth QHDB LSQB expr RSQB'
-    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1]], [p[4]])
+    p[0] = ASTCallExpr(QSym("bv", "const"), [p[1], p[4]], [])
 
 def p_expr_0(p):
     'expr : sym'
@@ -214,6 +216,11 @@ def p_type_2(p):
     'type : BV LSQB exprs RSQB'
     p[0] = TypeCall(BVType(), p[3])
 
+def p_type_3(p):
+    'type : CBV LSQB exprs RSQB'
+    p[0] = TypeCall(CBVType(), p[3])
+
+
 def p_decl_r_0(p):
     'decl_r : sym COLON type'
     p[0] = [p[1], p[3]]
@@ -231,6 +238,10 @@ def p_callexpr_0(p):
     p[0] = ASTCallExpr(*p[1], p[3])
 
 def p_callexpr_1(p):
+    'callexpr : qsym_p LPAREN RPAREN'
+    p[0] = ASTCallExpr(*p[1], [])
+
+def p_callexpr_2(p):
     'callexpr : bvvalue'
     p[0] = p[1]
 

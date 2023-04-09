@@ -4,13 +4,14 @@ from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int, type_to_N
+from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int, type_to_nT
 import itertools as it
 
 import pysmt.shortcuts as smt
 
 def exactly_one(*args):
-    return ht.SMTBit(smt.ExactlyOne(*[arg.value for arg in args]))
+    ret = ht.SMTBit(smt.ExactlyOne(*[arg.value for arg in args]))
+    return ret
 
 def matmul(x, y):
     N = len(x)
@@ -243,7 +244,7 @@ class AdjEncoding(PatternEncoding):
             op_iT, op_oT = op.get_type()
             if len(op_oT) > 1:
                 raise NotImplementedError()
-            n = type_to_N(op_oT[0])
+            n = type_to_nT(op_oT[0])
             ens = [] #ens[opi][snk]
             for opi in op_ids:
                 lvars = {snk:v for (src, snk), v in self.edges.items() if src==(opi, 0)}

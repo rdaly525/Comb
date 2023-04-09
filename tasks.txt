@@ -1,0 +1,105 @@
+Current:
+    Wrote sym_same_op for comb and adj
+    Want to test it
+    Comm=False, same_op=False broken in spec_synth test
+        Bug in Pattern equality.
+    Fixed pattern Equality
+    Comb.sym_same_op works
+    Adj.sym_same_op works
+    Done on P_sym_same_op
+
+
+
+
+Goal: 4/9: Optimize for results for presentation
+    GOAL:
+        for (simple isa, complex isa):
+            Pre-filter perf better than post filter perf.
+            Quality of instruction selection are at least matched.
+    TASKS
+        -Choose single application to do instruction selection on/gen rules for
+        -Update codebase to have have a CBV type and allow BV[0].
+        -Choose and serialize complex isa so that it is complete with DSE (feel free to hack). ... I want it in comb form to serialize.
+        -get the pre-filtering code working again for Comb
+        -get post-filtering code working (with post-filtering)
+        -Add timing decorators to the codebase
+        -Get the actual numbers for that simple example in a real table.
+        -Write instruction selection:
+            - I can just manually write the application in Comb form.
+    Issues to handle:
+        How to deal with constants?
+        Booleans: Would be nice to just have BV[0] mean bit... I would get almost everything for free I think.
+        Complications:
+            Everything is written in terms of 'n' and referring to BV, not CBV. I would need to change almost everything in the codebase.
+                How to do this? currently by type is n -> blah. I could simply do (n, is_const) at all those locations. fuck is annoying. Seems best though.
+            I really thing this could be a good result. CBV-> Would be 1 op that is essentialy required. That would give me the N->2 rewrite rules, fuck yeah. I should do it.
+            How does Buchwald deal with compiler constants? I think he doesn't. Confirmed, no distinction
+        Just create a new CBV type and a 'const op that goes from CBV -> BV'
+
+    Current work queue:
+        Add support for bool
+        write the ISA by hand for conv
+        Add pound comments in yacc
+
+    DONE
+        Add CBV type. DONE
+        Add synth test for CBV
+        update CombSynth to use (n, const)
+
+Idea to handle Constants.
+
+
+
+Task List:
+	Required:
+		DepthEncoding.P_sym_input_perm
+		#Starting a Paper Overleaf
+		Rule Synth with Spec Synth:
+		Update Rules to include lists of Patterns
+
+		Composition matching but adhere to syms
+		I also need to actually write the damn paper. When am I going to do that???
+		I should get it done in the next 2 weeks ideally…?
+
+		Read the papers referenced in Clarks’ target.
+		Explicity write out the experiments that I want to run.
+		Experiments:
+			Comparison of different methods
+		Main Results:
+			Pre-filtering is more efficient than post-filtering
+				Do for Spec Synth and Rule Synth.
+				Rule
+			Perf comparison between the 3 Encodings:
+			Effect of each symmetry (When you turn them off and on)
+			Actually perform instruction selection on real CoreIR graphs with real rules.
+
+	Features:
+		Update commutativity to be general
+		Determine commutativity of spec automatically
+
+Focus on 1 -> M
+         N -> M
+         N -> 1
+
+Pick 3 titles with 3 abstracts.
+
+
+Program synthesis
+
+
+2 Different papers.
+
+
+Fix CoreIR to be the IR.
+
+
+Pick a Contrived Instruction Set.
+
+
+Real simple PE vs Real complex PE
+
+
+I designed 2 PEs.
+
+
+Making the case for the different encodings

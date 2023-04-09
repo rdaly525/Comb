@@ -2,6 +2,7 @@ from comb.frontend.ast import BVType, IntValue, TypeCall
 from comb.frontend.compiler import compile_program
 from comb.synth.adj_encoding import AdjEncoding
 from comb.synth.comb_encoding import CombEncoding
+from comb.synth.depth_encoding import DepthEncoding
 from comb.synth.pattern import SymOpts
 from comb.synth.solver_utils import SolverOpts
 from comb.synth.verify import verify as synth_verify
@@ -10,8 +11,6 @@ from comb.synth.rule_synth import RuleSynth
 from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules['bv']
 import pytest
-
-
 
 def verify(ss, opts, gold, debug=False):
     cnt = 0
@@ -28,25 +27,32 @@ def verify(ss, opts, gold, debug=False):
 @pytest.mark.parametrize("pat_en_t", [
     AdjEncoding,
     #CombEncoding,
+    #DepthEncoding,
 ])
-@pytest.mark.parametrize("comm,same_op,input_perm,num_sols", [
-    #(False, False, False, 24*24),
-    #(True, False, False, 6*6),
-    (True, True, True, 12),
+@pytest.mark.parametrize("num_adds, comm, same_op, input_perm, num_sols", [
+    #(1, False, False, False, 4),
+    #(1, True, False, False, 1),
+    #(1, False, True, False, 4),
+    #(1, False, False, True, 2),
+    #(1, True, True, True, 1),
+    #(1, False, False, False, 24*24),
+    #(2, False, False, False, 24),
+    #(2, False, False, False, 24**2),
+    #(2, True, False, False, 6**2),
+    #(2, True, True, False, 3**2),
+    (2, True, True, True, 1),
+    #(3, True, True, True, 2),
+    #(True, True, True, 12),
     #(True, True, True, 1),
     #(False, False, 24),
     #(True, False, 6),
 ])
-def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
-    N = 8
+def test_add(pat_en_t, num_adds, comm, same_op, input_perm, num_sols):
+    N = 16
     #Synthesize Distributive rule for Multiplication
-    lhs = [BV.add[N]]*4
-    rhs = [BV.add[N]]*4
-    #lhs = [BV.add[N]]*2 + [BV.not_[N]]
-    #rhs = [BV.add[N]]*2 + [BV.not_[N]]
-    #lhs = [BV.not_[N]]*2 + [BV.add[N]]*2
-    #rhs = [BV.not_[N]]*2 + [BV.add[N]]*2
-    iT = [N for _ in range(5)]
+    lhs = [BV.add[N]]*num_adds
+    rhs = [BV.add[N]]*num_adds
+    iT = [N]*(num_adds+1)
     oT = [N]
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=input_perm)
     ss = RuleSynth(
@@ -59,7 +65,7 @@ def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
     )
     opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
     rules = ss.gen_all_sols(opts=opts)
-    #rules = list(rules)
+    rules_ = []
     for i, (l, r) in enumerate(rules):
         print(i)
         combl = l.to_comb('R', f"L{i}")
@@ -69,11 +75,52 @@ def test_add(pat_en_t, comm, same_op, input_perm, num_sols):
         print(combl)
         print("->")
         print(combr)
-    assert i+1 == num_sols
-    #assert len(rules) == num_sols
+        rules_.append((l,r))
+    num_rules = len(rules_)
+    assert num_rules == num_sols
 
-    #verify(ss, opts, 1, debug=True)
 
+@pytest.mark.parametrize("pat_en_t", [
+    AdjEncoding,
+    #CombEncoding,
+    #DepthEncoding,
+])
+@pytest.mark.parametrize("comm, same_op, input_perm, num_sols", [
+    #(False, False, False, 8),
+    (False, True, True, 2),
+])
+def test_addsub(pat_en_t, comm, same_op, input_perm, num_sols):
+    N = 16
+    #Synthesize Distributive rule for Multiplication
+    lhs = [BV.add[N]]
+    #lhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
+    rhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
+    iT = [N]*(2)
+    oT = [N]
+    sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=input_perm)
+    ss = RuleSynth(
+        iT,
+        oT,
+        lhs_op_list=lhs,
+        rhs_op_list=rhs,
+        pat_en_t=pat_en_t,
+        sym_opts=sym_opts
+    )
+    opts = SolverOpts(verbose=1, max_iters=1000, solver_name='z3')
+    rules = ss.gen_all_sols(opts=opts)
+    rules_ = []
+    for i, (l, r) in enumerate(rules):
+        print(i)
+        combl = l.to_comb('R', f"L{i}")
+        combr = r.to_comb('R', f"R{i}")
+        assert synth_verify(combl, combr) is None
+        print("-" * 80)
+        print(combl)
+        print("->")
+        print(combr)
+        rules_.append((l,r))
+    num_rules = len(rules_)
+    assert num_rules == num_sols
 
 Cprog = '''
 Comb c.const

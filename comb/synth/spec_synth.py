@@ -5,7 +5,7 @@ from hwtypes import smt_utils as fc
 from comb import Comb
 from .pattern import PatternEncoding, SymOpts, Pattern
 from .solver_utils import SolverOpts, Cegis
-from .utils import _make_list, type_to_N
+from .utils import _make_list, type_to_nT
 
 
 class SpecSynth(Cegis):
@@ -19,8 +19,8 @@ class SpecSynth(Cegis):
     ):
         assert issubclass(pat_en_t, PatternEncoding)
         iT, oT = spec.get_type()
-        iT = [type_to_N(t) for t in iT]
-        oT = [type_to_N(t) for t in oT]
+        iT = [type_to_nT(t) for t in iT]
+        oT = [type_to_nT(t) for t in oT]
         self.pat_en = pat_en_t(iT, oT, op_list, const_list, sym_opts=sym_opts)
         self.spec = spec
         #Formal Spec (P_spec)
@@ -40,6 +40,7 @@ class SpecSynth(Cegis):
                 And(P_spec)
             )
         ])
+        #print(query.serialize())
         E_vars = self.pat_en.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
 
