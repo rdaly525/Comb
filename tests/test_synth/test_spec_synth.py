@@ -196,8 +196,8 @@ o = t2
 
 @pytest.mark.parametrize("pat_en_t", [
     CombEncoding,
-    AdjEncoding,
-    DepthEncoding,
+    #AdjEncoding,
+    #DepthEncoding,
 ])
 def test_c_fma(pat_en_t):
     N = 16

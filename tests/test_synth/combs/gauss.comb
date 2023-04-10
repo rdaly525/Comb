@@ -2,65 +2,75 @@
 
 # const
 Comb isa.I0
-In c0 : CBV[16]
-Out o : BV[16]
-o = bv.abs_const[16](c0)
-
-# mul
-Comb isa.I1
-In x0 : BV[16]
-In x1 : BV[16]
-Out o : BV[16]
-o = bv.mul[16](x0, x1)
+Param N: Int
+In c0 : CBV[N]
+Out o : BV[N]
+o = bv.abs_const[N](c0)
 
 # add
+Comb isa.I1
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# mul
 Comb isa.I2
-In x0 : BV[16]
-In x1 : BV[16]
-Out o : BV[16]
-o = bv.add[16](x0, x1)
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
+
 
 # const mul
 Comb isa.I3
-In x0 : BV[16]
-In x1 : CBV[16]
-Out o : BV[16]
-o = bv.mul[16](x0, bv.abs_const[16](x1))
+Param N: Int
+In x0 : BV[N]
+In x1 : CBV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, bv.abs_const[N](x1))
 
 # add3
 Comb isa.I4
-In x0 : BV[16]
-In x1 : BV[16]
-In x2 : BV[16]
-Out o : BV[16]
-t0 = bv.add[16](x0, x1)
-o = bv.add[16](t0, x2)
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.add[N](x0, x1)
+o = bv.add[N](t0, x2)
 
 # FMA: C(a)*b + c
 Comb isa.I5
-In x0 : CBV[16]
-In x1 : BV[16]
-In x2 : BV[16]
-Out o : BV[16]
-t0 = bv.mul[16](bv.abs_const[16](x0), x1)
-o = bv.add[16](t0, x2)
+Param N: Int
+In x0 : CBV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.mul[N](bv.abs_const[N](x0), x1)
+o = bv.add[N](t0, x2)
 
 # IR
 Comb ir.I0
-In c0 : CBV[16]
-Out o : BV[16]
-o = bv.abs_const[16](c0)
+Param N: Int
+In c0 : CBV[N]
+Out o : BV[N]
+o = bv.abs_const[N](c0)
 
 # mul
 Comb ir.I1
-In x0 : BV[16]
-In x1 : BV[16]
-Out o : BV[16]
-o = bv.mul[16](x0, x1)
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
 
 # add
 Comb ir.I2
-In x0 : BV[16]
-In x1 : BV[16]
-Out o : BV[16]
-o = bv.add[16](x0, x1)
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)

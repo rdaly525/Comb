@@ -4,7 +4,7 @@ from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc
 # Create an adjacency graph
-from .utils import comb_type_to_sT, _make_list, flat, _list_to_dict, _to_int, type_to_nT
+from .utils import comb_type_to_nT, _make_list, flat, _list_to_dict, _to_int, type_to_nT
 import itertools as it
 
 import pysmt.shortcuts as smt
@@ -55,8 +55,8 @@ class AdjEncoding(PatternEncoding):
         self.num_ops = num_ops
         input_T = _list_to_dict(self.iT)
         output_T = _list_to_dict(self.oT)
-        op_iTs = [comb_type_to_sT(op.get_type()[0]) for op in self.op_list]
-        op_oTs = [comb_type_to_sT(op.get_type()[1]) for op in self.op_list]
+        op_iTs = [comb_type_to_nT(op.get_type()[0]) for op in self.op_list]
+        op_oTs = [comb_type_to_nT(op.get_type()[1]) for op in self.op_list]
 
         # Create a set of all sources/snks sorted by type
         srcs = {n: [(-1, i) for i in ids] for n, ids in input_T.items()}

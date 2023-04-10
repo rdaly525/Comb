@@ -27,13 +27,23 @@ Goal: 4/9: Optimize for results for presentation
         -Write instruction selection:
             - I can just manually write the application in Comb form.
     Issues to handle:
+        Two ways to filter searches.
+        If I already have a semantically matching pattern on the left. I can exclude superset patterns on right
+        Similarly if I have a semantically matching pattern on the right, I can exclude smaller patterns on left (might not be true)
+
 
     Current work queue:
-        write postfiltering
-        Get prefiltering working
+        get prefiltering working
+        I can only timeout on individual calls to sat. Very annoying and slow
+            I cannot get this to work efficiently. Going to skip for now.
+
         add timing decorators for SMT calls
+        Ill just time CEGIS
+        I need to add logging somehow. First add timing
 
     DONE
+        add max op filter to RuleSynth call
+        write postfiltering
         write the ISA by hand for conv
         Add pound comments in yacc
         Add CBV type. DONE

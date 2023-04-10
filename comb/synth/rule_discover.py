@@ -1,9 +1,10 @@
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
+from comb.synth.pattern import PatternEncoding, SymOpts
+from comb.synth.rule import Rule
 from comb.synth.rule_synth import RuleSynth
-from comb.synth.pattern import Pattern
 from comb.synth.solver_utils import SolverOpts, smt_solve_all
-from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_sT
+from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_nT
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht
@@ -23,41 +24,107 @@ def smart_iter(mL: int, mR: int):
                 yield (l, r)
 
 @dataclass
-class Rule:
-    lhs_pat: Pattern
-    rhs_pat: Pattern
-    lhs_ids: tp.List[int] #each id is the index into the SymSynth op list (which has all ops)
-    rhs_ids: tp.List[int]
-    def __post_init__(self):
-        self.lhs_cnt = _list_to_counts(self.lhs_ids)
-        self.rhs_cnt = _list_to_counts(self.rhs_ids)
-        self.comb_type = self.lhs_pat.comb_type
-
-    def __str__(self):
-        ret = str(self.lhs_pat)
-        ret += "\n ----->\n"
-        ret += str(self.rhs_pat)
-        return ret
-
-    #def to_pattern(self) -> tp.Tuple[Pattern]:
-    #    for comb in (self.lhs_comb, self.rhs_comb):
-
-
-@dataclass
 class RuleDiscovery:
-    lhss: tp.Set[Comb]
-    rhss: tp.Set[Comb]
+    lhss: tp.List[Comb]
+    rhss: tp.List[Comb]
     maxL: int
     maxR: int
-    T: object = ht.SMTBitVector[16]
+    pat_en_t: tp.Type[PatternEncoding]
+    opMaxL: tp.Mapping[int, int] = None
+    opMaxR: tp.Mapping[int, int] = None
 
     def __post_init__(self):
+        if self.opMaxL is None:
+            self.opMaxL = {i:self.maxL for i in range(len(self.lhss))}
+        if self.opMaxR is None:
+            self.opMaxR = {i:self.maxR for i in range(len(self.rhss))}
         self.lhss = list(self.lhss)
         self.rhss = list(self.rhss)
         self.rules: tp.List[Rule] = []
-        self.rule_vars = []
-        #Create integer variables for each kind
-        pass
+
+    def gen_all(self, opts=SolverOpts()):
+        raise NotImplementedError()
+
+
+    def gen_all_T(self, lhs_ops, rhs_ops):
+        def get_cnt(op, k):
+            return {T:len(ids) for T, ids in comb_type_to_nT(op.get_type()[k]).items()}
+
+        def count(l):
+            ret = {}
+            for d in l:
+                for n, v in d.items():
+                    ret[n] = ret.get(n, 0) + v
+            return ret
+
+        lhs_iTs = count([get_cnt(op, 0) for op in lhs_ops])
+        lhs_oTs = count([get_cnt(op, 1) for op in lhs_ops])
+        rhs_iTs = count([get_cnt(op, 0) for op in rhs_ops])
+        rhs_oTs = count([get_cnt(op, 1) for op in rhs_ops])
+        if len(lhs_oTs) > 1 or len(rhs_oTs) > 1:
+            raise NotImplementedError()
+        max_lhs_oT = {T:1 for T in lhs_oTs.keys()}
+        max_lhs_iT = {T:(cnt-(lhs_oTs.get(T,0) - max_lhs_oT.get(T, 0))) for T,cnt in lhs_iTs.items()}
+        max_rhs_oT = {T:1 for T in rhs_oTs.keys()}
+        max_rhs_iT = {T:(cnt-(rhs_oTs.get(T,0) - max_rhs_oT.get(T, 0))) for T,cnt in rhs_iTs.items()}
+
+        i_keys = set(max_lhs_iT.keys()) | set(max_rhs_iT.keys())
+        o_keys = set(max_lhs_oT.keys()) | set(max_rhs_oT.keys())
+        max_iT = {T: min(max_lhs_iT.get(T, 0), max_rhs_iT.get(T, 0)) for T in i_keys}
+        max_oT = {T: min(max_lhs_oT.get(T, 0), max_rhs_oT.get(T, 0)) for T in o_keys}
+
+        i_poss = {T:list(reversed(range(1,m+1))) for T,m in max_iT.items()}
+        o_poss = {T:list(reversed(range(1,m+1))) for T,m in max_oT.items()}
+        for ivs in it.product(*list(i_poss.values())):
+            iT = []
+            for T, v in zip(i_poss.keys(), ivs):
+                iT += [T for _ in range(v)]
+            for ovs in it.product(*list(o_poss.values())):
+                oT = []
+                for T, v in zip(o_poss.keys(), ovs):
+                    oT += [T for _ in range(v)]
+                assert len(oT) == 1
+                yield (iT, oT)
+
+class RulePostFilter(RuleDiscovery):
+
+    def gen_all(self, opts=SolverOpts()):
+        #print("TOT:", sum(1 for _ in self.num_ss_calls()))
+        for lN, rN, in smart_iter(self.maxL, self.maxR):
+            #lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
+            #rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
+            lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
+            rhs_mc_ids = flat([[i for _ in range(self.opMaxR[i])] for i in range(len(self.rhss))])
+            for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                rhs_ops = [self.rhss[i] for i in rhs_ids]
+                #print("*"*80)
+                #op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
+                op_strs = ["(" + ", ".join(str(id) for id in ids) + ")" for ids in (lhs_ids, rhs_ids)]
+                print(f"{op_strs[0]} -> {op_strs[1]}")
+                for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
+                    print("iT:", tuple(str(t) for t in iT))
+                    #How to determine the Input/Output Types??
+                    ss = RuleSynth(
+                        iT,
+                        oT,
+                        lhs_op_list=lhs_ops,
+                        rhs_op_list=rhs_ops,
+                        pat_en_t=self.pat_en_t,
+                        sym_opts=SymOpts(),
+                    )
+                    for i, sol in enumerate(ss.cegis_all(opts)):
+                        lhs_pat = ss.lhs_cs.pattern_from_sol(sol)
+                        rhs_pat = ss.rhs_cs.pattern_from_sol(sol)
+                        rule = Rule(lhs_pat, rhs_pat)
+                        self.rules.append(rule)
+                        yield rule
+
+
+class RulePreFilter(RuleDiscovery):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rule_vars: tp.List[Rule] = []
 
     def add_rule(self, rule: Rule):
         var = self.T(prefix=f"Rule{len(self.rules)}")
@@ -106,55 +173,6 @@ class RuleDiscovery:
             yield rules
 
 
-    #TODO this should be a more intelligent enumeration in terms of the typing of each op
-    def gen_all_T(self, lhs_ops, rhs_ops):
-        def get_cnt(op, k):
-            return {n:len(ids) for n, ids in comb_type_to_sT(op.get_type()[k]).items()}
-
-        def count(l):
-            ret = {}
-            for d in l:
-                for n, v in d.items():
-                    ret[n] = ret.get(n, 0) + v
-            return ret
-
-        lhs_iTs = count([get_cnt(op, 0) for op in lhs_ops])
-        lhs_oTs = count([get_cnt(op, 1) for op in lhs_ops])
-        rhs_iTs = count([get_cnt(op, 0) for op in rhs_ops])
-        rhs_oTs = count([get_cnt(op, 1) for op in rhs_ops])
-        if len(lhs_oTs) > 1 or len(rhs_oTs) > 1:
-            raise NotImplementedError()
-        max_lhs_oT = {n:1 for n in lhs_oTs.keys()}
-        max_lhs_iT = {n:(cnt-(lhs_oTs.get(n,0) - max_lhs_oT.get(n, 0))) for n,cnt in lhs_iTs.items()}
-        max_rhs_oT = {n:1 for n in rhs_oTs.keys()}
-        max_rhs_iT = {n:(cnt-(rhs_oTs.get(n,0) - max_rhs_oT.get(n, 0))) for n,cnt in rhs_iTs.items()}
-
-        i_keys = set(max_lhs_iT.keys()) | set(max_rhs_iT.keys())
-        o_keys = set(max_lhs_oT.keys()) | set(max_rhs_oT.keys())
-        max_iT = {n: min(max_lhs_iT.get(n, 0), max_rhs_iT.get(n, 0)) for n in i_keys}
-        max_oT = {n: min(max_lhs_oT.get(n, 0), max_rhs_oT.get(n, 0)) for n in o_keys}
-
-
-        def to_BVN(n):
-            if n ==0:
-                raise NotImplementedError()
-            else:
-                BVN = TypeCall(BVType(), [IntValue(n)])
-            return BVN
-        i_poss = {n:list(reversed(range(1,m+1))) for n,m in max_iT.items()}
-        o_poss = {n:list(reversed(range(1,m+1))) for n,m in max_oT.items()}
-        for ivs in it.product(*list(i_poss.values())):
-            iT = []
-            for n, v in zip(i_poss.keys(), ivs):
-                BVN = to_BVN(n)
-                iT += [BVN for _ in range(v)]
-            for ovs in it.product(*list(o_poss.values())):
-                oT = []
-                for n, v in zip(o_poss.keys(), ovs):
-                    BVN = to_BVN(n)
-                    oT += [BVN for _ in range(v)]
-                assert len(oT) == 1
-                yield (iT, oT)
     def num_ss_calls(self):
         for lN, rN, in smart_iter(self.maxL, self.maxR):
             lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])

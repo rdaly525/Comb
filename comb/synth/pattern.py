@@ -213,6 +213,7 @@ class PatternEncoding:
     ):
         self.iT = iT
         self.oT = oT
+        assert all(isinstance(T, nT) for T in [*iT, *oT])
         self.op_list = op_list
         self.const_list = const_list
         self.prefix = prefix

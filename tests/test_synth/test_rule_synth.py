@@ -5,6 +5,7 @@ from comb.synth.comb_encoding import CombEncoding
 from comb.synth.depth_encoding import DepthEncoding
 from comb.synth.pattern import SymOpts
 from comb.synth.solver_utils import SolverOpts
+from comb.synth.utils import nT
 from comb.synth.verify import verify as synth_verify
 from comb.synth.rule_synth import RuleSynth
 
@@ -95,8 +96,8 @@ def test_addsub(pat_en_t, comm, same_op, input_perm, num_sols):
     lhs = [BV.add[N]]
     #lhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
     rhs = [BV.add[N], BV.sub[N], BV.const[N, 1], BV.not_[N]]
-    iT = [N]*(2)
-    oT = [N]
+    iT = [nT(N,False)]*2
+    oT = [nT(N,False)]
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=input_perm)
     ss = RuleSynth(
         iT,
