@@ -35,8 +35,10 @@ def flat(l: tp.Iterable[tp.List[tp.Any]]) -> tp.List[tp.Any]:
 nT = collections.namedtuple('nT', 'n, const')
 def nT_str(self):
     if self.const:
-        return f"C({self.n}"
-    return str(self.n)
+        return f"C{self.n}"
+    else:
+        return f"N{self.n}"
+
 nT.__str__ = nT_str
 
 def type_to_nT(T: TypeCall):

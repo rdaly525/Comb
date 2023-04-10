@@ -23,6 +23,17 @@ def smart_iter(mL: int, mR: int):
             if l <= mL and r <= mR:
                 yield (l, r)
 
+def print_iot(iT, oT):
+    T_strs = ["(" + ", ".join(str(T) for T in Ts) + ")" for Ts in (iT, oT)]
+    print(f"IOT: {T_strs[0]} -> {T_strs[1]}")
+
+
+def print_kind(l_ids, r_ids):
+    id_strs = ["(" + ", ".join(str(id) for id in ids) + ")" for ids in (l_ids, r_ids)]
+    print(f"KIND: {id_strs[0]} -> {id_strs[1]}")
+
+
+
 @dataclass
 class RuleDiscovery:
     lhss: tp.List[Comb]
@@ -41,6 +52,7 @@ class RuleDiscovery:
         self.lhss = list(self.lhss)
         self.rhss = list(self.rhss)
         self.rules: tp.List[Rule] = []
+
 
     def gen_all(self, opts=SolverOpts()):
         raise NotImplementedError()
@@ -100,10 +112,9 @@ class RulePostFilter(RuleDiscovery):
                 rhs_ops = [self.rhss[i] for i in rhs_ids]
                 #print("*"*80)
                 #op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
-                op_strs = ["(" + ", ".join(str(id) for id in ids) + ")" for ids in (lhs_ids, rhs_ids)]
-                print(f"{op_strs[0]} -> {op_strs[1]}")
+                print_kind(lhs_ids, rhs_ids)
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                    print("iT:", tuple(str(t) for t in iT))
+                    print_iot(iT, oT)
                     #How to determine the Input/Output Types??
                     ss = RuleSynth(
                         iT,

@@ -30,7 +30,7 @@ def timer(f):
             k = "UNSAT"
         else:
             k = "SAT"
-        print(f"CEGIS: ({k},{delta})", flush=True)
+        print(f"CEGIS: res {k} t {delta})", flush=True)
         return res
     return wrapped
 
