@@ -41,11 +41,12 @@ def test_pattern_eq():
     for edges, p in zip(edges_list, ps):
         for e in edges:
             p.add_edge(*e)
-    opts = SymOpts(comm=False,same_op=True, input_perm=True)
+    opts = SymOpts(comm=False, same_op=True, input_perm=True)
     for pa, pb in itertools.combinations(ps, 2):
         assert pa.equal(pb, opts)
+        assert pb.equal(pa, opts)
 
-def test_pattern_eq():
+def test_comm_edge():
     N = 16
     ops = [BV.add[N], BV.add[N]]
     T = nT(N,False)

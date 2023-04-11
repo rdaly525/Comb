@@ -36,7 +36,7 @@ def test_isa(pat_en_t):
     assert all(v for v in isa)
     assert all(v for v in ir)
     tot = {}
-    for c, so, ip in itertools.product((0, 1), repeat=3):
+    for c, so, ip in itertools.product((1, 0), repeat=3):
     #for c, so, ip in ((1,1,1),(1,0,0)):
         print(f"\nSYM: ({c},{so},{ip})")
         sym_opts = SymOpts(comm=c, same_op=so, input_perm=ip)

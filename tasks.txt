@@ -38,12 +38,15 @@ Goal: 4/9: Optimize for results for presentation
             I cannot get this to work efficiently. Going to skip for now.
         Get prefiltering working
         Running real example in background for post-filtering
-        Rule filtering is broken. Rule equality does not work correctly.
         Create a match logger
-        Problem: Rewrite rules have a partial order. Not just equality.
-        Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
+        Problem: Rewrite rules have a partial order. Not just equality. I need better filtering
+            I can do this later. Presentaiton first
+
+
 
     DONE
+        Rule filtering is broken. Rule equality does not work correctly.
+        Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
         Pattern equality/matching does not work for the case on the baord
         Get comm_synth working
         Post filtering works

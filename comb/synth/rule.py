@@ -1,5 +1,6 @@
 from comb.synth.pattern import Pattern, SymOpts
 import typing as tp
+import itertools as it
 
 class Rule:
     def __init__(self, lhs_pat: Pattern, rhs_pat: Pattern):
@@ -19,18 +20,15 @@ class Rule:
         #For now only do equality on 0
         lp0 = self.lhss[0]
         lp1 = other.lhss[0]
-        l_perm = lp0.equal_with_perm(lp1, opts)
-        if l_perm is None:
+        l_matches = lp0.equal_with_match(lp1, opts)
+        if len(l_matches)==0:
             return False
         rp0 = self.rhss[0]
         rp1 = other.rhss[0]
-        r_perm = rp0.equal_with_perm(rp1, opts)
-        if r_perm is None:
+        r_matches = rp0.equal_with_match(rp1, opts)
+        if len(r_matches)==0:
             return False
-        if l_perm == r_perm:
-            return True
-        return False
-
+        return any(lm==rm for lm, rm in it.product(l_matches,r_matches))
 
 
 
@@ -51,31 +49,19 @@ class RuleDatabase:
             print("ENDRULE")
 
     def post_filter(self):
-        prim_rules = []
-        for ri, rule in enumerate(self.rules):
+        #TODO This does not take into generalized rules
+        prims = []
+        for ri, r in enumerate(self.rules):
             prim = True
-            for pi, other in enumerate(prim_rules):
-                eq = rule.equal(other)
+            for pi, p in enumerate(prims):
+                eq = r.equal(p)
                 if eq:
-                    if not other.equal(rule):
-                        eq0 = rule.equal(other)
-                        eq1 = other.equal(rule)
-                        print(eq0, eq1)
-                        assert eq1
-
-                    assert other.equal(rule)
+                    assert r.equal(p)
                     prim = False
                     break
-                else:
-                    if other.equal(rule):
-                        eq0 = rule.equal(other)
-                        eq1 = other.equal(rule)
-                        print(eq0, eq1)
-                        assert not eq1
-                    assert not other.equal(rule)
             if prim:
-                prim_rules.append(rule)
-        self.rules = prim_rules
+                prims.append(r)
+        self.rules = prims
 
     def diff(self, other: 'RuleDatabase'):
         ldb, rdb = self, other
