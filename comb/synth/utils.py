@@ -33,6 +33,14 @@ def flat(l: tp.Iterable[tp.List[tp.Any]]) -> tp.List[tp.Any]:
     return [l__ for l_ in l for l__ in l_]
 
 nT = collections.namedtuple('nT', 'n, const')
+def nT_str(self):
+    if self.const:
+        return f"C{self.n}"
+    else:
+        return f"N{self.n}"
+
+nT.__str__ = nT_str
+
 def type_to_nT(T: TypeCall):
     assert isinstance(T, TypeCall)
     n = T.pargs[0].value
@@ -49,7 +57,7 @@ def nT_to_type(T: nT):
     return TypeCall(t, [IntValue(T.n)])
 
 
-def comb_type_to_sT(Ts):
+def comb_type_to_nT(Ts):
     Ns = [type_to_nT(t) for t in Ts]
     return _list_to_dict(Ns)
 

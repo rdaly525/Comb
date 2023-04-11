@@ -2,7 +2,7 @@ from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
 from .pattern import Pattern, SymOpts, PatternEncoding
 from .comb_encoding import CombEncoding
-from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_sT
+from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_nT, nT
 
 import hwtypes.smt_utils as fc
 import typing as tp
@@ -101,12 +101,12 @@ def match_pattern(p: Pattern, cs: CombEncoding, ri_op_cnts):
         yield match_one_pattern(p, cs, pid_to_csid)
 
 def enum_dags(goal_T, rules):
-    from comb.synth.rule_discover import Rule
+    from .rule import Rule
     rules: tp.List[Rule] = rules
-    goal_iT = comb_type_to_sT(goal_T[0])
-    goal_oT = comb_type_to_sT(goal_T[1])
-    rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r in rules]
-    rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r in rules]
+    goal_iT = comb_type_to_nT(goal_T[0])
+    goal_oT = comb_type_to_nT(goal_T[1])
+    rule_iTs = [comb_type_to_nT(r.comb_type[0]) for r in rules]
+    rule_oTs = [comb_type_to_nT(r.comb_type[1]) for r in rules]
 
     if len(goal_iT) != 1:
         raise NotImplementedError()
@@ -144,8 +144,8 @@ def enum_dags(goal_T, rules):
 class RuleSynth(Cegis):
     def __init__(
         self,
-        iT: tp.List[int],
-        oT: tp.List[int],
+        iT: tp.List[nT],
+        oT: tp.List[nT],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
         pat_en_t: tp.Type[PatternEncoding],
@@ -214,7 +214,7 @@ class RuleSynth(Cegis):
 
 
     def add_rule_cover(self, cover):
-        from comb.synth.rule_discover import Rule
+        from .rule import Rule
         cover: tp.List[tp.Tuple[Rule, int]] = cover
         rules = flat([[r for _ in range(cnt)] for r, cnt in cover])
         #Need to get type info for everthing

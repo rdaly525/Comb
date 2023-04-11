@@ -1,0 +1,75 @@
+#I need:
+
+# IR
+Comb ir.I0
+Param N: Int
+In c0 : CBV[N]
+Out o : BV[N]
+o = bv.abs_const[N](c0)
+
+# add
+Comb ir.I1
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# mul
+Comb ir.I2
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
+
+# const
+Comb isa.I0
+Param N: Int
+In c0 : CBV[N]
+Out o : BV[N]
+o = bv.abs_const[N](c0)
+
+# add
+Comb isa.I1
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# mul
+Comb isa.I2
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
+
+# const mul
+Comb isa.I3
+Param N: Int
+In x0 : BV[N]
+In x1 : CBV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, bv.abs_const[N](x1))
+
+# add3
+Comb isa.I4
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.add[N](x0, x1)
+o = bv.add[N](t0, x2)
+
+# FMA: C(a)*b + c
+Comb isa.I5
+Param N: Int
+In x0 : CBV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.mul[N](bv.abs_const[N](x0), x1)
+o = bv.add[N](t0, x2)

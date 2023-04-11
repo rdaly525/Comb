@@ -27,21 +27,36 @@ Goal: 4/9: Optimize for results for presentation
         -Write instruction selection:
             - I can just manually write the application in Comb form.
     Issues to handle:
-        How to deal with constants?
-        Booleans: Would be nice to just have BV[0] mean bit... I would get almost everything for free I think.
-        Complications:
-            Everything is written in terms of 'n' and referring to BV, not CBV. I would need to change almost everything in the codebase.
-                How to do this? currently by type is n -> blah. I could simply do (n, is_const) at all those locations. fuck is annoying. Seems best though.
-            I really thing this could be a good result. CBV-> Would be 1 op that is essentialy required. That would give me the N->2 rewrite rules, fuck yeah. I should do it.
-            How does Buchwald deal with compiler constants? I think he doesn't. Confirmed, no distinction
-        Just create a new CBV type and a 'const op that goes from CBV -> BV'
+        Two ways to filter searches.
+        If I already have a semantically matching pattern on the left. I can exclude superset patterns on right
+        Similarly if I have a semantically matching pattern on the right, I can exclude smaller patterns on left (might not be true)
+
 
     Current work queue:
-        Add support for bool
-        write the ISA by hand for conv
-        Add pound comments in yacc
+        Get real logging working
+        I can only timeout on individual calls to sat. Very annoying and slow
+            I cannot get this to work efficiently. Going to skip for now.
+        Get prefiltering working
+        Running real example in background for post-filtering
+        Create a match logger
+        Problem: Rewrite rules have a partial order. Not just equality. I need better filtering
+            I can do this later. Presentaiton first
+
+
 
     DONE
+        Rule filtering is broken. Rule equality does not work correctly.
+        Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
+        Pattern equality/matching does not work for the case on the baord
+        Get comm_synth working
+        Post filtering works
+        Ill just time CEGIS
+        I need to add logging somehow (to stdout for now)
+        add timing decorators for SMT calls
+        add max op filter to RuleSynth call
+        write postfiltering
+        write the ISA by hand for conv
+        Add pound comments in yacc
         Add CBV type. DONE
         Add synth test for CBV
         update CombSynth to use (n, const)

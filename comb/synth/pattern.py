@@ -1,3 +1,4 @@
+import functools
 from collections import namedtuple
 from functools import cache, cached_property
 import networkx as nx
@@ -17,61 +18,74 @@ import itertools as it
 
 SymOpts = namedtuple('SymOpts', ('comm', 'same_op', 'input_perm'), defaults=(False,)*3)
 
+#dedupliates list of dicts
+def dedup(f):
+    @functools.wraps(f)
+    def dec(*args, **kwargs):
+        ret = f(*args, **kwargs)
+        return list({str(v):v for v in ret}.values())
+    return dec
+
 #(canonicalize comm=True means allow ckecing comm
 #(canonicalize same ops means
+@dedup
 def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
     r = from_pat
     r_root = from_root
     l = to_pat
     l_root = to_root
-    def match(l_src, r_src, ctx):
+    def match(l_src, r_src, ctx) -> tp.List[dict]:
         l_opi, l_arg = l_src
         r_opi, r_arg = r_src
         #Check if already done or if mismatch
 
-        #TODO base case for (-1)
         if r_opi == -1:
-            ctx = {r_src: l_src, **ctx}
-            return ctx
+            if r_src in ctx:
+                if ctx[r_src]==l_src:
+                    return [ctx]
+                else:
+                    #Fanout does not match
+                    return []
+            else:
+                ctx = {r_src: l_src, **ctx}
+            return [ctx]
+
         if l_arg != r_arg:
-            return None
+            return []
 
         if r_opi in ctx:
             if ctx[r_opi]==l_opi:
-                return ctx
+                return [ctx]
             else:
-                return None
+                #Fanout does not match
+                return []
 
         if opts.same_op:
             if l.op_names[l_opi] != r.op_names[r_opi]:
-                return None
+                return []
         else:
             if l_opi != r_opi:
-                return None
+                return []
         l_nodes = [l.nodes[l_opi]]
-        #TODO only works for comm size 2
+        #TODO only works for comm size 2 (or [0,1])
         if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].commutative:
             l_nodes.append(reversed(l.nodes[l_opi]))
 
-        succ_ctx = None
+        matched = []
+        #For each comm ordering
         for l_node in l_nodes:
-            cur_succ = True
-            ctx_ = {**ctx}
+            ctxs = [ctx]
+            #For each op argument
             for l_src, r_src in zip(l_node, r.nodes[r_opi]):
-                #Out index must be the same
-                match_ctx = match(l_src, r_src, ctx)
-                if match_ctx is None:
-                    cur_succ = False
-                    break
-                ctx_ = {**match_ctx, **ctx_}
-            if cur_succ:
-                succ_ctx = ctx_
-                break
-        if succ_ctx is None:
-            return None
-
-        ctx = {r_opi:l_opi, **ctx_}
-        return ctx
+                ctxs_ = []
+                for ctx_ in ctxs:
+                    m_ctxs = match(l_src, r_src, ctx_)
+                    ctxs_.extend(m_ctxs)
+                ctxs = ctxs_
+            matched.extend(ctxs)
+        assert all(r_opi not in ctx for ctx in matched)
+        matched = [{**ctx, r_opi:l_opi} for ctx in matched]
+        return matched
     return match(l_root, r_root, {})
 
 class Pattern:
@@ -136,19 +150,31 @@ class Pattern:
         return _list_to_dict(self.op_names)
 
     def equal(self, other, opts: SymOpts):
-        if not isinstance(other, Pattern):
-            return False
-        if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
-            return False
-        matches = matcher(other, other.root, self, self.root, opts)
-        if matches is None:
-            return False
+        matches = self.equal_with_match(other, opts)
         if opts.input_perm:
+            raise NotImplementedError()
             inputs = [(-1, i) for i in range(len(self.iT))]
             matched_inputs = (matches[input] for input in inputs)
             return set(inputs) == set(matched_inputs)
         else:
-            return all((-1, i)==matches[(-1,i)] for i in range(len(self.iT)))
+            return any(all((-1, i)==match[(-1,i)] for i in range(len(self.iT))) for match in matches)
+
+    #Returns if the patterns are equal and the input matches
+    def equal_with_match(self, other: 'Pattern', opts: SymOpts):
+        if not isinstance(other, Pattern):
+            return []
+        if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
+            return []
+        matches = matcher(other, other.root, self, self.root, opts)
+        inputs = [(-1, i) for i in range(len(self.iT))]
+        matches_ = []
+        for match in matches:
+            if set(inputs) == set(match[input] for input in inputs):
+                matches_.append({i:match[i] for i in inputs})
+        return matches_
+
+    def gt(self, other, opts: SymOpts):
+        raise NotImplementedError()
 
 
     def __str__(self):
@@ -213,6 +239,7 @@ class PatternEncoding:
     ):
         self.iT = iT
         self.oT = oT
+        assert all(isinstance(T, nT) for T in [*iT, *oT])
         self.op_list = op_list
         self.const_list = const_list
         self.prefix = prefix
