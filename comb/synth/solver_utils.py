@@ -1,7 +1,6 @@
 import functools
 import typing as tp
 from dataclasses import dataclass
-import timeout_decorator as td
 import hwtypes as ht
 from pysmt import shortcuts as smt
 
@@ -18,29 +17,33 @@ class IterLimitError(Exception):
 class TimeoutError(Exception):
    pass
 
-def timer(f):
-    @functools.wraps(f)
-    def wrapped(*args, **kwargs):
-        start = timeit.default_timer()
-        res = f(*args, **kwargs)
-        delta = round(timeit.default_timer() - start, 3)
-        if isinstance(res, IterLimitError):
-            k = "MAX"
-        elif res is None:
-            k = "UNSAT"
-        else:
-            k = "SAT"
-        print(f"CEGIS: res {k} t {delta})", flush=True)
-        return res
-    return wrapped
-
 @dataclass
 class SolverOpts:
     logic: Logic = QF_BV
     max_iters: int = 1000
     timeout: int = 20
     solver_name: str = "z3"
+    log: bool = False
     verbose: int = 0
+
+def timer(opts:SolverOpts):
+    def _timer(f):
+        @functools.wraps(f)
+        def wrapped(*args, **kwargs):
+            start = timeit.default_timer()
+            res = f(*args, **kwargs)
+            delta = round(timeit.default_timer() - start, 3)
+            if isinstance(res, IterLimitError):
+                k = "MAX"
+            elif res is None:
+                k = "UNSAT"
+            else:
+                k = "SAT"
+            if opts.log:
+                print(f"CEGIS: ({k}, {delta})", flush=True)
+            return res
+        return wrapped
+    return _timer
 
 def get_model(query, vars, solver_name, logic):
     model = smt.get_model(smt.And(query), solver_name=solver_name, logic=logic)
@@ -126,7 +129,6 @@ class Cegis:
 
 
 
-    @timer
     def cegis(self, opts: SolverOpts = SolverOpts(), exclude_list=[]):
         if opts.verbose==2:
             show_e = True
@@ -150,42 +152,47 @@ class Cegis:
         E_vars = set(var.value for var in self.E_vars)  # exist_vars
         A_vars = query.get_free_variables() - E_vars  # forall vars
 
-        with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
-            solver.add_assertion(smt.Bool(True))
+        @timer(opts)
+        def doit():
+            with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+                solver.add_assertion(smt.Bool(True))
 
-            # Start with checking all A vals beings 0
-            A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
-            solver.add_assertion(query.substitute(A_vals).simplify())
-            for i in range(opts.max_iters):
-                if show_iter and i%10==0:
-                    print(f".{i}", end='', flush=True)
-                E_res = solver.solve()
+                # Start with checking all A vals beings 0
+                A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
+                solver.add_assertion(query.substitute(A_vals).simplify())
+                for i in range(opts.max_iters):
+                    if show_iter and i%10==0:
+                        print(f".{i}", end='', flush=True)
+                    E_res = solver.solve()
 
-                if not E_res:
-                    return None
-                else:
-                    E_guess = {v: solver.get_value(v) for v in E_vars}
-                    if show_e and i%100==50:
-                        print_e(E_guess)
-                    query_guess = query.substitute(E_guess).simplify()
-                    model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
-                    if model is None:
-                        return E_guess
+                    if not E_res:
+                        return None
                     else:
-                        A_vals = {v: model.get_value(v) for v in A_vars}
-                        solver.add_assertion(query.substitute(A_vals).simplify())
+                        E_guess = {v: solver.get_value(v) for v in E_vars}
+                        if show_e and i%100==50:
+                            print_e(E_guess)
+                        query_guess = query.substitute(E_guess).simplify()
+                        model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
+                        if model is None:
+                            return E_guess
+                        else:
+                            A_vals = {v: model.get_value(v) for v in A_vars}
+                            solver.add_assertion(query.substitute(A_vals).simplify())
 
-            return IterLimitError(f"Unknown result in CEGIS in {opts.max_iters} number of iterations")
+                return IterLimitError(f"Unknown result in CEGIS in {opts.max_iters} number of iterations")
+        return doit()
 
     #enum_fun takes a single solution and enumerates all 'permutations' of that solution to add to the exclude list
     def cegis_all(self, opts: SolverOpts = SolverOpts(), enum_fun=None):
         exclude_list = []
         while True:
-            try:
-                sol = self.cegis(opts, exclude_list=exclude_list)
-            except:
-                print("Something went wrong")
-                break
+
+            sol = self.cegis(opts, exclude_list=exclude_list)
+            #try:
+            #    sol = self.cegis(opts, exclude_list=exclude_list)
+            #except:
+            #    print("Something went wrong")
+            #    break
             if isinstance(sol, IterLimitError):
                 break
             if sol is None:

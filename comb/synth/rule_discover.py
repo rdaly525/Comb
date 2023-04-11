@@ -41,6 +41,7 @@ class RuleDiscovery:
     maxL: int
     maxR: int
     pat_en_t: tp.Type[PatternEncoding]
+    sym_opts: SymOpts
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
 
@@ -110,11 +111,15 @@ class RulePostFilter(RuleDiscovery):
             for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
                 lhs_ops = [self.lhss[i] for i in lhs_ids]
                 rhs_ops = [self.rhss[i] for i in rhs_ids]
+                if len(lhs_ops)==1:
+                    continue
                 #print("*"*80)
                 #op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
-                print_kind(lhs_ids, rhs_ids)
+                if opts.log:
+                    print_kind(lhs_ids, rhs_ids)
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                    print_iot(iT, oT)
+                    if opts.log:
+                        print_iot(iT, oT)
                     #How to determine the Input/Output Types??
                     ss = RuleSynth(
                         iT,
@@ -122,7 +127,7 @@ class RulePostFilter(RuleDiscovery):
                         lhs_op_list=lhs_ops,
                         rhs_op_list=rhs_ops,
                         pat_en_t=self.pat_en_t,
-                        sym_opts=SymOpts(),
+                        sym_opts=self.sym_opts,
                     )
                     for i, sol in enumerate(ss.cegis_all(opts)):
                         lhs_pat = ss.lhs_cs.pattern_from_sol(sol)

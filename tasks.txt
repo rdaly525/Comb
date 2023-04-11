@@ -33,15 +33,23 @@ Goal: 4/9: Optimize for results for presentation
 
 
     Current work queue:
-        get prefiltering working
+        Get real logging working
         I can only timeout on individual calls to sat. Very annoying and slow
             I cannot get this to work efficiently. Going to skip for now.
-
-        add timing decorators for SMT calls
-        Ill just time CEGIS
-        I need to add logging somehow. First add timing
+        Get prefiltering working
+        Running real example in background for post-filtering
+        Rule filtering is broken. Rule equality does not work correctly.
+        Create a match logger
+        Problem: Rewrite rules have a partial order. Not just equality.
+        Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
 
     DONE
+        Pattern equality/matching does not work for the case on the baord
+        Get comm_synth working
+        Post filtering works
+        Ill just time CEGIS
+        I need to add logging somehow (to stdout for now)
+        add timing decorators for SMT calls
         add max op filter to RuleSynth call
         write postfiltering
         write the ISA by hand for conv

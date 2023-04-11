@@ -29,9 +29,15 @@ def get_comm_info(spec: Comb, opts: SolverOpts=SolverOpts()):
             outs = _make_list(spec.evaluate(*_swap(in_vars, ia, ib)))
             outs_eq = fc.And([outA==outB for outA, outB in zip(base_outs, outs)])
             f = (~outs_eq.to_hwtypes()).value
-            print(outs_eq.serialize())
             is_comm = not smt_is_sat(f, opts)
             if is_comm:
                 sets.setdefault(ia, {ia}).add(ib)
                 sets.setdefault(ib, {ib}).add(ia)
     ret = set(frozenset(s) for s in sets.values())
+    return ret
+
+
+def set_comm(op: Comb):
+    info = get_comm_info(op)
+    if info == {frozenset([0,1])}:
+        op.commutative = True

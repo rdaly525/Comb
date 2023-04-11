@@ -31,8 +31,16 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
 
         #TODO base case for (-1)
         if r_opi == -1:
-            ctx = {r_src: l_src, **ctx}
+            if r_src in ctx:
+                if ctx[r_src]==l_src:
+                    return ctx
+                else:
+                    #Fanout does not match
+                    return None
+            else:
+                ctx = {r_src: l_src, **ctx}
             return ctx
+
         if l_arg != r_arg:
             return None
 
@@ -40,6 +48,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
             if ctx[r_opi]==l_opi:
                 return ctx
             else:
+                #Fanout does not match
                 return None
 
         if opts.same_op:
@@ -49,7 +58,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
             if l_opi != r_opi:
                 return None
         l_nodes = [l.nodes[l_opi]]
-        #TODO only works for comm size 2
+        #TODO only works for comm size 2 (or [0,1])
         if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].commutative:
             l_nodes.append(reversed(l.nodes[l_opi]))
 
@@ -59,18 +68,17 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
             ctx_ = {**ctx}
             for l_src, r_src in zip(l_node, r.nodes[r_opi]):
                 #Out index must be the same
-                match_ctx = match(l_src, r_src, ctx)
-                if match_ctx is None:
+                ctx_ = match(l_src, r_src, ctx_)
+                if ctx_ is None:
                     cur_succ = False
                     break
-                ctx_ = {**match_ctx, **ctx_}
             if cur_succ:
                 succ_ctx = ctx_
                 break
         if succ_ctx is None:
             return None
-
-        ctx = {r_opi:l_opi, **ctx_}
+        assert r_opi not in succ_ctx
+        ctx = {**succ_ctx, r_opi:l_opi}
         return ctx
     return match(l_root, r_root, {})
 
@@ -150,6 +158,20 @@ class Pattern:
         else:
             return all((-1, i)==matches[(-1,i)] for i in range(len(self.iT)))
 
+    #Returns if the patterns are equal other than input perm
+    def equal_with_perm(self, other: 'Pattern', opts: SymOpts):
+        if not isinstance(other, Pattern):
+            return None
+        if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
+            return None
+        matches = matcher(other, other.root, self, self.root, opts)
+        if matches is None:
+            return None
+        inputs = [(-1, i) for i in range(len(self.iT))]
+        matched_inputs = (matches[input] for input in inputs)
+        if set(inputs) != set(matched_inputs):
+            return None
+        return {i:matches[i] for i in inputs}
 
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
