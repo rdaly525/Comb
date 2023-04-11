@@ -16,12 +16,18 @@ from dataclasses import dataclass
 from more_itertools import distinct_combinations as multicomb
 
 
-def smart_iter(mL: int, mR: int):
+def _smart_iter(mL: int, mR: int):
     for s in range(2, mL+mR+1):
         for l in range(1, s):
             r = s-l
             if l <= mL and r <= mR:
                 yield (l, r)
+
+def smart_iter(mL: int, mR: int):
+    for r in range(1,mR+1):
+        for l in range(1,mL+1):
+            yield (l, r)
+
 
 def print_iot(iT, oT):
     T_strs = ["(" + ", ".join(str(T) for T in Ts) + ")" for Ts in (iT, oT)]
@@ -111,8 +117,6 @@ class RulePostFilter(RuleDiscovery):
             for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
                 lhs_ops = [self.lhss[i] for i in lhs_ids]
                 rhs_ops = [self.rhss[i] for i in rhs_ids]
-                if len(lhs_ops)==1:
-                    continue
                 #print("*"*80)
                 #op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
                 if opts.log:

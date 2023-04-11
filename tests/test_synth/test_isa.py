@@ -23,7 +23,7 @@ from timeit import default_timer as time
     CombEncoding,
 ])
 def test_isa(pat_en_t):
-    N = 16
+    N = 4
     with open(fname, 'r') as f:
         obj = compile_program(f.read())
     ir = [obj.get(f"ir.I{i}")[N] for i in range(3)]
@@ -33,19 +33,21 @@ def test_isa(pat_en_t):
     for i in [1,2]:
         assert ir[i].commutative
         assert isa[i].commutative
-    assert all(v for v in isa)
-    assert all(v for v in ir)
+
+    opts = SolverOpts(verbose=0, max_iters=2000, solver_name='z3', timeout=10, log=True)
+    maxIR = 3
+    maxISA = 2
+    lhs = ir
+    rhs = isa
+    opMaxIR = {0:2, 1:2, 2:1}
+    opMaxISA = {0:2, 1:1, 2:1, 3:1, 4:1, 5:1}
     tot = {}
-    for c, so, ip in itertools.product((1, 0), repeat=3):
-    #for c, so, ip in ((1,1,1),(1,0,0)):
+    #for c, so, ip in itertools.product((1, 0), repeat=3):
+    #for c, so, ip in ((1,1,1),):
+    for c, so, ip in ((1,1,1),):
         print(f"\nSYM: ({c},{so},{ip})")
         sym_opts = SymOpts(comm=c, same_op=so, input_perm=ip)
-        maxIR = 2
-        maxISA = 1
-        lhs = ir
-        rhs = isa
-        opMaxIR = {0:0, 1:2, 2:0}
-        opMaxISA = {i:1 for i in range(6)}
+
         start_time = time()
         ss = RulePostFilter(
             lhs,
@@ -57,7 +59,6 @@ def test_isa(pat_en_t):
             opMaxIR,
             opMaxISA
         )
-        opts = SolverOpts(verbose=0, max_iters=1000, solver_name='z3', timeout=10, log=True)
         db = RuleDatabase()
         for ri, rule in enumerate(ss.gen_all(opts)):
             #print("RULE", ri)

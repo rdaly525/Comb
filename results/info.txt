@@ -1,0 +1,2 @@
+3_2 represents the synthesis time for the IR/ISA in tests/test_synth/combs/gauss.comb
+Currently run using test_isa.py

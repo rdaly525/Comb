@@ -41,6 +41,10 @@ Goal: 4/9: Optimize for results for presentation
         Create a match logger
         Problem: Rewrite rules have a partial order. Not just equality. I need better filtering
             I can do this later. Presentaiton first
+        Do the parsing script.
+            What results do I want for the presentation
+            #Show the effect of the different canonicalizations?
+            Number of calls to CEGIS
 
 
 
