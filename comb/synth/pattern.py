@@ -185,7 +185,7 @@ class Pattern:
         return hash(str(self))
 
     #TODO verify this works
-    def to_comb(self, ns, name) -> CombProgram:
+    def to_comb(self, ns="C", name="C") -> CombProgram:
 
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(self.iT))}

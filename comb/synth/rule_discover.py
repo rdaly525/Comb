@@ -1,7 +1,7 @@
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
 from comb.synth.pattern import PatternEncoding, SymOpts
-from comb.synth.rule import Rule
+from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all
 from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_nT
@@ -52,6 +52,8 @@ class RuleDiscovery:
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
     custom_filter: tp.Callable = lambda x,y: False
+    pgf: bool = True #Preemtive Generative Filtering
+    igf: bool = True #Incremental Generative Filtering
 
     def __post_init__(self):
         if self.opMaxL is None:
@@ -60,7 +62,7 @@ class RuleDiscovery:
             self.opMaxR = {i:self.maxR for i in range(len(self.rhss))}
         self.lhss = list(self.lhss)
         self.rhss = list(self.rhss)
-        self.rules: tp.List[Rule] = []
+        self.rdb: RuleDatabase = RuleDatabase()
         assert len(self.costs) == len(self.rhss)
 
     #Returns the order of rhs ids sorted by cost
@@ -130,47 +132,10 @@ class RuleDiscovery:
                 assert len(oT) == 1
                 yield (tuple(iT), tuple(oT))
 
-
-class RulePostFilter(RuleDiscovery):
-
-    def gen_all(self, opts=SolverOpts()):
-        for (lhs_ids, rhs_ids) in self.enum_buckets():
-            lhs_ops = [self.lhss[i] for i in lhs_ids]
-            rhs_ops = [self.rhss[i] for i in rhs_ids]
-            if opts.log:
-                print_kind(lhs_ids, rhs_ids)
-            for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                if opts.log:
-                    print_iot(iT, oT)
-                info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
-                ss = RuleSynth(
-                    iT,
-                    oT,
-                    lhs_op_list=lhs_ops,
-                    rhs_op_list=rhs_ops,
-                    pat_en_t=self.pat_en_t,
-                    sym_opts=self.sym_opts,
-                )
-                for i, (sol, t) in enumerate(ss.cegis_all(opts)):
-                    lhs_pat = ss.lhs_cs.pattern_from_sol(sol)
-                    rhs_pat = ss.rhs_cs.pattern_from_sol(sol)
-                    rule = Rule(lhs_pat, rhs_pat, t, info)
-                    self.rules.append(rule)
-                    yield rule
-
-
-class RulePreFilter(RuleDiscovery):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.rule_vars: tp.List[Rule] = []
-
-    def add_rule(self, rule: Rule):
-        var = self.T(prefix=f"Rule{len(self.rules)}")
-        self.rule_vars.append(var)
-        self.rules.append(rule)
-
     #Sets up a solve #Find a multiset of rules
+    #
     def all_rule_covers(self, lhs_ids, rhs_ids):
+        raise NotImplementedError()
         exp_lhs_cnt = _list_to_counts(lhs_ids)
         exp_rhs_cnt = _list_to_counts(rhs_ids)
         lhs_op_cnts = [self.T(0) for _ in self.lhss]
@@ -210,43 +175,44 @@ class RulePreFilter(RuleDiscovery):
             rules = [(self.rules[ci], cnt) for ci, cnt in r_cnt.items()]
             yield rules
 
+
     def gen_all(self, opts=SolverOpts()):
-        print("TOT:", sum(1 for _ in self.num_combinations()))
-        for lN, rN, in smart_iter(self.maxL, self.maxR):
-            lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
-            rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
-            for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
-                lhs_ops = [self.lhss[i] for i in lhs_ids]
-                rhs_ops = [self.rhss[i] for i in rhs_ids]
-                print("*"*80)
-                op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
-                print(f"{op_strs[0]} -> {op_strs[1]}")
+        for (lhs_ids, rhs_ids) in self.enum_buckets():
+            lhs_ops = [self.lhss[i] for i in lhs_ids]
+            rhs_ops = [self.rhss[i] for i in rhs_ids]
+            if opts.log:
+                print_kind(lhs_ids, rhs_ids)
 
+            #Discover all lhs pattern covers
+            if self.pgf:
                 covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
+            else:
+                covers = []
+            for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
+                if opts.log:
+                    print_iot(iT, oT)
+                info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
+                rs = RuleSynth(
+                    iT,
+                    oT,
+                    lhs_op_list=lhs_ops,
+                    rhs_op_list=rhs_ops,
+                    pat_en_t=self.pat_en_t,
+                    sym_opts=self.sym_opts,
+                )
+                for cover in covers:
+                    rs.add_rule_cover(cover)
 
-                for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                    print("iT:", tuple(str(t) for t in iT))
-                    #How to determine the Input/Output Types??
-                    ss = RuleSynth(
-                        comb_type=(iT, oT),
-                        lhs_op_list=lhs_ops,
-                        rhs_op_list=rhs_ops,
-                    )
-                    for cover in covers:
-                        ss.add_rule_cover(cover)
-                    for i in it.count(start=1):
-                        sol = ss.cegis(opts)
-                        if sol is None:
-                            break
-                        #lhs_comb = ss.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
-                        #rhs_comb = ss.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
-                        lhs_pat = ss.lhs_cs.pattern_from_solved(sol)
-                        rhs_pat = ss.rhs_cs.pattern_from_solved(sol)
-                        rule = Rule(lhs_pat, rhs_pat, lhs_ids, rhs_ids)
-                        self.add_rule(rule)
-                        yield rule
-                        #Force the new cover to be used in the current it
-                        #Recalculate the covers generator for other Types
+                for i, (sol, t) in enumerate(rs.cegis_all(opts)):
+                    lhs_pat = rs.lhs_cs.pattern_from_sol(sol)
+                    rhs_pat = rs.rhs_cs.pattern_from_sol(sol)
+                    rule = Rule(i, lhs_pat, rhs_pat, t, info)
+                    assert rule.verify()
+                    self.rdb.add_rule(rule)
+                    yield rule
+                    #Force the new cover to be used in the current it
+                    #Recalculate the covers generator for other Types
+                    if self.igf:
                         cur_cover = [(rule, 1)]
-                        ss.add_rule_cover(cur_cover)
+                        rs.add_rule_cover(cur_cover)
                         covers.append(cur_cover)

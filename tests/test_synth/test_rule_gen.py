@@ -9,7 +9,7 @@ from comb.synth.comb_encoding import CombEncoding
 from comb.synth.comm_synth import set_comm
 from comb.synth.pattern import SymOpts
 from comb.synth.rule import Rule, RuleDatabase
-from comb.synth.rule_discover import RulePostFilter
+from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 
 dir = os.path.dirname(os.path.realpath(__file__))
@@ -44,8 +44,6 @@ def test_isa(pat_en_t):
     opts = SolverOpts(verbose=0, max_iters=0, solver_name='z3', timeout=10, log=True)
     maxIR = 3
     maxISA = 2
-    lhs = ir
-    rhs = isa
     opMaxIR = {0:1, 1:2, 2:1, 3:1}
     opMaxISA = {0:1, 1:1, 2:1, 3:1}
     #for c, so, ip in itertools.product((1, 0), repeat=3):
@@ -56,25 +54,27 @@ def test_isa(pat_en_t):
         sym_opts = SymOpts(comm=c, same_op=so, input_perm=ip)
 
         start_time = time()
-        ss = RulePostFilter(
-            lhs,
-            rhs,
-            costs,
-            maxIR,
-            maxISA,
-            pat_en_t,
-            sym_opts,
-            opMaxIR,
-            opMaxISA,
-            custom_filter=custom_filter
+        rd = RuleDiscovery(
+            lhss=ir,
+            rhss=isa,
+            costs=costs,
+            maxL=maxIR,
+            maxR=maxISA,
+            pat_en_t=pat_en_t,
+            sym_opts=sym_opts,
+            opMaxL=opMaxIR,
+            opMaxR=opMaxISA,
+            custom_filter=custom_filter,
+            pgf=False,
+            igf=False
         )
-        db = RuleDatabase()
-        for ri, rule in enumerate(ss.gen_all(opts)):
+        for ri, rule in enumerate(rd.gen_all(opts)):
+            pass
             #print("RULE", ri)
             #print(rule)
             #print("ENDRULE")
-            db.add_rule(rule)
         gen_time = time()
+        db = rd.rdb
         pre_rules = len(db)
         db.post_filter()
         post_time = time()

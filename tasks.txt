@@ -45,6 +45,9 @@ Goal: 4/9: Optimize for results for presentation
             But input_perm parameterized over the commutative args. Similar to a constraint to remove extra program orders
         Write Preemptive Generative Filtering
 
+        Write Incremental Generative Filtering
+            Verify by it passing the wfp constraints
+            I could do the naive enumeration and just filter based off if it passes the other kind of constraints.
     DONE
         Smart iteration based on cost (low to high)
         Write the generalization of commutativity

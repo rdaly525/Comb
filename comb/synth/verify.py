@@ -2,11 +2,12 @@ from hwtypes import smt_utils as fc
 from pysmt import shortcuts as smt
 from pysmt.logics import QF_BV
 
+from .solver_utils import SolverOpts
 from ..frontend.ast import Comb
 from .utils import _make_list
 
 
-def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
+def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts()):
     #Verify that the two interfaces are identical
     i0Ts, o0Ts = comb0.get_type()
     i1Ts, o1Ts = comb1.get_type()
@@ -23,7 +24,7 @@ def verify(comb0: Comb, comb1: Comb, logic=QF_BV, solver_name='z3'):
 
     not_formula = ~(formula.to_hwtypes())
 
-    with smt.Solver(logic=logic, name=solver_name) as solver:
+    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
         solver.add_assertion(not_formula.value)
         res = solver.solve()
         if res is False:

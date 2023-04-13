@@ -1,15 +1,28 @@
+from comb.synth.comm_synth import get_comm_info
 from comb.synth.pattern import Pattern, SymOpts
 import typing as tp
 import itertools as it
 
+from comb.synth.solver_utils import SolverOpts
+from comb.synth.verify import verify
+
+
 class Rule:
-    def __init__(self, lhs_pat: Pattern, rhs_pat: Pattern, synth_time: float, info):
-        self.lhss: tp.List[Pattern] = [lhs_pat]
-        self.rhss: tp.List[Pattern] = [rhs_pat]
+    def __init__(self, id:int, lhs_pat: Pattern, rhs_pat: Pattern, synth_time: float, info, opts: SolverOpts= SolverOpts()):
+        self.id = id
+        self.lhs: Pattern = lhs_pat
+        self.rhs: Pattern = rhs_pat
         self.iT = lhs_pat.iT
         self.oT = lhs_pat.oT
         self.time = [synth_time]
         self.info = info
+        self.comm_info = get_comm_info(lhs_pat.to_comb(), opts)
+
+    def verify(self):
+        lcomb = self.lhs.to_comb()
+        rcomb = self.rhs.to_comb()
+        ce = verify(lcomb, rcomb)
+        return ce is None
 
     def update_time(self, ts):
         self.time.extend(ts)
@@ -27,13 +40,13 @@ class Rule:
     def equal(self, other: 'Rule'):
         opts = SymOpts(comm=True, same_op=True)
         #For now only do equality on 0
-        lp0 = self.lhss[0]
-        lp1 = other.lhss[0]
+        lp0 = self.lhs
+        lp1 = other.lhs
         l_matches = lp0.equal_with_match(lp1, opts)
         if len(l_matches)==0:
             return False
-        rp0 = self.rhss[0]
-        rp1 = other.rhss[0]
+        rp0 = self.rhs
+        rp1 = other.rhs
         r_matches = rp0.equal_with_match(rp1, opts)
         if len(r_matches)==0:
             return False
