@@ -68,7 +68,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
                 return []
         l_nodes = [l.nodes[l_opi]]
         #TODO only works for comm size 2 (or [0,1])
-        if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].commutative:
+        if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].comm_info:
             l_nodes.append(reversed(l.nodes[l_opi]))
 
         matched = []

@@ -152,10 +152,12 @@ class DepthEncoding(PatternEncoding):
 
     @property
     def P_sym_comm(self):
+        assert self.sym_opts.comm
+        raise NotImplementedError()
         #Strict ordering on arguments of commutative ops
         P_comm = []
         for opi, op in enumerate(self.op_list):
-            if op.commutative:
+            if op.comm_info:
                 for lv0, lv1 in zip(self.snk_lvars[opi][:-1], self.snk_lvars[opi][1:]):
                     P_comm.append(lv0.id <= lv1.id)
         return fc.And(P_comm)

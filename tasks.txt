@@ -30,7 +30,7 @@ Goal: 4/9: Optimize for results for presentation
         Two ways to filter searches.
         If I already have a semantically matching pattern on the left. I can exclude superset patterns on right
         Similarly if I have a semantically matching pattern on the right, I can exclude smaller patterns on left (might not be true)
-
+        What if I had some basic 'const instruction' parameterization in the ISA block? I could imagine something like programming adding 1 or 0
 
     Work queue:
         Get a better flow for logging results
@@ -41,11 +41,13 @@ Goal: 4/9: Optimize for results for presentation
         Write Incremental Generative Filtering
             Verify by it passing the wfp constraints
             I could do the naive enumeration and just filter based off if it passes the other kind of constraints.
+        Idea: Excluding commutative Programs could be simply adding input_perm constraint to the rhs
+            But input_perm parameterized over the commutative args. Similar to a constraint to remove extra program orders
         Write Preemptive Generative Filtering
-        Write the generalization of commutativity
-
 
     DONE
+        Smart iteration based on cost (low to high)
+        Write the generalization of commutativity
         I can only timeout on individual calls to sat. Very annoying and slow
         Rule filtering is broken. Rule equality does not work correctly.
         Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
@@ -64,7 +66,6 @@ Goal: 4/9: Optimize for results for presentation
         update CombSynth to use (n, const)
 
 Idea to handle Constants.
-
 
 
 Task List:

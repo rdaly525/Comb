@@ -14,14 +14,14 @@ with open(sm_file, 'r') as f:
 
 N = 4
 am_add = am_obj.get('am.add')
-am_add.commutative = True
+am_add.comm_info = True
 am_mul = am_obj.get('am.mul')
-am_mul.commutative = True
+am_mul.comm_info = True
 sm_sub = sm_obj.get('sm.sub')
-sm_sub.commutative = True
+sm_sub.comm_info = True
 sm_mul = sm_obj.get('sm.mul')
 sm_C = sm_obj.get('sm.C')
-sm_mul.commutative = True
+sm_mul.comm_info = True
 
 
 

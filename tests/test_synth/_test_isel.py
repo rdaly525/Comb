@@ -24,9 +24,9 @@ def test_foo():
     N = 3
 
     am_add = am_obj.get('am.add')
-    am_add.commutative = True
+    am_add.comm_info = True
     am_mul = am_obj.get('am.mul')
-    am_mul.commutative = True
+    am_mul.comm_info = True
     lhs = [
         am_add[N],
         am_mul[N],
@@ -38,8 +38,8 @@ def test_foo():
         #sm_obj.get('sm.C')[N, 2**N-1],
         #sm_obj.get('sm.C')[N, 1],
     ]
-    rhs[0].commutative = True
-    rhs[1].commutative = True
+    rhs[0].comm_info = True
+    rhs[1].comm_info = True
 
     #A Core Idea that Pat Liked:
     #      If your solution space is large and riddled with semantically equivelent solutions,

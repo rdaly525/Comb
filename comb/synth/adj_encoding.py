@@ -275,10 +275,11 @@ class AdjEncoding(PatternEncoding):
     @property
     def P_sym_comm(self):
         assert self.sym_opts.comm
+        raise NotImplementedError()
         #Tactic: All pairwise exclusions.
         comm_op_ids = []
         for i, op in enumerate(self.op_list):
-            if op.commutative:
+            if op.comm_info:
                 comm_op_ids.append(i)
         def gt(src_a, src_b):
             if src_a[0] == src_b[0]:
