@@ -206,10 +206,10 @@ class RuleSynth(Cegis):
         #    rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
         #    yield (lhs_comb, rhs_comb)
 
-        for sol in self.cegis_all(opts):
+        for sol, info in self.cegis_all(opts):
             lhs_pat = self.lhs_cs.pattern_from_sol(sol)
             rhs_pat = self.rhs_cs.pattern_from_sol(sol)
-            yield (lhs_pat, rhs_pat)
+            yield (lhs_pat, rhs_pat), info
 
 
 

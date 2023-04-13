@@ -16,12 +16,18 @@ from dataclasses import dataclass
 from more_itertools import distinct_combinations as multicomb
 
 
-def smart_iter(mL: int, mR: int):
+def _smart_iter(mL: int, mR: int):
     for s in range(2, mL+mR+1):
         for l in range(1, s):
             r = s-l
             if l <= mL and r <= mR:
                 yield (l, r)
+
+def smart_iter(mL: int, mR: int):
+    for r in range(1,mR+1):
+        for l in range(1,mL+1):
+            yield (l, r)
+
 
 def print_iot(iT, oT):
     T_strs = ["(" + ", ".join(str(T) for T in Ts) + ")" for Ts in (iT, oT)]
@@ -58,6 +64,18 @@ class RuleDiscovery:
     def gen_all(self, opts=SolverOpts()):
         raise NotImplementedError()
 
+
+    def num_ss_calls(self):
+        for lN, rN, in smart_iter(self.maxL, self.maxR):
+            lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
+            rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
+            for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                rhs_ops = [self.rhss[i] for i in rhs_ids]
+                if custom_filter(rhs_ids):
+                    continue
+                for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
+                    yield None
 
     def gen_all_T(self, lhs_ops, rhs_ops):
         def get_cnt(op, k):
@@ -97,7 +115,14 @@ class RuleDiscovery:
                 for T, v in zip(o_poss.keys(), ovs):
                     oT += [T for _ in range(v)]
                 assert len(oT) == 1
-                yield (iT, oT)
+                yield (tuple(iT), tuple(oT))
+
+
+def custom_filter(ids):
+    if ids == [0,0,2]:
+        return True
+    if 2 in ids and 3 in ids:
+        return True
 
 class RulePostFilter(RuleDiscovery):
 
@@ -109,10 +134,11 @@ class RulePostFilter(RuleDiscovery):
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             rhs_mc_ids = flat([[i for _ in range(self.opMaxR[i])] for i in range(len(self.rhss))])
             for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
+                assert all(id0<=id1 for id0,id1 in zip(rhs_ids[:-1],rhs_ids[1:]))
+                if custom_filter(rhs_ids):
+                    continue
                 lhs_ops = [self.lhss[i] for i in lhs_ids]
                 rhs_ops = [self.rhss[i] for i in rhs_ids]
-                if len(lhs_ops)==1:
-                    continue
                 #print("*"*80)
                 #op_strs = ["(" + ", ".join(str(op.qualified_name) for op in ops) + ")" for ops in (lhs_ops, rhs_ops)]
                 if opts.log:
@@ -120,7 +146,7 @@ class RulePostFilter(RuleDiscovery):
                 for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
                     if opts.log:
                         print_iot(iT, oT)
-                    #How to determine the Input/Output Types??
+                    info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
                     ss = RuleSynth(
                         iT,
                         oT,
@@ -129,10 +155,10 @@ class RulePostFilter(RuleDiscovery):
                         pat_en_t=self.pat_en_t,
                         sym_opts=self.sym_opts,
                     )
-                    for i, sol in enumerate(ss.cegis_all(opts)):
+                    for i, (sol, t) in enumerate(ss.cegis_all(opts)):
                         lhs_pat = ss.lhs_cs.pattern_from_sol(sol)
                         rhs_pat = ss.rhs_cs.pattern_from_sol(sol)
-                        rule = Rule(lhs_pat, rhs_pat)
+                        rule = Rule(lhs_pat, rhs_pat, t, info)
                         self.rules.append(rule)
                         yield rule
 
@@ -187,17 +213,6 @@ class RulePreFilter(RuleDiscovery):
             print("RCNT", r_cnt)
             rules = [(self.rules[ci], cnt) for ci, cnt in r_cnt.items()]
             yield rules
-
-
-    def num_ss_calls(self):
-        for lN, rN, in smart_iter(self.maxL, self.maxR):
-            lhs_mc_ids = flat([[i for _ in range(lN)] for i in range(len(self.lhss))])
-            rhs_mc_ids = flat([[i for _ in range(rN)] for i in range(len(self.rhss))])
-            for (lhs_ids, rhs_ids) in it.product(multicomb(lhs_mc_ids, lN), multicomb(rhs_mc_ids, rN)):
-                lhs_ops = [self.lhss[i] for i in lhs_ids]
-                rhs_ops = [self.rhss[i] for i in rhs_ids]
-                for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                    yield None
 
 
     def gen_all(self, opts=SolverOpts()):
