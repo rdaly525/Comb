@@ -60,14 +60,14 @@ def parse_line(l):
 
 data = {}
 syms = (
-    (0,0,0),
-    (1,1,0),
-    (1,0,1),
-    (0,1,1),
+    #(0,0,0),
+    (1,0,0),
+    (0,1,0),
+    #(0,0,1),
     (1,1,1),
 )
 for c, so, ip in syms:
-    file = f"/Users/rdaly/comb/results/res{c}{so}{ip}_3_2.txt"
+    file = f"/Users/rdaly/comb/results/res{c}{so}{ip}.txt"
     try:
         with open(file, 'r') as f:
             smt_calls = {}

@@ -32,23 +32,21 @@ Goal: 4/9: Optimize for results for presentation
         Similarly if I have a semantically matching pattern on the right, I can exclude smaller patterns on left (might not be true)
 
 
-    Current work queue:
-        Get real logging working
-        I can only timeout on individual calls to sat. Very annoying and slow
-            I cannot get this to work efficiently. Going to skip for now.
-        Get prefiltering working
-        Running real example in background for post-filtering
-        Create a match logger
-        Problem: Rewrite rules have a partial order. Not just equality. I need better filtering
-            I can do this later. Presentaiton first
-        Do the parsing script.
-            What results do I want for the presentation
-            #Show the effect of the different canonicalizations?
-            Number of calls to CEGIS
-
+    Work queue:
+        Get a better flow for logging results
+        Write full instruction selection.
+            Create a Match logger
+            Could leverage for rewrite rule uniqueness
+            Would allow for getting real results for certain applications
+        Write Incremental Generative Filtering
+            Verify by it passing the wfp constraints
+            I could do the naive enumeration and just filter based off if it passes the other kind of constraints.
+        Write Preemptive Generative Filtering
+        Write the generalization of commutativity
 
 
     DONE
+        I can only timeout on individual calls to sat. Very annoying and slow
         Rule filtering is broken. Rule equality does not work correctly.
         Problem: Multiple matches can occur with commutivity. I cannot do an eager break. Fix it
         Pattern equality/matching does not work for the case on the baord
