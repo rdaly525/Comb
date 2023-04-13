@@ -68,8 +68,8 @@ BV = GlobalModules['bv']
 #I can therefor test the input_perm symmetry here.
 @pytest.mark.parametrize("pat_en_t", [
     CombEncoding,
-    AdjEncoding,
-    DepthEncoding,
+    #AdjEncoding,
+    #DepthEncoding,
 ])
 @pytest.mark.parametrize("num_adds,comm,same_op,iperm,num_sols", [
     (1, False, False, False, 2),

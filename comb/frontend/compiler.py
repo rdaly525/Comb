@@ -5,13 +5,17 @@ from comb.frontend.passes import SymRes, VerifyNoAST
 from comb.frontend.stdlib import GlobalModules
 
 
-def compile_program(program: str, debug=False) -> Obj:
+def compile_program(program: str, debug=False, add_comm=True) -> Obj:
     yacc_start = 'obj'
     parser = get_parser(yacc_start)
     aobj = parser.parse(program, lexer=lexer, debug=debug)
     if aobj is None:
         raise ValueError("Syntax Error!!!")
     obj = symbol_resolution(aobj)
+    if add_comm:
+        from comb.synth.comm_synth import set_comm
+        for comb in obj.comb_dict.values():
+            set_comm(comb)
     return obj
 
 

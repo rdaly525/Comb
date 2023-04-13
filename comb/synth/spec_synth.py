@@ -45,7 +45,7 @@ class SpecSynth(Cegis):
         super().__init__(query.to_hwtypes(), E_vars)
 
     def gen_all_sols(self, opts: SolverOpts = SolverOpts()) -> tp.List[Pattern]:
-        for sol in self.cegis_all(opts):
+        for sol, info in self.cegis_all(opts):
             yield self.pat_en.pattern_from_sol(sol)
     # Tactic. Generate all the non-permuted solutions.
     # For each of those solutions, generate all the permutations

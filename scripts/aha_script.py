@@ -17,6 +17,12 @@ fname = f"{dir}/combs/pres.comb"
 import typing as tp
 
 
+def custom_filter(lhs_ids, rhs_ids):
+    if rhs_ids == [0,0,2]:
+        return True
+    if 2 in rhs_ids and 3 in rhs_ids:
+        return True
+
 from timeit import default_timer as time
 
 @pytest.mark.parametrize("pat_en_t", [
@@ -28,11 +34,18 @@ def test_isa(pat_en_t):
         obj = compile_program(f.read())
     ir = [obj.get(f"ir.I{i}")[N] for i in range(4)]
     isa = [obj.get(f"isa.I{i}")[N] for i in range(4)]
+    costs = [1.1, 0.8, 3, 1.8]
     for op in [*ir, *isa]:
         set_comm(op)
     for i in (1,3):
-        assert ir[i].commutative
-    assert isa[0].commutative
+        assert ir[i].comm_info
+    assert isa[0].comm_info
+
+    def custom_filter(lhs_ids, rhs_ids):
+        if rhs_ids == [0,0,2]:
+            return True
+        if 2 in rhs_ids and 3 in rhs_ids:
+            return True
 
     opts = SolverOpts(verbose=0, max_iters=0, solver_name='z3', timeout=10, log=True)
     maxIR = 3
@@ -53,12 +66,14 @@ def test_isa(pat_en_t):
         ss = RulePostFilter(
             lhs,
             rhs,
+            costs,
             maxIR,
             maxISA,
             pat_en_t,
             sym_opts,
             opMaxIR,
-            opMaxISA
+            opMaxISA,
+            custom_filter=custom_filter
         )
         db = RuleDatabase()
         for ri, rule in enumerate(ss.gen_all(opts)):

@@ -14,19 +14,24 @@ def _swap(vals, ia, ib):
     assert ia < ib
     return [*vals[:ia], vals[ib], *vals[ia+1:ib], vals[ia], *vals[ib+1:]]
 
-def get_comm_info(spec: Comb, opts: SolverOpts=SolverOpts()):
-    iT, oT = spec.get_type()
+def get_comm_info(spec: Comb, opts: SolverOpts):
+    pvals = tuple(16 for _ in spec.param_types)
+    if len(pvals) > 0:
+        spec_n = spec[pvals]
+    else:
+        spec_n = spec
+    iT, oT = spec_n.get_type()
     iT = [type_to_nT(t) for t in iT]
 
     in_vars = [get_var(f"I{i}", n) for i, n in enumerate(iT)]
-    base_outs = _make_list(spec.evaluate(*in_vars))
+    base_outs = _make_list(spec_n.evaluate(*in_vars))
     sets = {}
     for n, ids in _list_to_dict(iT).items():
         if len(ids)==1:
             continue
         for ia, ib in it.combinations(ids, 2):
             assert ia < ib
-            outs = _make_list(spec.evaluate(*_swap(in_vars, ia, ib)))
+            outs = _make_list(spec_n.evaluate(*_swap(in_vars, ia, ib)))
             outs_eq = fc.And([outA==outB for outA, outB in zip(base_outs, outs)])
             f = (~outs_eq.to_hwtypes()).value
             is_comm = not smt_is_sat(f, opts)
@@ -34,10 +39,15 @@ def get_comm_info(spec: Comb, opts: SolverOpts=SolverOpts()):
                 sets.setdefault(ia, {ia}).add(ib)
                 sets.setdefault(ib, {ib}).add(ia)
     ret = set(frozenset(s) for s in sets.values())
-    return ret
+    for s0, s1 in it.combinations(ret, 2):
+        assert s0 & s1 == frozenset()
+    return tuple(sorted(s) for s in ret)
 
 
-def set_comm(op: Comb):
-    info = get_comm_info(op)
-    if info == {frozenset([0,1])}:
-        op.commutative = True
+def set_comm(op: Comb, opts: SolverOpts=SolverOpts()):
+    info = get_comm_info(op, opts)
+    op.comm_info = info
+
+def check_comm_equal(comm0, comm1):
+    vs = [set(frozenset(s) for s in comm) for comm in (comm0, comm1)]
+    return (vs[0] == vs[1])

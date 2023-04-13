@@ -185,8 +185,10 @@ class CombEncoding(PatternEncoding):
         #Strict ordering on arguments of commutative ops
         P_comm = []
         for i, op in enumerate(self.op_list):
-            if op.commutative:
-                for lv0, lv1 in  zip(self.op_in_lvars[i][:-1], self.op_in_lvars[i][1:]):
+            for arg_ids in op.comm_info:
+                assert sorted(arg_ids) == arg_ids
+                arg_lvars = [self.op_in_lvars[i][ai] for ai in arg_ids]
+                for lv0, lv1 in  zip(arg_lvars[:-1], arg_lvars[1:]):
                     P_comm.append(lv0 <= lv1)
         return fc.And(P_comm)
 
@@ -227,7 +229,7 @@ class CombEncoding(PatternEncoding):
         return fc.And(P_wfp)
 
     def fix_comm(self, sol):
-        comm_ids = [i for i, op in enumerate(self.op_list) if op.commutative]
+        comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
         v_sols = []
         for i in comm_ids:
             lvars = self.op_in_lvars[i]
@@ -311,7 +313,7 @@ class CombEncoding(PatternEncoding):
         #Get indices of each commutative op
         commute_idxs = []
         for i, op in enumerate(self.op_list):
-            if op.commutative:
+            if op.comm_info:
                 commute_idxs.append(i)
 
         lvar_perms = []

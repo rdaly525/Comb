@@ -263,7 +263,7 @@ class ASTObj(Node):
         return ",".join(str(comb.name) for comb in self.combs)
 
 class Comb(Node):
-    commutative = False
+    comm_info = []
     specialzied = False
     param_types = []
     def __init__(self, *args):

@@ -129,7 +129,7 @@ def create_BVBinary(class_name: str, fun, comm):
     class BVBin(CombPrimitive):
         name = QSym('bv', class_name)
         param_types = [IntType()]
-        commutative = comm
+        comm_info = [[0,1]] if comm else []
         num_inputs = 2
         num_outputs = 1
 

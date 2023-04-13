@@ -59,7 +59,7 @@ class CombSpecialized(Comb):
         self.comb = comb
         self.name = comb.name
         self.pargs = [IntValue(parg) for parg in pargs]
-        self.commutative = comb.commutative
+        self.comm_info = comb.comm_info
 
     @property
     def qualified_name(self):
@@ -220,7 +220,7 @@ class CombProgram(Comb):
             raise TypeError(f"TC: Type check failed: \n{f.serialize()}")
 
 class Obj(Node):
-    def __init__(self, combs):
+    def __init__(self, combs: tp.List[Comb]):
         super().__init__(*combs)
         self.comb_dict = OrderedDict({str(comb.name): comb for comb in combs})
 
