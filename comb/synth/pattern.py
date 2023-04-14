@@ -8,7 +8,7 @@ from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
 from .solver_utils import get_var
-from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT
+from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -61,7 +61,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
                 return []
 
         if opts.same_op:
-            if l.op_names[l_opi] != r.op_names[r_opi]:
+            if l.op_names_with_io[l_opi] != r.op_names_with_io[r_opi]:
                 return []
         else:
             if l_opi != r_opi:
@@ -110,7 +110,12 @@ class Pattern:
 
     @cached_property
     def op_names(self):
+        return [op.qualified_name for op in self.ops]
+
+    @cached_property
+    def op_names_with_io(self):
         return [op.qualified_name for op in self.ops] + ["IO"]
+
 
     @cached_property
     def num_ops(self):
@@ -133,21 +138,25 @@ class Pattern:
         self.edges.append((src, snk))
         self.nodes[snk[0]][snk[1]] = src
 
-    #@property
-    #def interior_edges(self):
-    #    yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
+    @property
+    def interior_edges(self):
+        yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
 
-    #@property
-    #def in_edges(self):
-    #    yield from (e for e in self.edges if e[0][0]==-1)
+    @property
+    def in_edges(self):
+        yield from (e for e in self.edges if e[0][0]==-1)
 
-    #@property
-    #def out_edges(self):
-    #    yield from (e for e in self.edges if e[1][0]==self.num_ops)
+    @property
+    def out_edges(self):
+        yield from (e for e in self.edges if e[1][0]==self.num_ops)
 
     @cached_property
     def op_dict(self):
         return _list_to_dict(self.op_names)
+
+    @cached_property
+    def op_cnt(self):
+        return _list_to_counts(self.op_names)
 
     def equal(self, other, opts: SymOpts):
         matches = self.equal_with_match(other, opts)

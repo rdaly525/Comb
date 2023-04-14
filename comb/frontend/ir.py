@@ -222,13 +222,16 @@ class CombProgram(Comb):
 class Obj(Node):
     def __init__(self, combs: tp.List[Comb]):
         super().__init__(*combs)
-        self.comb_dict = OrderedDict({str(comb.name): comb for comb in combs})
+        self.comb_dict = OrderedDict({(comb.name.module, comb.name.name): comb for comb in combs})
 
-    def get(self, k):
-        return self.comb_dict.get(k, None)
+    def get(self, ns, name):
+        return self.comb_dict.get((ns, name), None)
 
     def __str__(self):
         return "\n\n".join(str(comb) for comb in self.comb_dict.values())
 
     def serialize(self):
         return str(self)
+
+    def get_from_ns(self, ns):
+        return [comb for (ns_, name), comb in self.comb_dict.items() if ns==ns_]

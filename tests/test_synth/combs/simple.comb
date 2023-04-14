@@ -1,0 +1,70 @@
+# IR
+Comb ir.C
+Param N: Int
+In c0 : CBV[N]
+Out o : BV[N]
+o = bv.abs_const[N](c0)
+
+# add
+Comb ir.add
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# sub
+Comb ir.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sub[N](x0, x1)
+
+# mul
+Comb ir.mul
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
+
+# add
+Comb isa.add
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# Neg
+Comb isa.neg
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = bv.neg[N](x)
+
+# const mul
+Comb isa.mulC
+Param N: Int
+In x0 : BV[N]
+In x1 : CBV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, bv.abs_const[N](x1))
+
+# add3
+Comb isa.add3
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.add[N](x0, x1)
+o = bv.add[N](t0, x2)
+
+# zero
+Comb isa.zero
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = [N]'h0

@@ -38,9 +38,6 @@ Goal: 4/9: Optimize for results for presentation
             Create a Match logger
             Could leverage for rewrite rule uniqueness
             Would allow for getting real results for certain applications
-        Write Incremental Generative Filtering
-            Verify by it passing the wfp constraints
-            I could do the naive enumeration and just filter based off if it passes the other kind of constraints.
         Idea: Excluding commutative Programs could be simply adding input_perm constraint to the rhs
             But input_perm parameterized over the commutative args. Similar to a constraint to remove extra program orders
         Write Preemptive Generative Filtering
@@ -48,7 +45,12 @@ Goal: 4/9: Optimize for results for presentation
         Write Incremental Generative Filtering
             Verify by it passing the wfp constraints
             I could do the naive enumeration and just filter based off if it passes the other kind of constraints.
+
+        ISSUE: The ordering must be fucked up. I am first generating a rewrite rule for Sub(x,x)=0 and that is excluding generating rules for (sub(x,y))
+
     DONE
+        Work on add_rule_cover
+        Fixed generate all rule covers based on cost.
         Smart iteration based on cost (low to high)
         Write the generalization of commutativity
         I can only timeout on individual calls to sat. Very annoying and slow

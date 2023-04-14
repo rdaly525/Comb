@@ -3,7 +3,7 @@ from comb.synth.pattern import Pattern, SymOpts
 import typing as tp
 import itertools as it
 
-from comb.synth.solver_utils import SolverOpts
+from comb.synth.solver_utils import SolverOpts, get_var
 from comb.synth.verify import verify
 
 
@@ -32,9 +32,9 @@ class Rule:
         return round(sum(self.time),2)
 
     def __str__(self):
-        ret = str(self.lhss[0].to_comb('R','R'))
+        ret = str(self.lhs.to_comb(name=f"LHS{self.id}"))
         ret += "\n ----->\n"
-        ret += str(self.rhss[0].to_comb('R','R'))
+        ret += str(self.rhs.to_comb(name=f"RHS{self.id}"))
         return ret
 
     def equal(self, other: 'Rule'):
@@ -56,8 +56,12 @@ class Rule:
 class RuleDatabase:
     def __init__(self):
         self.rules: tp.List[Rule] = []
+        self.rule_vars = []
 
     def add_rule(self, rule: Rule):
+        i = len(self.rules)
+        rule.id = i
+        self.rule_vars.append(get_var(f"R{i}", 32))
         self.rules.append(rule)
 
     def __len__(self):
