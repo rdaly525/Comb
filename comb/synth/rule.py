@@ -3,7 +3,7 @@ from comb.synth.pattern import Pattern, SymOpts
 import typing as tp
 import itertools as it
 
-from comb.synth.solver_utils import SolverOpts, get_var
+from comb.synth.solver_utils import SolverOpts
 from comb.synth.verify import verify
 
 
@@ -56,13 +56,13 @@ class Rule:
 class RuleDatabase:
     def __init__(self):
         self.rules: tp.List[Rule] = []
-        self.rule_vars = []
+        self.costs: tp.List[int] = []
 
-    def add_rule(self, rule: Rule):
+    def add_rule(self, rule: Rule, cost: int):
         i = len(self.rules)
         rule.id = i
-        self.rule_vars.append(get_var(f"R{i}", 32))
         self.rules.append(rule)
+        self.costs.append(cost)
 
     def __len__(self):
         return len(self.rules)

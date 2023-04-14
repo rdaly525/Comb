@@ -121,8 +121,13 @@ def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
     #Easy filter to remove most of the bad connections
     def invalid_edge(src, snk):
         return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
-    def invalid_edges(edges):
-        return any(invalid_edge(src, snk) for src, snk in edges)
+    all_src = flat([srcs_ for srcs_ in srcs.values()])
+    def invalid_dag(edges):
+        used_srcs = set(src for src,_ in edges)
+        all_used = all(src in used_srcs for src in all_src)
+        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
+        return (not all_used) or bad_edge
+        #each source should be in edge list
 
     src_poss = []
     snk_list = []
@@ -133,7 +138,7 @@ def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
     graphs = []
     for src_list in it.product(*src_poss):
         edges = list(zip(src_list, snk_list))
-        if not invalid_edges(edges):
+        if not invalid_dag(edges):
             graphs.append(edges)
     return graphs
 

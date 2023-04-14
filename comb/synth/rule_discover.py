@@ -3,7 +3,7 @@ from comb.frontend.ast import TypeCall, BVType, IntValue
 from comb.synth.pattern import PatternEncoding, SymOpts
 from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
-from comb.synth.solver_utils import SolverOpts, smt_solve_all
+from comb.synth.solver_utils import SolverOpts, smt_solve_all, get_var
 from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_nT, _list_to_dict
 
 import hwtypes.smt_utils as fc
@@ -73,7 +73,7 @@ class RuleDiscovery:
             for rhs_ids in multicomb(rhs_mc_ids, rN):
                 cost = sum(self.costs[i] for i in rhs_ids)
                 rs.append((cost,rhs_ids))
-        return [rhs_ids for _, rhs_ids in sorted(rs)]
+        return [tuple(rhs_ids) for _, rhs_ids in sorted(rs)]
 
     def enum_buckets(self):
         rhs_id_order = self.gen_rhs_order()
@@ -89,7 +89,7 @@ class RuleDiscovery:
     def num_combinations(self):
         return sum(1 for _ in self.enum_buckets())
 
-    def gen_all_T(self, lhs_ops, rhs_ops):
+    def gen_all_T2(self, lhs_ops, rhs_ops):
         def get_cnt(op, k):
             return {T:len(ids) for T, ids in comb_type_to_nT(op.get_type()[k]).items()}
 
@@ -129,94 +129,147 @@ class RuleDiscovery:
                 assert len(oT) == 1
                 yield (tuple(iT), tuple(oT))
 
-    # Finds all combinations of rules that exactly match the lhs and have the same or greater cost than the rhs
+    def gen_all_T1(self, ops):
+        def get_cnt(op, k):
+            return {T:len(ids) for T, ids in comb_type_to_nT(op.get_type()[k]).items()}
+
+        def count(l):
+            ret = {}
+            for d in l:
+                for n, v in d.items():
+                    ret[n] = ret.get(n, 0) + v
+            return ret
+
+        iTs = count([get_cnt(op, 0) for op in ops])
+        oTs = count([get_cnt(op, 1) for op in ops])
+        if len(oTs) > 1:
+            raise NotImplementedError()
+        max_oT = {T:1 for T in oTs.keys()}
+        max_iT = {T:(cnt-(oTs.get(T,0) - max_oT.get(T, 0))) for T,cnt in iTs.items()}
+
+
+        #There is a partial order of input types. It forms a lattice.
+        #I need to return a full group where each group is equal
+        i_poss = {T:list(reversed(range(1,m+1))) for T,m in max_iT.items()}
+        o_poss = {T:list(reversed(range(1,m+1))) for T,m in max_oT.items()}
+        ivss = [(sum(ivs),ivs) for ivs in it.product(*list(i_poss.values()))]
+        grouped_ivs = {}
+        for (s, ivs) in ivss:
+            grouped_ivs.setdefault(s,[]).append(ivs)
+        for s, ivss in sorted(grouped_ivs.items()):
+            print(s)
+            group = []
+            for ivs in ivss:
+                iT = []
+                for T, v in zip(i_poss.keys(), ivs):
+                    iT += [T for _ in range(v)]
+                for ovs in it.product(*list(o_poss.values())):
+                    oT = []
+                    for T, v in zip(o_poss.keys(), ovs):
+                        oT += [T for _ in range(v)]
+                    assert len(oT) == 1
+                    group.append((tuple(iT), tuple(oT)))
+            yield group
+
+    # Finds all combinations of rules that exactly match the lhs and have less cost than or eq to the rhs
     def all_rule_covers(self, lhs_ids, rhs_ids):
         exp_cost = sum([self.costs[ri] for ri in rhs_ids])
         assert isinstance(exp_cost, int)
 
+        lhs_op_cnt = _list_to_counts([self.lhss[lid].qualified_name for lid in lhs_ids])
+
+        #Prefiltering
+        poss_rules = {}
+        for ri, (rule, ri_cost) in enumerate(zip(self.rdb.rules, self.rdb.costs)):
+            if ri_cost > exp_cost:
+                continue
+            elif rule.lhs.op_cnt == lhs_op_cnt:
+                print("RCNT", {ri:1},flush=True)
+                yield [(rule.lhs, 1)]
+            elif set(lhs_op_cnt.keys()) >= set(rule.lhs.op_cnt.keys()):
+                if all([rule.lhs.op_cnt.get(op, 0) <= cnt for op, cnt in lhs_op_cnt.items()]):
+                    poss_rules[ri] = (rule.lhs.op_cnt, ri_cost)
+        if len(poss_rules) == 0:
+            return
+
         T = ht.SMTBitVector[32]
-        lhs_op_cnts = [T(0) for _ in self.lhss]
-
+        max_rvar = max(cnt for cnt in lhs_op_cnt.values())
+        lhs_op_cnts = {op:T(0) for op in lhs_op_cnt.keys()}
         cost = T(0)
-        for rule, rvar in zip(self.rdb.rules, self.rdb.rule_vars):
-            #lhs op count must be an exact match
-            for opname, cnt in rule.lhs.op_cnt.items():
-                assert opname in self.lhs_name_to_id
-                lid = self.lhs_name_to_id[opname]
-                lhs_op_cnts[lid] += rvar*cnt
-
-            rcost = 0
-            for opname, cnt in rule.rhs.op_cnt.items():
-                assert opname in self.rhs_name_to_id
-                rid = self.rhs_name_to_id[opname]
-                rcost += self.costs[rid]*cnt
-            cost += rvar*rcost
-
-        exp_lhs_cnt = _list_to_counts(lhs_ids)
+        rvars = {ri:get_var(f"R{ri}", 32) for ri in poss_rules.keys()}
+        for ri, (op_cnt, ri_cost) in poss_rules.items():
+            rvar = rvars[ri]
+            cost += rvar*ri_cost
+            for op, cnt in op_cnt.items():
+                assert op in lhs_op_cnts
+                lhs_op_cnts[op] += rvar*cnt
         lconds = []
-        for li, cnt in enumerate(lhs_op_cnts):
-            exp_cnt = 0
-            if li in exp_lhs_cnt:
-                exp_cnt = exp_lhs_cnt[li]
-            lconds.append(cnt == exp_cnt)
-        max_rvar = min(len(self.lhss), len(self.rhss))
-        max_rvars = [rvar <= max_rvar for rvar in self.rdb.rule_vars]
+        for op, cnt in lhs_op_cnts.items():
+            lconds.append(cnt == lhs_op_cnt[op])
+        max_rvars = [rvar <= max_rvar for rvar in rvars.values()]
         f = fc.And([
             fc.And(max_rvars),
             fc.And(lconds),
-            exp_cost >= cost,
+            cost <= exp_cost
         ])
-        #print("DEBUG")
-        #print(f.serialize())
+        print("DEBUG")
+        print(f.serialize())
         for sol in smt_solve_all(f.to_hwtypes().value):
             r_cnt = {}
-            for ri, rvar in enumerate(self.rdb.rule_vars):
+            for ri, rvar in rvars.items():
                 assert rvar.value in sol
                 rval = _to_int(sol[rvar.value])
                 if rval != 0:
                     r_cnt[ri] = rval
-            print("RCNT", r_cnt)
-            lhs_pats = [(self.rdb.rules[ci].lhs, cnt) for ci, cnt in r_cnt.items()]
+            print("RCNT", r_cnt,flush=True)
+            lhs_pats = [(self.rdb.rules[ri].lhs, cnt) for ri, cnt in r_cnt.items()]
             yield lhs_pats
 
 
     def gen_all(self, opts=SolverOpts()):
-        for (lhs_ids, rhs_ids) in self.enum_buckets():
-            lhs_ops = [self.lhss[i] for i in lhs_ids]
-            rhs_ops = [self.rhss[i] for i in rhs_ids]
-            if opts.log:
-                print_kind(lhs_ids, rhs_ids)
+        rhs_id_order = self.gen_rhs_order()
+        for lN in range(1, self.maxL+1):
+            lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
+            for lhs_ids in multicomb(lhs_mc_ids, lN):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                for rhs_ids in rhs_id_order:
+                    rhs_ops = [self.rhss[i] for i in rhs_ids]
+                    for (iT, oT) in self.gen_all_T2(lhs_ops, rhs_ops):
+                        if self.custom_filter(lhs_ids, rhs_ids):
+                            continue
+                        if opts.log:
+                            print_kind(lhs_ids, rhs_ids)
 
-            #Discover all lhs pattern covers
-            if self.pgf:
-                covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
-            else:
-                covers = []
-            for (iT, oT) in self.gen_all_T(lhs_ops, rhs_ops):
-                if opts.log:
-                    print_iot(iT, oT)
-                info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
-                rs = RuleSynth(
-                    iT,
-                    oT,
-                    lhs_op_list=lhs_ops,
-                    rhs_op_list=rhs_ops,
-                    pat_en_t=self.pat_en_t,
-                    sym_opts=self.sym_opts,
-                )
-                for cover in covers:
-                    rs.add_rule_cover(cover)
+                        #Discover all lhs pattern covers
+                        if self.pgf:
+                            covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
+                        else:
+                            covers = []
+                        if opts.log:
+                            print_iot(iT, oT)
+                        info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
+                        rs = RuleSynth(
+                            iT,
+                            oT,
+                            lhs_op_list=lhs_ops,
+                            rhs_op_list=rhs_ops,
+                            pat_en_t=self.pat_en_t,
+                            sym_opts=self.sym_opts,
+                        )
+                        for cover in covers:
+                            rs.add_rule_cover(cover)
 
-                for i, (sol, t) in enumerate(rs.cegis_all(opts)):
-                    lhs_pat = rs.lhs_cs.pattern_from_sol(sol)
-                    rhs_pat = rs.rhs_cs.pattern_from_sol(sol)
-                    rule = Rule(i, lhs_pat, rhs_pat, t, info)
-                    assert rule.verify()
-                    self.rdb.add_rule(rule)
-                    yield rule
-                    #Force the new cover to be used in the current it
-                    #Recalculate the covers generator for other Types
-                    if self.igf:
-                        cur_cover = [(lhs_pat, 1)]
-                        rs.add_rule_cover(cur_cover)
-                        covers.append(cur_cover)
+                        for i, (sol, t) in enumerate(rs.cegis_all(opts)):
+                            lhs_pat = rs.lhs_cs.pattern_from_sol(sol)
+                            rhs_pat = rs.rhs_cs.pattern_from_sol(sol)
+                            rule = Rule(i, lhs_pat, rhs_pat, t, info)
+                            assert rule.verify()
+                            rule_cost = sum([self.costs[self.rhs_name_to_id[op]]*cnt for op, cnt in rule.rhs.op_cnt.items()])
+                            self.rdb.add_rule(rule, rule_cost)
+                            yield rule
+                            #Force the new cover to be used in the current it
+                            #Recalculate the covers generator for other Types
+                            if self.igf:
+                                cur_cover = [(lhs_pat, 1)]
+                                rs.add_rule_cover(cur_cover)
+                                covers.append(cur_cover)

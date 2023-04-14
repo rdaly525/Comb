@@ -23,7 +23,7 @@ from timeit import default_timer as time
     CombEncoding,
 ])
 def test_isa(pat_en_t):
-    N = 3
+    N = 16
     with open(fname, 'r') as f:
         obj = compile_program(f.read())
     ir = [c[N] for c in obj.get_from_ns("ir")]
@@ -46,6 +46,7 @@ def test_isa(pat_en_t):
     maxIR = 2
     maxISA = 2
     opMaxIR = {0:1, 1:2, 2:1, 3:1}
+    #opMaxIR = {0:0, 1:0, 2:1, 3:0}
     opMaxISA = {0:1, 1:1, 2:1, 3:1, 4:2}
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     for c, so, ip in (
@@ -70,9 +71,9 @@ def test_isa(pat_en_t):
             igf=True
         )
         for ri, rule in enumerate(rd.gen_all(opts)):
-            #print("RULE", ri)
-            #print(rule)
-            #print("ENDRULE")
+            print("RULE", ri)
+            print(rule)
+            print("*"*80)
             pass
         gen_time = time()
         db = rd.rdb
