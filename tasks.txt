@@ -45,10 +45,13 @@ Goal: 4/9: Optimize for results for presentation
         There is a dag construction error with a certain rule.
             I missed a constraint in comb. I need to only allow for well typed
         dag enumeration is not excluding enough due to commutivity when comm constraint disabled
+
         There is a rule with 0 it is calling equal.
         Missing filtering
         MOst rules are just varius ways to make 0
         Some Compositions are not being excluded.
+        Find all the 0s by incrementally excluding them.
+        Put the matching code within the encoding class
 
 
     DONE

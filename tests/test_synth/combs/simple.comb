@@ -31,13 +31,6 @@ In x1 : BV[N]
 Out o : BV[N]
 o = bv.mul[N](x0, x1)
 
-# zero
-Comb ir.zero1
-Param N: Int
-In x : BV[N]
-Out o : BV[N]
-o = [N]'h0
-
 # add
 Comb isa.add
 Param N: Int
@@ -70,37 +63,3 @@ In x2 : BV[N]
 Out o : BV[N]
 t0 = bv.add[N](x0, x1)
 o = bv.add[N](t0, x2)
-
-# zero
-Comb isa.zero1
-Param N: Int
-In x : BV[N]
-Out o : BV[N]
-o = [N]'h0
-
-# zero
-Comb isa.zero2
-Param N: Int
-In x : BV[N]
-In y : BV[N]
-Out o : BV[N]
-o = [N]'h0
-
-# zero
-Comb isa.zero3
-Param N: Int
-In x : BV[N]
-In y : BV[N]
-In z : BV[N]
-Out o : BV[N]
-o = [N]'h0
-
-Comb isa.zero4
-Param N: Int
-In x : BV[N]
-In y : BV[N]
-In z : BV[N]
-In w : BV[N]
-Out o : BV[N]
-o = [N]'h0
-

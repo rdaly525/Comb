@@ -12,6 +12,8 @@ from .pattern import PatternEncoding, Pattern
 from .solver_utils import get_var
 from .utils import flat, _to_int, _list_to_dict, type_to_nT
 from hwtypes import SMTBitVector as SBV
+import typing as tp
+
 
 VarPair = collections.namedtuple('VarPair', 'lvar, var')
 
@@ -367,6 +369,52 @@ class CombEncoding(PatternEncoding):
             src = lval_to_src[lval]
             p.add_edge(src, (self.num_ops, i))
         return p
+
+
+    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
+        #Interior edges
+        interior_edges = []
+        for (li, lai), (ri, rai) in p.interior_edges:
+            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
+            r_csid = pid_to_csid[ri]
+            r_lvars = self.op_in_lvars[r_csid]
+            r_lvar = r_lvars[rai]
+            interior_edges.append(l_lvar==r_lvar)
+        #Exterior edges
+        in_lvars = {}
+        for (li, lai), (ri, rai) in p.in_edges:
+            assert li == -1
+            assert ri != p.num_ops
+            r_lvar = self.op_in_lvars[pid_to_csid[ri]][rai]
+            in_lvars[lai] = r_lvar
+        out_lvars = {}
+        for (li, lai), (ri, rai) in p.out_edges:
+            assert ri == p.num_ops
+            assert li != -1
+            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
+            out_lvars[lai] = l_lvar
+        return fc.And(interior_edges), in_lvars, out_lvars
+
+    def match_rule_dag(self, dag, r_matches):
+        l_insides = [m[0] for m in r_matches]
+        l_ins = [m[1] for m in r_matches]
+        l_outs = [m[2] for m in r_matches]
+        ios = []
+        for d in dag:
+            (src, src_i), (snk, snk_i) = d
+            if src==-1:
+                l_src_lvar = src_i
+            else:
+                l_src_lvar = l_outs[src][src_i]
+            if snk == len(r_matches):
+                l_snk_lvar = self.output_lvars[snk_i]
+            else:
+                l_snk_lvar = l_ins[snk][snk_i]
+            ios.append(l_src_lvar == l_snk_lvar)
+        return fc.And([fc.And(l_insides), fc.And(ios)])
+
+
+
 
 
     #def comb_from_solved(self, lvals, name: QSym):

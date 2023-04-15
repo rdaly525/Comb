@@ -186,10 +186,10 @@ class RuleDiscovery:
                 continue
             elif rule.lhs.op_cnt == lhs_op_cnt:
                 rule_iTs = _list_to_counts(rule.lhs.iT)
-                #if all(rule_iTs.get(T,0) >=cnt for T, cnt in iTs.items()):
-                #    print("RCNT", {ri:1},flush=True)
-                #    yield [(rule.lhs, 1)]
-                yield [(rule.lhs, 1)]
+                if all(rule_iTs.get(T,0) >=cnt for T, cnt in iTs.items()):
+                    print("RCNT", {ri:1},flush=True)
+                    yield [(rule.lhs, 1)]
+                #yield [(rule.lhs, 1)]
             elif set(lhs_op_cnt.keys()) >= set(rule.lhs.op_cnt.keys()):
                 if all([rule.lhs.op_cnt.get(op, 0) <= cnt for op, cnt in lhs_op_cnt.items()]):
                     #Check that typing works
@@ -241,7 +241,7 @@ class RuleDiscovery:
         f = fc.And([
             fc.And(max_rvars),
             fc.And(lconds),
-            #fc.And(iT_conds),
+            fc.And(iT_conds),
             cost <= exp_cost
         ])
         #TODO

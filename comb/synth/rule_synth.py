@@ -98,10 +98,6 @@ def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int,
     return fc.And(interior_edges), in_lvars, out_lvars
 
 
-def match_pattern(p: Pattern, cs: CombEncoding, ri_op_cnts):
-    for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
-        yield match_one_pattern(p, cs, pid_to_csid)
-
 def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
     pat_iTs = [_list_to_dict(p.iT) for p in pats]
     pat_oTs = [_list_to_dict(p.oT) for p in pats]
@@ -188,6 +184,10 @@ class RuleSynth(Cegis):
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(query.to_hwtypes(), E_vars)
 
+    def match_pattern(self, p: Pattern, ri_op_cnts):
+        for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
+            yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
+
     #Note this is really only a LHS pat cover
     def add_rule_cover(self, cover: tp.List[tp.Tuple[Pattern, int]]):
         pats = flat([[p for _ in range(cnt)] for p, cnt in cover])
@@ -207,27 +207,12 @@ class RuleSynth(Cegis):
             matchers = []
             for pi, pat in enumerate(pats):
                 lhs_ri_op_cnts = {op:cnts[pi] for op, cnts in lhs_rule_partions.items() if len(cnts[pi]) > 0}
-                lhs_matcher = match_pattern(pat, self.lhs_cs, lhs_ri_op_cnts)
+                lhs_matcher = self.match_pattern(pat, lhs_ri_op_cnts)
                 matchers.append(lhs_matcher)
             for r_matches in it.product(*matchers):
-                l_insides = [m[0] for m in r_matches]
-                l_ins = [m[1] for m in r_matches]
-                l_outs = [m[2] for m in r_matches]
                 for dag in enum_dags(self.iT, self.oT, pats):
-                    ios = []
-                    for d in dag:
-                        (src, src_i), (snk, snk_i) = d
-                        if src==-1:
-                            l_src_lvar = src_i
-                        else:
-                            l_src_lvar = l_outs[src][src_i]
-                        if snk == len(pats):
-                            l_snk_lvar = self.lhs_cs.output_lvars[snk_i]
-                        else:
-                            l_snk_lvar = l_ins[snk][snk_i]
-                        ios.append(l_src_lvar == l_snk_lvar)
-                    pat = fc.And([fc.And(l_insides), fc.And(ios)])
-                    matches.append(pat)
+                    match = self.lhs_cs.match_rule_dag(dag, r_matches)
+                    matches.append(match)
         f_matches = fc.Or(matches)
         print(f"Excluded {len(matches)} Patterns")
         self.query = self.query & ~(f_matches.to_hwtypes())

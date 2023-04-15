@@ -337,24 +337,33 @@ class PatternEncoding:
     def pattern_from_sol(self, sol):
         raise NotImplementedError()
 
-    #Makes sure the typing makes sense for the query
-    def types_viable(self):
+    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
         raise NotImplementedError()
-        def cnt_vals(vals):
-            cnt = collections.defaultdict(int)
-            for v in vals:
-                cnt[v] += 1
-            return cnt
 
-        spec_iTs, spec_oTs = self.comb_type
-        spec_inputs = cnt_vals(i.type for i in spec_iTs)
-        spec_outputs = cnt_vals(o.type for o in spec_oTs)
+    def match_rule_dag(self, dag, r_matches):
+        raise NotImplementedError()
 
-        op_inputs = cnt_vals(flat([[i.type for i in op.get_type()[0]] for op in self.op_list]))
-        op_outputs = cnt_vals(flat([[o.type for o in op.get_type()[1]] for op in self.op_list]))
 
-        if not all(t in op_inputs and op_inputs[t] >= cnt for t, cnt in spec_inputs.items()):
-            return False
-        if not all(t in op_outputs and op_outputs[t] >= cnt for t, cnt in spec_outputs.items()):
-            return False
-        return True
+
+
+    #Makes sure the typing makes sense for the query
+    #def types_viable(self):
+    #    raise NotImplementedError()
+    #    def cnt_vals(vals):
+    #        cnt = collections.defaultdict(int)
+    #        for v in vals:
+    #            cnt[v] += 1
+    #        return cnt
+
+    #    spec_iTs, spec_oTs = self.comb_type
+    #    spec_inputs = cnt_vals(i.type for i in spec_iTs)
+    #    spec_outputs = cnt_vals(o.type for o in spec_oTs)
+
+    #    op_inputs = cnt_vals(flat([[i.type for i in op.get_type()[0]] for op in self.op_list]))
+    #    op_outputs = cnt_vals(flat([[o.type for o in op.get_type()[1]] for op in self.op_list]))
+
+    #    if not all(t in op_inputs and op_inputs[t] >= cnt for t, cnt in spec_inputs.items()):
+    #        return False
+    #    if not all(t in op_outputs and op_outputs[t] >= cnt for t, cnt in spec_outputs.items()):
+    #        return False
+    #    return True

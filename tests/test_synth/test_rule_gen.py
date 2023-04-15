@@ -30,8 +30,8 @@ def test_isa(pat_en_t):
     isa = [c[N] for c in obj.get_from_ns("isa")]
     print([c.name for c in isa])
     #costs = [11, 8, 30, 18, 5,5,5,5]
-    costs = [11, 8, 30, 18, 0,0,0,0]
-    num_isa = 8
+    costs = [11, 8, 30, 18]
+    num_isa = 4
     isa = isa[:num_isa]
     costs = costs[:num_isa]
     for op in [*ir, *isa]:
@@ -49,7 +49,7 @@ def test_isa(pat_en_t):
             return True
 
     opts = SolverOpts(verbose=1, max_iters=0, solver_name='z3', timeout=120, log=True)
-    maxIR = 3
+    maxIR = 2
     maxISA = 2
     opMaxIR = {0:1, 1:2, 2:1, 3:1, 4:3}
     #opMaxIR = {0:0, 1:0, 2:1, 3:0}
