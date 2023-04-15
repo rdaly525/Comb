@@ -138,6 +138,17 @@ class CombEncoding(PatternEncoding):
         P_used = (used == (2**self.tot_locs)-1)
         return P_used
 
+    #Restricts snks to only allow for same type sources
+    @property
+    def P_well_typed(self):
+        src_lvars = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.src_n.items()}
+        snk_lvars = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
+        well_typed = []
+        for T, snk_lvars in snk_lvars.items():
+            for snk_lvar in snk_lvars:
+                well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars[T]]))
+        return fc.And(well_typed)
+
     @property
     def P_sym_same_op(self):
         assert self.sym_opts.same_op
@@ -223,6 +234,7 @@ class CombEncoding(PatternEncoding):
             self.P_in_range,
             self.P_loc_unique,
             self.P_multi_out,
+            self.P_well_typed,
             self.P_acyc,
             self.P_used_source,
         ]

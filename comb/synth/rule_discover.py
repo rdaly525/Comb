@@ -1,3 +1,5 @@
+import functools
+
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
 from comb.synth.pattern import PatternEncoding, SymOpts
@@ -36,7 +38,6 @@ def print_iot(iT, oT):
 def print_kind(l_ids, r_ids):
     id_strs = ["(" + ", ".join(str(id) for id in ids) + ")" for ids in (l_ids, r_ids)]
     print(f"KIND: {id_strs[0]} -> {id_strs[1]}")
-
 
 @dataclass
 class RuleDiscovery:
@@ -172,37 +173,67 @@ class RuleDiscovery:
             yield group
 
     # Finds all combinations of rules that exactly match the lhs and have less cost than or eq to the rhs
-    def all_rule_covers(self, lhs_ids, rhs_ids):
+    def all_rule_covers(self, lhs_ids, rhs_ids, iT, oT):
         exp_cost = sum([self.costs[ri] for ri in rhs_ids])
         assert isinstance(exp_cost, int)
-
+        iTs = _list_to_counts(iT)
+        oTs = _list_to_counts(oT)
         lhs_op_cnt = _list_to_counts([self.lhss[lid].qualified_name for lid in lhs_ids])
-
         #Prefiltering
         poss_rules = {}
         for ri, (rule, ri_cost) in enumerate(zip(self.rdb.rules, self.rdb.costs)):
             if ri_cost > exp_cost:
                 continue
             elif rule.lhs.op_cnt == lhs_op_cnt:
-                print("RCNT", {ri:1},flush=True)
+                rule_iTs = _list_to_counts(rule.lhs.iT)
+                #if all(rule_iTs.get(T,0) >=cnt for T, cnt in iTs.items()):
+                #    print("RCNT", {ri:1},flush=True)
+                #    yield [(rule.lhs, 1)]
                 yield [(rule.lhs, 1)]
             elif set(lhs_op_cnt.keys()) >= set(rule.lhs.op_cnt.keys()):
                 if all([rule.lhs.op_cnt.get(op, 0) <= cnt for op, cnt in lhs_op_cnt.items()]):
-                    poss_rules[ri] = (rule.lhs.op_cnt, ri_cost)
+                    #Check that typing works
+                    poss_rules[ri] = (rule.lhs.op_cnt, (rule.lhs.iT, rule.lhs.oT), ri_cost)
         if len(poss_rules) == 0:
             return
 
-        T = ht.SMTBitVector[32]
+        #Early out if there is not at least one matching op over all poss rules
+        poss_ops = functools.reduce(lambda s0, s1: s0|s1, [set(op_cnt.keys()) for op_cnt,_,_ in poss_rules.values()])
+        if poss_ops != set(lhs_op_cnt.keys()):
+            return
+
+
+        rvarT = ht.SMTBitVector[32]
         max_rvar = max(cnt for cnt in lhs_op_cnt.values())
-        lhs_op_cnts = {op:T(0) for op in lhs_op_cnt.keys()}
-        cost = T(0)
+        lhs_op_cnts = {op:rvarT(0) for op in lhs_op_cnt.keys()}
+        cost = rvarT(0)
         rvars = {ri:get_var(f"R{ri}", 32) for ri in poss_rules.keys()}
-        for ri, (op_cnt, ri_cost) in poss_rules.items():
+        lhs_iTs = {}
+        lhs_oTs = {}
+        for ri, (op_cnt, (r_iT, r_oT), ri_cost) in poss_rules.items():
             rvar = rvars[ri]
+            #Cost
             cost += rvar*ri_cost
+
+            #op count is good
             for op, cnt in op_cnt.items():
                 assert op in lhs_op_cnts
                 lhs_op_cnts[op] += rvar*cnt
+
+            #Typing is good
+            for T, cnt in _list_to_counts(r_iT).items():
+                v = lhs_iTs.get(T,rvarT(0))
+                lhs_iTs[T] = v + rvar*cnt
+            for T, cnt in _list_to_counts(r_oT).items():
+                v = lhs_oTs.get(T,rvarT(0))
+                lhs_oTs[T] = v + rvar*cnt
+
+        #Using lhs_oTs is a bit of a hack. This is assuming that rules only have 1 output
+        max_lhs_oT = lhs_oTs
+        max_lhs_iT = {T:(cnt-(lhs_oTs.get(T,0) - max_lhs_oT.get(T, 0))) for T,cnt in lhs_iTs.items()}
+        iT_conds = []
+        for T, cnt in iTs.items():
+            iT_conds.append(max_lhs_iT[T] >= cnt)
         lconds = []
         for op, cnt in lhs_op_cnts.items():
             lconds.append(cnt == lhs_op_cnt[op])
@@ -210,10 +241,12 @@ class RuleDiscovery:
         f = fc.And([
             fc.And(max_rvars),
             fc.And(lconds),
+            #fc.And(iT_conds),
             cost <= exp_cost
         ])
-        print("DEBUG")
-        print(f.serialize())
+        #TODO
+        #print("DEBUG")
+        #print(f.serialize())
         for sol in smt_solve_all(f.to_hwtypes().value):
             r_cnt = {}
             for ri, rvar in rvars.items():
@@ -242,7 +275,7 @@ class RuleDiscovery:
 
                         #Discover all lhs pattern covers
                         if self.pgf:
-                            covers = list(self.all_rule_covers(lhs_ids, rhs_ids))
+                            covers = list(self.all_rule_covers(lhs_ids, rhs_ids, iT, oT))
                         else:
                             covers = []
                         if opts.log:

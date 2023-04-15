@@ -108,6 +108,12 @@ class Pattern:
         self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
         self.root = (len(ops), 0) #TODO only works for single output
 
+    #Produces the maximum typing for these set of ops
+    #@cached_property
+    #def max_T(self):
+    #    [_list_to_counts(iTs) for iTs in self.op_iTs]
+
+
     @cached_property
     def op_names(self):
         return [op.qualified_name for op in self.ops]
@@ -134,7 +140,9 @@ class Pattern:
             snk_t = self.oT[snk[1]]
         else:
             snk_t = self.op_iTs[snk[0]][snk[1]]
-        assert src_t == snk_t
+        if src_t != snk_t:
+            raise ValueError()
+            assert src_t == snk_t
         self.edges.append((src, snk))
         self.nodes[snk[0]][snk[1]] = src
 

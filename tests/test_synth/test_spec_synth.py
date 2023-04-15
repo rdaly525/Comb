@@ -90,7 +90,7 @@ BV = GlobalModules['bv']
 def test_add(pat_en_t, num_adds, comm, same_op, iperm, num_sols):
     N = 32
     obj = compile_program(add_file)
-    spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
+    spec = obj.get("test",f"add{num_adds+1}")[N]
     ops = [BV.add[N]] * num_adds
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=iperm)
     sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)

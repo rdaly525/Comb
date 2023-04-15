@@ -82,6 +82,10 @@ class RuleDatabase:
                 eq = r.equal(p)
                 if eq:
                     assert r.equal(p)
+                    print("EQUAL RULE")
+                    print(r)
+                    print("&"*80)
+                    print(p)
                     prim = False
                     p.update_time(r.time)
                     break

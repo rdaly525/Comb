@@ -29,7 +29,11 @@ def test_isa(pat_en_t):
     ir = [c[N] for c in obj.get_from_ns("ir")]
     isa = [c[N] for c in obj.get_from_ns("isa")]
     print([c.name for c in isa])
-    costs = [11, 8, 30, 18, 5]
+    #costs = [11, 8, 30, 18, 5,5,5,5]
+    costs = [11, 8, 30, 18, 0,0,0,0]
+    num_isa = 8
+    isa = isa[:num_isa]
+    costs = costs[:num_isa]
     for op in [*ir, *isa]:
         set_comm(op)
     for i in (1,3):
@@ -37,17 +41,19 @@ def test_isa(pat_en_t):
     assert isa[0].comm_info
 
     def custom_filter(lhs_ids, rhs_ids):
+        if any((i in rhs_ids) and len(rhs_ids)>1 for i in range(4,8)):
+            return True
         if rhs_ids == [0,0,2]:
             return True
         if 2 in rhs_ids and 3 in rhs_ids:
             return True
 
-    opts = SolverOpts(verbose=1, max_iters=0, solver_name='z3', timeout=10, log=True)
-    maxIR = 2
+    opts = SolverOpts(verbose=1, max_iters=0, solver_name='z3', timeout=120, log=True)
+    maxIR = 3
     maxISA = 2
-    opMaxIR = {0:1, 1:2, 2:1, 3:1}
+    opMaxIR = {0:1, 1:2, 2:1, 3:1, 4:3}
     #opMaxIR = {0:0, 1:0, 2:1, 3:0}
-    opMaxISA = {0:1, 1:1, 2:1, 3:1, 4:2}
+    opMaxISA = {0:1, 1:1, 2:1, 3:1, **{4+i:1 for i in range(4)}}
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     for c, so, ip in (
         (1,1,1),
