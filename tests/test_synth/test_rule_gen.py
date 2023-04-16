@@ -48,7 +48,7 @@ def test_isa(pat_en_t):
         if 2 in rhs_ids and 3 in rhs_ids:
             return True
 
-    opts = SolverOpts(verbose=1, max_iters=0, solver_name='z3', timeout=120, log=True)
+    opts = SolverOpts(verbose=0, max_iters=0, solver_name='z3', timeout=60, log=True)
     maxIR = 3
     maxISA = 2
     const_synth = True
@@ -60,6 +60,10 @@ def test_isa(pat_en_t):
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     for c, so, ip in (
         (1,1,1),
+        (0,0,1),
+        (0,1,0),
+        (1,0,0),
+        (0,0,0),
     ):
         print(f"\nSYM: ({c},{so},{ip})")
         sym_opts = SymOpts(comm=c, same_op=so, input_perm=ip)
@@ -81,19 +85,19 @@ def test_isa(pat_en_t):
             const_synth=const_synth,
         )
         for ri, rule in enumerate(rd.gen_all(opts)):
-            print("RULE", ri)
-            print(rule)
-            print("*"*80)
+            #print("RULE", ri)
+            #print(rule)
+            #print("*"*80)
             pass
         gen_time = time()
         db = rd.rdb
         pre_rules = len(db)
-        db.post_filter()
-        post_time = time()
+        #db.post_filter()
+        #post_time = time()
         gen_delta = round(gen_time - start_time, 4)
-        post_delta = round(post_time - gen_time, 4)
+        #post_delta = round(post_time - gen_time, 4)
         print(f"PRE: ({pre_rules}, {gen_delta})")
-        print(f"POST: ({len(db)}, {post_delta})")
+        #print(f"POST: ({len(db)}, {post_delta})")
         table = db.sort(maxIR, maxISA)
         for l in range(1,maxIR+1):
             for r in range(1,maxISA+1):
