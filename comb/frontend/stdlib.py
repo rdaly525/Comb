@@ -85,6 +85,7 @@ def create_BVUnary(class_name: str, fun):
         param_types = [IntType()]
         num_inputs = 1
         num_outputs = 1
+        comm_info = ([0],)
 
         def get_type(self, N: Expr):
             BVCall = TypeCall(BVType(), [N])
@@ -110,6 +111,7 @@ class AbsConst(CombPrimitive):
     param_types = [IntType()]
     num_inputs = 1
     num_outputs = 1
+    comm_info = ([0],)
 
     def get_type(self, N: Expr):
         return [TypeCall(CBVType(), [N])], [TypeCall(BVType(), [N])]
@@ -129,7 +131,7 @@ def create_BVBinary(class_name: str, fun, comm):
     class BVBin(CombPrimitive):
         name = QSym('bv', class_name)
         param_types = [IntType()]
-        comm_info = [[0,1]] if comm else []
+        comm_info = ([0,1],) if comm else ([0], [1])
         num_inputs = 2
         num_outputs = 1
 

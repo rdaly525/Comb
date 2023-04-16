@@ -11,6 +11,7 @@ from comb.synth.pattern import SymOpts
 from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
+from comb.synth.utils import _list_to_counts
 
 dir = os.path.dirname(os.path.realpath(__file__))
 fname = f"{dir}/combs/simple.comb"
@@ -37,12 +38,11 @@ def test_isa(pat_en_t):
     for op in [*ir, *isa]:
         set_comm(op)
     for i in (1,3):
-        assert ir[i].comm_info
-    assert isa[0].comm_info
+        assert ir[i].comm_info == ([0,1],)
+    assert isa[0].comm_info == ([0,1],)
+    assert isa[3].comm_info == ([0,1,2],)
 
     def custom_filter(lhs_ids, rhs_ids):
-        if any((i in rhs_ids) and len(rhs_ids)>1 for i in range(4,8)):
-            return True
         if rhs_ids == [0,0,2]:
             return True
         if 2 in rhs_ids and 3 in rhs_ids:
@@ -52,9 +52,11 @@ def test_isa(pat_en_t):
     maxIR = 3
     maxISA = 2
     const_synth = True
-    opMaxIR = {0:1, 1:2, 2:1, 3:1, 4:3}
-    #opMaxIR = {0:0, 1:0, 2:1, 3:0}
-    opMaxISA = {0:1, 1:1, 2:1, 3:1, **{4+i:1 for i in range(4)}}
+    #const_synth = False
+    opMaxIR = {0:1, 1:2, 2:1, 3:1, 4:1}
+    #opMaxIR = {0:0, 1:2, 2:1, 3:0}
+    opMaxISA = {0:1, 1:1, 2:1, 3:1}
+    #opMaxISA = {0:1, 1:0, 2:0, 3:1}
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     for c, so, ip in (
         (1,1,1),

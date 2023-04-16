@@ -1,3 +1,5 @@
+import functools
+
 from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
 from .pattern import Pattern, SymOpts, PatternEncoding
@@ -36,8 +38,6 @@ def enum_pattern_partitions(p: Pattern, partitions):
     #I need another level of enumeration
     #I currently have a set of matching ops. Now i need to assign each of those ops to each pattern idx
     if set(p.op_names) != set(partitions.keys()):
-        a = set(p.op_names)
-        b = set(partitions.keys())
         raise ValueError()
     product_ids = []
     for op, p_ids in _list_to_dict(p.op_names).items():
@@ -185,9 +185,23 @@ class RuleSynth(Cegis):
             E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
             super().__init__(query.to_hwtypes(), E_vars)
 
-    def match_pattern(self, p: Pattern, ri_op_cnts):
-        for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
+    #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
+    #def _match_pattern(self, p: Pattern, ri_op_ids):
+    #    for pid_to_csid in enum_pattern_partitions(p, ri_op_ids):
+    #        yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
+
+    #This enumerates all equiv patterns (from passed in pat) then matches on that
+    def match_pattern(self, pat: Pattern, r_op_ids:tp.Mapping[str,tp.Iterable[int]]):
+        ops = sorted(r_op_ids.keys())
+        for p in pat.enum_all_equal():
+            maps = [{pid:csid for pid,csid in zip(p.op_dict[op],r_op_ids[op])} for op in ops]
+            pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
             yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
+
+
+
+
+
 
     #Note this is really only a LHS pat cover
     def add_rule_cover(self, cover: tp.List[tp.Tuple[Pattern, int]]):
@@ -200,6 +214,7 @@ class RuleSynth(Cegis):
             lhs_op_cnt = pat.op_cnt
             for _ in range(rcnt):
                 lhs_rule_op_cnts.append(lhs_op_cnt)
+        assert len(lhs_rule_op_cnts) == len(pats)
 
         lhs_op_list = [op.qualified_name for op in self.lhs_cs.op_list]
 
@@ -207,8 +222,8 @@ class RuleSynth(Cegis):
         for lhs_rule_partions in enum_rule_partitions(lhs_op_list, lhs_rule_op_cnts):
             matchers = []
             for pi, pat in enumerate(pats):
-                lhs_ri_op_cnts = {op:cnts[pi] for op, cnts in lhs_rule_partions.items() if len(cnts[pi]) > 0}
-                lhs_matcher = self.match_pattern(pat, lhs_ri_op_cnts)
+                lhs_ri_op_ids = {op:cnts[pi] for op, cnts in lhs_rule_partions.items() if len(cnts[pi]) > 0}
+                lhs_matcher = self.match_pattern(pat, lhs_ri_op_ids)
                 matchers.append(lhs_matcher)
             for r_matches in it.product(*matchers):
                 for dag in enum_dags(self.iT, self.oT, pats):

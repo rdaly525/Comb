@@ -49,13 +49,25 @@ Goal: 4/9: Optimize for results for presentation
             Generalize the match code to any encoding
 
         Verify (exclude) patterns by using wfp and sym constraints
+
+        'Problem': The same kind of rule is often synthesized.
+            Specifically: smallIR -> spec and bigIR -> spec. where smalIR has a match in bigIR
+            I think it is the case of when a rule is synthesized that does not use one of its inputs
+        I am still post filtering rules. Looks like an issue with commutivity.
+            It is not getting filtered out because I am enumerate all things with comm
+            Also an issue with checking the inputs. I can get it with 3->1
+        I can remove the sym constraints on the RHS.
+
+        Current: enumerate all commutativness
+        Comm issue is actually program order issue. It is generating two distinct program orders.
         dag enumeration is not excluding enough due to commutivity when comm constraint disabled
             Enumerate all dags with pattern based on commutivity/same_op/other
+    DONE
+        Pattern matching comm equality is broken and too permisive. Not it isnt. I am just not excluding enough rules
+        Preemtively filter when added to rule db
+        Generalize comm info to include all args
         Add the constSynth algorithm back to the main thing
         Add types viable for encoding to early out
-
-
-    DONE
         Bug: sub + sub should be able to find (x,y) -> x identity.
             It was a bug in SpecSynth. It should never do input_perm=True
         Put the matching code within the encoding class

@@ -148,8 +148,6 @@ class CombEncoding(PatternEncoding):
         snk_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
         well_typed = []
         for T, snk_lvars in snk_lvars_T.items():
-            if T not in src_lvars_T:
-                print("FOO")
             assert T in src_lvars_T
             src_lvars = src_lvars_T[T]
             for snk_lvar in snk_lvars:
@@ -262,19 +260,19 @@ class CombEncoding(PatternEncoding):
         ret = fc.And(P_perms)
         return ret
 
-    def fix_comm(self, sol):
-        comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
-        v_sols = []
-        for i in comm_ids:
-            lvars = self.op_in_lvars[i]
-            lvals = [sol[lvar.value] for lvar in lvars]
-            vals = sorted([(int(sol[lvar.value].constant_value()), li) for li, lvar in enumerate(lvars)])
-            v_sols.append({lvars[si].value: lvals[oi] for si, (v, oi) in enumerate(vals)})
+    #def fix_comm(self, sol):
+    #    comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
+    #    v_sols = []
+    #    for i in comm_ids:
+    #        lvars = self.op_in_lvars[i]
+    #        lvals = [sol[lvar.value] for lvar in lvars]
+    #        vals = sorted([(int(sol[lvar.value].constant_value()), li) for li, lvar in enumerate(lvars)])
+    #        v_sols.append({lvars[si].value: lvals[oi] for si, (v, oi) in enumerate(vals)})
 
-        new_sol = dict(sol)
-        for d in v_sols:
-            new_sol = {**new_sol, **d}
-        return new_sol
+    #    new_sol = dict(sol)
+    #    for d in v_sols:
+    #        new_sol = {**new_sol, **d}
+    #    return new_sol
 
 
     #def gen_all_program_orders(self, sol):
@@ -445,9 +443,15 @@ class CombEncoding(PatternEncoding):
         poss = [it.permutations(cs_ops[op], len(pat_ops[op])) for op in ops]
         for cs_op_ids in it.product(*poss):
             assert len(cs_op_ids) == len(ops)
-            pc_ids = [{pi:ci for pi, ci in zip(pat_ops[op],ids)} for op, ids in zip(ops, cs_op_ids)]
-            pid_to_csid = functools.reduce(lambda x,y: {**x,**y}, pc_ids)
-            yield self.match_one_pattern(pat, pid_to_csid)
+            for p in pat.enum_all_equal():
+                maps = [{pid:csid for pid,csid in zip(p.op_dict[op],ids)} for op, ids in zip(ops, cs_op_ids)]
+                pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
+                yield self.match_one_pattern(p, pid_to_csid)
+
+
+            #pc_ids = [{pi:ci for pi, ci in zip(pat_ops[op],ids)} for op, ids in zip(ops, cs_op_ids)]
+            #pid_to_csid = functools.reduce(lambda x,y: {**x,**y}, pc_ids)
+            #yield self.match_one_pattern(pat, pid_to_csid)
 
     #Returns a formula that is true when the pattern matches at least once
     def any_pat_match(self, pat: Pattern):

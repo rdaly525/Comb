@@ -9,7 +9,7 @@ import typing as tp
 
 from .solver_utils import get_var
 from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, types_to_nTs, add_cnts, \
-    ge0_cnts, sub_cnts, types_to_nT_cnts
+    ge0_cnts, sub_cnts, types_to_nT_cnts, flat
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -67,17 +67,31 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         else:
             if l_opi != r_opi:
                 return []
-        l_nodes = [l.nodes[l_opi]]
-        #TODO only works for comm size 2 (or [0,1])
-        if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].comm_info:
-            l_nodes.append(reversed(l.nodes[l_opi]))
+        l_poss_args = [l.nodes[l_opi]]
+        #Find all possible commititive permutations
+        if opts.comm and l_opi in range(l.num_ops):
+            l_args = l.nodes[l_opi] #[0,1,2,3]
+            comm_info = l.ops[l_opi].comm_info
+            assert all(isinstance(l, list) for l in comm_info)
+            assert r.ops[r_opi].comm_info == comm_info
+            #Append comm_info with extra args
+            cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
+            assert isinstance(cur_ais, set)
+            assert cur_ais == set(range(len(l_args)))
+            l_poss_args = []
+            for poss in it.product(*[it.permutations(comm) for comm in comm_info]):
+                comm_l_args = [None for _ in l_args]
+                for f,t in zip(flat(comm_info), flat(poss)):
+                    comm_l_args[t] = l_args[f]
+                assert all(v is not None for v in comm_l_args)
+                l_poss_args.append(comm_l_args)
 
         matched = []
         #For each comm ordering
-        for l_node in l_nodes:
+        for l_args in l_poss_args:
             ctxs = [ctx]
             #For each op argument
-            for l_src, r_src in zip(l_node, r.nodes[r_opi]):
+            for l_src, r_src in zip(l_args, r.nodes[r_opi]):
                 ctxs_ = []
                 for ctx_ in ctxs:
                     m_ctxs = match(l_src, r_src, ctx_)
@@ -145,6 +159,7 @@ class Pattern:
             raise ValueError()
             assert src_t == snk_t
         self.edges.append((src, snk))
+        # snk, snk -> src
         self.nodes[snk[0]][snk[1]] = src
 
     @property
@@ -166,6 +181,45 @@ class Pattern:
     @cached_property
     def op_cnt(self):
         return _list_to_counts(self.op_names)
+
+
+    def enum_all_equal(self):
+        #Does all the symmetries
+        for es_ip in self.enum_input_perm(self.edges):
+            for es_so in self.enum_same_op(es_ip):
+                for es_c in self.enum_comm(es_so):
+                    p = Pattern(self.iT, self.oT, self.ops)
+                    for e in es_c:
+                        p.add_edge(*e)
+                    yield p
+
+    def enum_input_perm(self, edges):
+        yield edges
+
+    def enum_comm(self, edges):
+        for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
+            map = {self.num_ops:{0:0}} #[opi][ai]
+            for opi, (op, poss) in enumerate(zip(self.ops, op_poss)):
+                map[opi] = {f:t for f,t in zip(flat(self.ops[opi].comm_info), flat(poss))}
+            es = []
+            for src, (snk_i, snk_a) in edges:
+                new_snk = (snk_i, map[snk_i][snk_a])
+                es.append((src, new_snk))
+            yield es
+
+    def enum_same_op(self, edges):
+        #First only do the comm_symmetries
+        ops = self.op_dict.keys()
+        self_ids = flat(self.op_dict.values())
+        for ids in it.product(*[it.permutations(self.op_dict[op]) for op in ops]):
+            op_map = {**{f:t for f,t in zip(self_ids, flat(ids))},-1:-1,self.num_ops:self.num_ops}
+            es = []
+            for (src_i, src_a), (snk_i, snk_a) in edges:
+                new_src = (op_map[src_i], src_a)
+                new_snk = (op_map[snk_i], snk_a)
+                es.append((new_src, new_snk))
+            yield es
+
 
     def equal(self, other, opts: SymOpts):
         matches = self.equal_with_match(other, opts)

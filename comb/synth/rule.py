@@ -17,6 +17,7 @@ class Rule:
         self.time = [synth_time]
         self.info = info
         self.comm_info = get_comm_info(lhs_pat.to_comb(), opts)
+        self.eq_rules = []
 
     def verify(self):
         lcomb = self.lhs.to_comb()
@@ -26,6 +27,9 @@ class Rule:
 
     def update_time(self, ts):
         self.time.extend(ts)
+
+    def add_equiv(self, rule: 'Rule'):
+        self.eq_rules.append(rule)
 
     @property
     def tot_time(self):
@@ -58,11 +62,29 @@ class RuleDatabase:
         self.rules: tp.List[Rule] = []
         self.costs: tp.List[int] = []
 
-    def add_rule(self, rule: Rule, cost: int):
+    def add_rule(self, rule: Rule, cost: int, filter=True):
         i = len(self.rules)
         rule.id = i
-        self.rules.append(rule)
-        self.costs.append(cost)
+        new_rule = True
+        for erule in self.rules:
+            eq = erule.equal(rule)
+            if eq:
+                assert rule.equal(erule)
+                print("EQUAL RULE")
+                print(erule)
+                print("="*10, "New Rule")
+                print(rule)
+                print("-"*10, "New Rule")
+                print(erule.lhs)
+                print(rule.lhs)
+                print("END EQUAL RULE")
+                new_rule = False
+                erule.update_time(rule.time)
+                erule.add_equiv(rule)
+                break
+        if new_rule:
+            self.rules.append(rule)
+            self.costs.append(cost)
 
     def __len__(self):
         return len(self.rules)
@@ -84,8 +106,9 @@ class RuleDatabase:
                     assert r.equal(p)
                     print("EQUAL RULE")
                     print(r)
-                    print("&"*80)
+                    print("="*30)
                     print(p)
+                    print("END EQUAL RULE")
                     prim = False
                     p.update_time(r.time)
                     break
