@@ -144,12 +144,16 @@ class CombEncoding(PatternEncoding):
     #Restricts snks to only allow for same type sources
     @property
     def P_well_typed(self):
-        src_lvars = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.src_n.items()}
-        snk_lvars = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
+        src_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.src_n.items()}
+        snk_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
         well_typed = []
-        for T, snk_lvars in snk_lvars.items():
+        for T, snk_lvars in snk_lvars_T.items():
+            if T not in src_lvars_T:
+                print("FOO")
+            assert T in src_lvars_T
+            src_lvars = src_lvars_T[T]
             for snk_lvar in snk_lvars:
-                well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars[T]]))
+                well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars]))
         return fc.And(well_typed)
 
     #Every pairwise same op needs to have distinct inputs
@@ -273,94 +277,94 @@ class CombEncoding(PatternEncoding):
         return new_sol
 
 
-    def gen_all_program_orders(self, sol):
-        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
-        #Create Graph from sol
-        lvar_to_nid = {}
-        int_to_lval = {}
-        for v in input_lvars:
-            lvar_to_nid[v] = 'In'
-        assert len(hard_const_lvars) == 0
-        ln_to_nid = {}
+    #def gen_all_program_orders(self, sol):
+    #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+    #    #Create Graph from sol
+    #    lvar_to_nid = {}
+    #    int_to_lval = {}
+    #    for v in input_lvars:
+    #        lvar_to_nid[v] = 'In'
+    #    assert len(hard_const_lvars) == 0
+    #    ln_to_nid = {}
 
-        nids = []
-        for li, lvars in enumerate(op_out_lvars):
-            tmp_vals = tuple(_to_int(sol[lvar.value]) for lvar in lvars)
-            nid = tmp_vals
-            nids.append((tmp_vals[0], nid))
-            ln_to_nid[li] = nid
-            for v, lvar in zip(tmp_vals, lvars):
-                lvar_to_nid[v] = nid
-                int_to_lval[v] = sol[lvar.value]
-        nids = ["In"] + [v for _, v in sorted(nids)] + ["Out"]
-        g = nx.DiGraph()
-        #Add the edges
-        for ti, lvars in enumerate(op_in_lvars):
-            op_nid = ln_to_nid[ti]
-            tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
-            #Add edge to input
-            g.add_edge('In', op_nid)
-            for v, lvar in zip(tmp_vals, lvars):
-                assert v in lvar_to_nid
-                g.add_edge(lvar_to_nid[v], op_nid)
-                int_to_lval[v] = sol[lvar.value]
+    #    nids = []
+    #    for li, lvars in enumerate(op_out_lvars):
+    #        tmp_vals = tuple(_to_int(sol[lvar.value]) for lvar in lvars)
+    #        nid = tmp_vals
+    #        nids.append((tmp_vals[0], nid))
+    #        ln_to_nid[li] = nid
+    #        for v, lvar in zip(tmp_vals, lvars):
+    #            lvar_to_nid[v] = nid
+    #            int_to_lval[v] = sol[lvar.value]
+    #    nids = ["In"] + [v for _, v in sorted(nids)] + ["Out"]
+    #    g = nx.DiGraph()
+    #    #Add the edges
+    #    for ti, lvars in enumerate(op_in_lvars):
+    #        op_nid = ln_to_nid[ti]
+    #        tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
+    #        #Add edge to input
+    #        g.add_edge('In', op_nid)
+    #        for v, lvar in zip(tmp_vals, lvars):
+    #            assert v in lvar_to_nid
+    #            g.add_edge(lvar_to_nid[v], op_nid)
+    #            int_to_lval[v] = sol[lvar.value]
 
-        #Add Output edges
-        for oval in [_to_int(sol[lvar.value]) for lvar in output_lvars]:
-            assert oval in lvar_to_nid
-            g.add_edge(lvar_to_nid[oval], "Out")
+    #    #Add Output edges
+    #    for oval in [_to_int(sol[lvar.value]) for lvar in output_lvars]:
+    #        assert oval in lvar_to_nid
+    #        g.add_edge(lvar_to_nid[oval], "Out")
 
-        for k, lval in int_to_lval.items():
-            assert _to_int(lval) == k
+    #    for k, lval in int_to_lval.items():
+    #        assert _to_int(lval) == k
 
-        all_lvars = flat(op_in_lvars) + flat(op_out_lvars) + output_lvars
-        i_to_lvars = {}
-        for lvar in all_lvars:
-            v = int(sol[lvar.value].constant_value())
-            i_to_lvars.setdefault(v, []).append(lvar)
+    #    all_lvars = flat(op_in_lvars) + flat(op_out_lvars) + output_lvars
+    #    i_to_lvars = {}
+    #    for lvar in all_lvars:
+    #        v = int(sol[lvar.value].constant_value())
+    #        i_to_lvars.setdefault(v, []).append(lvar)
 
-        def sort_to_sol(sort):
-            v_sols = []
-            for from_nid, to_nid in zip(nids[1:-1], sort[1:-1]):
-                for from_val, to_val in zip(from_nid, to_nid):
-                    to_lval = int_to_lval[to_val]
-                    v_sols.append({lvar.value: to_lval for lvar in i_to_lvars[from_val]})
+    #    def sort_to_sol(sort):
+    #        v_sols = []
+    #        for from_nid, to_nid in zip(nids[1:-1], sort[1:-1]):
+    #            for from_val, to_val in zip(from_nid, to_nid):
+    #                to_lval = int_to_lval[to_val]
+    #                v_sols.append({lvar.value: to_lval for lvar in i_to_lvars[from_val]})
 
-            new_sol = dict(sol)
-            for d in v_sols:
-                new_sol = {**new_sol, **d}
-            return new_sol
+    #        new_sol = dict(sol)
+    #        for d in v_sols:
+    #            new_sol = {**new_sol, **d}
+    #        return new_sol
 
-        #Run the gen all topographical orderings algorithm
-        for sort in nx.all_topological_sorts(g):
-            new_sol = sort_to_sol(sort)
-            yield new_sol
+    #    #Run the gen all topographical orderings algorithm
+    #    for sort in nx.all_topological_sorts(g):
+    #        new_sol = sort_to_sol(sort)
+    #        yield new_sol
 
 
-    def gen_op_permutations(self, sol):
-        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+    #def gen_op_permutations(self, sol):
+    #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
 
-        #Get indices of each commutative op
-        commute_idxs = []
-        for i, op in enumerate(self.op_list):
-            if op.comm_info:
-                commute_idxs.append(i)
+    #    #Get indices of each commutative op
+    #    commute_idxs = []
+    #    for i, op in enumerate(self.op_list):
+    #        if op.comm_info:
+    #            commute_idxs.append(i)
 
-        lvar_perms = []
-        lvar_list = []
-        for i in commute_idxs:
-            lvar_list += [lvar.value for lvar in op_in_lvars[i]]
-            lvals = [sol[lvar.value] for lvar in op_in_lvars[i]]
-            lvar_perms.append(set(it.permutations(lvals)))
+    #    lvar_perms = []
+    #    lvar_list = []
+    #    for i in commute_idxs:
+    #        lvar_list += [lvar.value for lvar in op_in_lvars[i]]
+    #        lvals = [sol[lvar.value] for lvar in op_in_lvars[i]]
+    #        lvar_perms.append(set(it.permutations(lvals)))
 
-        for lvals in it.product(*lvar_perms):
-            lval_list = flat([lval_tuple for lval_tuple in lvals])
-            new_vals = {lvar: lval for lvar, lval in zip(lvar_list, lval_list)}
-            new_sol = {**sol, **new_vals}
-            yield new_sol
-            #sols.append(new_sol)
-        #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
-        #return sols
+    #    for lvals in it.product(*lvar_perms):
+    #        lval_list = flat([lval_tuple for lval_tuple in lvals])
+    #        new_vals = {lvar: lval for lvar, lval in zip(lvar_list, lval_list)}
+    #        new_sol = {**sol, **new_vals}
+    #        yield new_sol
+    #        #sols.append(new_sol)
+    #    #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
+    #    #return sols
 
     def pattern_from_sol(self, sol):
         num_inputs = len(self.iT)

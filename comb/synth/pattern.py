@@ -8,7 +8,8 @@ from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
 from .solver_utils import get_var
-from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts
+from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, types_to_nTs, add_cnts, \
+    ge0_cnts, sub_cnts, types_to_nT_cnts
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -262,6 +263,7 @@ class PatternEncoding:
         self.prefix = prefix
         self.sym_opts = sym_opts
 
+
         if len(self.const_list) > 0:
             raise NotImplementedError()
         #Spec, and ops cannot have params
@@ -349,25 +351,17 @@ class PatternEncoding:
     def any_pat_match(self, pat: Pattern):
         raise NotImplementedError()
 
+    @cached_property
+    def types_viable(self):
+        iTs = _list_to_counts(self.iT)
+        oTs = _list_to_counts(self.oT)
+        op_iTs = [types_to_nT_cnts(op.get_type()[0]) for op in self.op_list]
+        op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
+        snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))
+        srcs = add_cnts(iTs, functools.reduce(lambda a, b: add_cnts(a,b), op_oTs))
+        if set(snks.keys()) != set(srcs.keys()):
+            return False
+        return ge0_cnts(sub_cnts(snks, srcs))
 
-    #Makes sure the typing makes sense for the query
-    #def types_viable(self):
-    #    raise NotImplementedError()
-    #    def cnt_vals(vals):
-    #        cnt = collections.defaultdict(int)
-    #        for v in vals:
-    #            cnt[v] += 1
-    #        return cnt
 
-    #    spec_iTs, spec_oTs = self.comb_type
-    #    spec_inputs = cnt_vals(i.type for i in spec_iTs)
-    #    spec_outputs = cnt_vals(o.type for o in spec_oTs)
 
-    #    op_inputs = cnt_vals(flat([[i.type for i in op.get_type()[0]] for op in self.op_list]))
-    #    op_outputs = cnt_vals(flat([[o.type for o in op.get_type()[1]] for op in self.op_list]))
-
-    #    if not all(t in op_inputs and op_inputs[t] >= cnt for t, cnt in spec_inputs.items()):
-    #        return False
-    #    if not all(t in op_outputs and op_outputs[t] >= cnt for t, cnt in spec_outputs.items()):
-    #        return False
-    #    return True

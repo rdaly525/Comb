@@ -1,13 +1,12 @@
 import dataclasses
 import typing as tp
-from hwtypes import smt_utils as fc
 
 from more_itertools import distinct_combinations as multicomb
 from comb import Comb
-from .pattern import PatternEncoding, SymOpts, Pattern
-from .solver_utils import SolverOpts, Cegis
+from .pattern import PatternEncoding, SymOpts
+from .solver_utils import SolverOpts
 from .spec_synth import SpecSynth
-from .utils import _make_list, type_to_nT, flat, _list_to_counts
+from .utils import flat, _list_to_counts, sub_cnts, ge0_cnts
 import os
 
 from ..frontend.compiler import compile_program
@@ -21,15 +20,6 @@ def pretty(spec, p, pi, s):
     print(spec)
     print("     ----->")
     print(p.to_comb(), flush=True)
-
-def sub_cnts(acnt, bcnt):
-    sub = {}
-    for k in (set(acnt.keys())|(set(bcnt.keys()))):
-        sub[k] = acnt.get(k,0) - bcnt.get(k,0)
-    return sub
-
-def ge0_cnts(cnts):
-    return all(v>=0 for v in cnts.values())
 
 
 #Synthesizes Constants (0, 1)
@@ -91,6 +81,8 @@ class ConstDiscover:
                                 exclude_pats.append(pat)
                     for (ea_spec, cval) in ea_consts:
                         ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
+                        if not ss.pat_en.types_viable:
+                            continue
                         for pat in exclude_pats:
                             ss.exclude_pattern(pat)
                         for sol, info in ss.cegis_all(opts):
@@ -102,6 +94,8 @@ class ConstDiscover:
                             pi[0] +=1
                     for i, ea_spec in enumerate(ea_ids):
                         ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
+                        if not ss.pat_en.types_viable:
+                            continue
                         for pat in exclude_pats:
                             ss.exclude_pattern(pat)
                         for sol, info in ss.cegis_all(opts):
@@ -117,10 +111,11 @@ class ConstDiscover:
         print("FIRST DOEN")
         #Now do the same thing but with the constants added to the IR spec
         #Only constants that have at least one pattern are added
-        consts = [const_specs[c] for c in const_vals if len(ea_pats[c])>0]
-        irs_w_const = self.irs + consts
+        ea_pats = {c:pats for c, pats in ea_pats.items() if len(pats)>0}
+        const_specs = {c:const_specs[c] for c in ea_pats}
+        irs_w_const = self.irs + list(const_specs.values())
         num_ops = len(self.irs)
-        opMax_w_const = {**self.opMax, **{i:1 for i in range(num_ops, num_ops+len(consts))}}
+        opMax_w_const = {**self.opMax, **{i:1 for i in range(num_ops, num_ops+len(const_specs))}}
         run(irs_w_const, opMax_w_const)
 
         return (ea_pats, const_specs), id_pats

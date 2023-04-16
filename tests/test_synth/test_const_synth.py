@@ -23,8 +23,8 @@ def test_const_synth():
     with open(fname, 'r') as f:
         obj = compile_program(f.read())
     ir = [c[N] for c in obj.get_from_ns("ir")]
-    maxIR = 2
-    maxOp = {0:0,1:2,2:2,3:1}
+    maxIR = 3
+    maxOp = {0:1,1:2,2:2,3:1}
     cvals = [0,1,-1]
     sym_opts = SymOpts(comm=True, same_op=True, input_perm=True)
     cd = ConstDiscover(ir, maxIR, maxOp, CombEncoding, sym_opts)

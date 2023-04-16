@@ -49,8 +49,9 @@ def test_isa(pat_en_t):
             return True
 
     opts = SolverOpts(verbose=1, max_iters=0, solver_name='z3', timeout=120, log=True)
-    maxIR = 2
+    maxIR = 3
     maxISA = 2
+    const_synth = True
     opMaxIR = {0:1, 1:2, 2:1, 3:1, 4:3}
     #opMaxIR = {0:0, 1:0, 2:1, 3:0}
     opMaxISA = {0:1, 1:1, 2:1, 3:1, **{4+i:1 for i in range(4)}}
@@ -74,7 +75,8 @@ def test_isa(pat_en_t):
             opMaxR=opMaxISA,
             custom_filter=custom_filter,
             pgf=True,
-            igf=True
+            igf=True,
+            const_synth=const_synth,
         )
         for ri, rule in enumerate(rd.gen_all(opts)):
             print("RULE", ri)

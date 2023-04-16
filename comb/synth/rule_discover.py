@@ -2,11 +2,12 @@ import functools
 
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
+from comb.synth.const_synth import ConstDiscover
 from comb.synth.pattern import PatternEncoding, SymOpts
 from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all, get_var
-from comb.synth.utils import _list_to_counts, flat, _to_int, comb_type_to_nT, _list_to_dict
+from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht
@@ -53,6 +54,8 @@ class RuleDiscovery:
     custom_filter: tp.Callable = lambda x,y: False
     pgf: bool = True #Preemtive Generative Filtering
     igf: bool = True #Incremental Generative Filtering
+    const_synth: tp.Union[str, bool] = False
+    const_vals: tp.Iterable[int] = (0,)
 
     def __post_init__(self):
         if self.opMaxL is None:
@@ -92,7 +95,7 @@ class RuleDiscovery:
 
     def gen_all_T2(self, lhs_ops, rhs_ops):
         def get_cnt(op, k):
-            return {T:len(ids) for T, ids in comb_type_to_nT(op.get_type()[k]).items()}
+            return {T:len(ids) for T, ids in types_to_nTs(op.get_type()[k]).items()}
 
         def count(l):
             ret = {}
@@ -132,7 +135,7 @@ class RuleDiscovery:
 
     def gen_all_T1(self, ops):
         def get_cnt(op, k):
-            return {T:len(ids) for T, ids in comb_type_to_nT(op.get_type()[k]).items()}
+            return {T:len(ids) for T, ids in types_to_nTs(op.get_type()[k]).items()}
 
         def count(l):
             ret = {}
@@ -258,13 +261,34 @@ class RuleDiscovery:
             lhs_pats = [(self.rdb.rules[ri].lhs, cnt) for ri, cnt in r_cnt.items()]
             yield lhs_pats
 
+    def get_ir_const(self, opts):
+        if isinstance(self.const_synth, str):
+            #Load from file
+            raise NotImplementedError()
+        assert isinstance(self.const_synth, bool)
+        if self.const_synth:
+            cd = ConstDiscover(self.lhss, self.maxL, self.opMaxL, self.pat_en_t, self.sym_opts)
+            return cd.gen_all(self.const_vals, opts=opts)
+        else:
+            return ({}, {}), []
 
     def gen_all(self, opts=SolverOpts()):
+        (ea_pats, const_specs), id_pats = self.get_ir_const(opts)
+        lhs_exclude_pats = [id_pats] + list(ea_pats.values())
+        #Update lhss
+        self.lhss += list(const_specs.values())
         rhs_id_order = self.gen_rhs_order()
         for lN in range(1, self.maxL+1):
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             for lhs_ids in multicomb(lhs_mc_ids, lN):
                 lhs_ops = [self.lhss[i] for i in lhs_ids]
+                lhs_op_cnt = _list_to_counts([op.qualified_name for op in lhs_ops])
+                exclude_pats = []
+                for pats in lhs_exclude_pats:
+                    for pat in pats:
+                        if ge0_cnts(sub_cnts(lhs_op_cnt, pat.op_cnt)):
+                            exclude_pats.append(pat)
+                print(f"Excluded Bad Patterns: {len(exclude_pats)}")
                 for rhs_ids in rhs_id_order:
                     rhs_ops = [self.rhss[i] for i in rhs_ids]
                     for (iT, oT) in self.gen_all_T2(lhs_ops, rhs_ops):
@@ -289,9 +313,11 @@ class RuleDiscovery:
                             pat_en_t=self.pat_en_t,
                             sym_opts=self.sym_opts,
                         )
+                        assert rs.lhs_cs.types_viable and rs.rhs_cs.types_viable
                         for cover in covers:
                             rs.add_rule_cover(cover)
-
+                        for pat in exclude_pats:
+                            rs.exclude_pattern(pat)
                         for i, (sol, t) in enumerate(rs.cegis_all(opts)):
                             lhs_pat = rs.lhs_cs.pattern_from_sol(sol)
                             rhs_pat = rs.rhs_cs.pattern_from_sol(sol)

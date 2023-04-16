@@ -2,7 +2,7 @@ from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
 from .pattern import Pattern, SymOpts, PatternEncoding
 from .comb_encoding import CombEncoding
-from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_nT, nT
+from .utils import _list_to_dict, bucket_combinations, flat, types_to_nTs, nT
 from .rule import Rule
 
 import hwtypes.smt_utils as fc
@@ -154,35 +154,36 @@ class RuleSynth(Cegis):
         self.oT = oT
         lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
         rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=r_sym_opts)
-        self.lhs_cs = lhs_cs
-        self.rhs_cs = rhs_cs
+        if lhs_cs.types_viable and rhs_cs.types_viable:
+            self.lhs_cs = lhs_cs
+            self.rhs_cs = rhs_cs
 
-        P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
-        P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
+            P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
+            P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-        #Final query:
-        #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-        query = fc.And([
-            lhs_cs.P_sym,
-            rhs_cs.P_sym,
-            lhs_cs.P_wfp,
-            rhs_cs.P_wfp,
-            fc.Implies(
-                fc.And([
-                    lhs_cs.P_lib,
-                    lhs_cs.P_conn,
-                    rhs_cs.P_lib,
-                    rhs_cs.P_conn,
-                ]),
+            #Final query:
+            #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
+            query = fc.And([
+                lhs_cs.P_sym,
+                rhs_cs.P_sym,
+                lhs_cs.P_wfp,
+                rhs_cs.P_wfp,
                 fc.Implies(
-                    fc.And(P_inputs),
-                    fc.And(P_outputs),
+                    fc.And([
+                        lhs_cs.P_lib,
+                        lhs_cs.P_conn,
+                        rhs_cs.P_lib,
+                        rhs_cs.P_conn,
+                    ]),
+                    fc.Implies(
+                        fc.And(P_inputs),
+                        fc.And(P_outputs),
+                    )
                 )
-            )
-        ])
-        #print(query.serialize())
-        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-        super().__init__(query.to_hwtypes(), E_vars)
+            ])
+            #print(query.serialize())
+            E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
+            super().__init__(query.to_hwtypes(), E_vars)
 
     def match_pattern(self, p: Pattern, ri_op_cnts):
         for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
@@ -214,8 +215,12 @@ class RuleSynth(Cegis):
                     match = self.lhs_cs.match_rule_dag(dag, r_matches)
                     matches.append(match)
         f_matches = fc.Or(matches)
-        print(f"Excluded {len(matches)} Patterns")
+        print(f"Excluded Cover Patterns: {len(matches)}")
         self.query = self.query & ~(f_matches.to_hwtypes())
+
+    def exclude_pattern(self, lhs_pat:Pattern):
+        m = self.lhs_cs.any_pat_match(lhs_pat)
+        self.query = self.query & ~m.to_hwtypes()
 
 
 
