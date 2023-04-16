@@ -51,11 +51,10 @@ Goal: 4/9: Optimize for results for presentation
         Verify (exclude) patterns by using wfp and sym constraints
         dag enumeration is not excluding enough due to commutivity when comm constraint disabled
             Enumerate all dags with pattern based on commutivity/same_op/other
-        Find all the 0s by incrementally excluding them.
-        Bug: sub + sub should be able to find (x,y) -> x identity. Currently it isn't
-
-
+        Add the constSynth algorithm back to
     DONE
+        Bug: sub + sub should be able to find (x,y) -> x identity.
+            It was a bug in SpecSynth. It should never do input_perm=True
         Put the matching code within the encoding class
         I should add a constraint to not do identical computation (called cse)
         #The matching code might be buggy.

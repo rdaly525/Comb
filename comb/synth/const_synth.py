@@ -67,47 +67,62 @@ class ConstDiscover:
         return identities, self.const_obj.get('bad', f'id1')[N]
 
     def gen_all(self, const_vals = (0,), opts: SolverOpts = SolverOpts()):
+
+        #ea = extra arguments
         ea_consts, const_specs = self.gen_const_specs(const_vals)
         ea_pats = {cval:[] for cval in const_vals}
         ea_ids, id_spec = self.gen_id_specs()
         id_pats = []
         #Synthesize constants
-        pi = 0
-        for lN in range(1, self.maxIR+1):
-            lhs_mc_ids = flat([[i for _ in range(self.opMax[i])] for i in range(len(self.irs))])
-            for lhs_ids in multicomb(lhs_mc_ids, lN):
-                #print("K"*30,lhs_ids)
-                ir_ops = [self.irs[i] for i in lhs_ids]
-                #print([op.qualified_name for op in ir_ops])
-                ir_op_cnt = _list_to_counts([op.qualified_name for op in ir_ops])
-                exclude_pats = []
-                for pats in ([id_pats] + list(ea_pats.values())):
-                    for pat in pats:
-                        if ge0_cnts(sub_cnts(ir_op_cnt, pat.op_cnt)):
+        pi = [0]
+
+        def run(irs, opMax):
+            for lN in range(1, self.maxIR+1):
+                lhs_mc_ids = flat([[i for _ in range(opMax[i])] for i in range(len(irs))])
+                for lhs_ids in multicomb(lhs_mc_ids, lN):
+                    #print("K"*30,lhs_ids)
+                    ir_ops = [irs[i] for i in lhs_ids]
+                    #print([op.qualified_name for op in ir_ops])
+                    ir_op_cnt = _list_to_counts([op.qualified_name for op in ir_ops])
+                    exclude_pats = []
+                    for pats in ([id_pats] + list(ea_pats.values())):
+                        for pat in pats:
+                            if ge0_cnts(sub_cnts(ir_op_cnt, pat.op_cnt)):
+                                exclude_pats.append(pat)
+                    for (ea_spec, cval) in ea_consts:
+                        ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
+                        for pat in exclude_pats:
+                            ss.exclude_pattern(pat)
+                        for sol, info in ss.cegis_all(opts):
+                            pat = ss.pat_en.pattern_from_sol(sol)
+                            #pretty(ea_spec, pat, pi, f"C{cval}")
+                            ea_pats[cval].append(pat)
+                            ss.exclude_pattern(pat)
                             exclude_pats.append(pat)
-                for (ea_spec, cval) in ea_consts:
-                    ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
-                    for pat in exclude_pats:
-                        ss.exclude_pattern(pat)
-                    for sol, info in ss.cegis_all(opts):
-                        pat = ss.pat_en.pattern_from_sol(sol)
-                        #pretty(ea_spec, pat, pi, f"C{cval}")
-                        ea_pats[cval].append(pat)
-                        ss.exclude_pattern(pat)
-                        exclude_pats.append(pat)
-                        pi += 1
-                for i, ea_spec in enumerate(ea_ids):
-                    ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
-                    for pat in exclude_pats:
-                        ss.exclude_pattern(pat)
-                    for sol, info in ss.cegis_all(opts):
-                        pat = ss.pat_en.pattern_from_sol(sol)
-                        #pretty(ea_spec, pat, pi, "ID")
-                        id_pats.append(pat)
-                        exclude_pats.append(pat)
-                        ss.exclude_pattern(pat)
-                        pi +=1
+                            pi[0] +=1
+                    for i, ea_spec in enumerate(ea_ids):
+                        ss = SpecSynth(ea_spec, ir_ops, self.pat_en_t, self.sym_opts)
+                        for pat in exclude_pats:
+                            ss.exclude_pattern(pat)
+                        for sol, info in ss.cegis_all(opts):
+                            pat = ss.pat_en.pattern_from_sol(sol)
+                            #pretty(ea_spec, pat, pi, "ID")
+                            id_pats.append(pat)
+                            exclude_pats.append(pat)
+                            ss.exclude_pattern(pat)
+                            pi[0] +=1
+
+        #Run first without constants
+        run(self.irs, self.opMax)
+        print("FIRST DOEN")
         #Now do the same thing but with the constants added to the IR spec
+        #Only constants that have at least one pattern are added
+        consts = [const_specs[c] for c in const_vals if len(ea_pats[c])>0]
+        irs_w_const = self.irs + consts
+        num_ops = len(self.irs)
+        opMax_w_const = {**self.opMax, **{i:1 for i in range(num_ops, num_ops+len(consts))}}
+        run(irs_w_const, opMax_w_const)
+
         return (ea_pats, const_specs), id_pats
 
     #def gen_all_const(self, const_vals = [0], opts: SolverOpts = SolverOpts()):
