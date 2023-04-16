@@ -66,6 +66,15 @@ t0 = bv.add[N](i0, i2)
 t1 = bv.add[N](i1, i3)
 o0 = bv.mul[N](t0, t1)
 
+Comb test.foo
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+Out o0 : BV[N]
+t0 = bv.add[N](i0, i2)
+o0 = bv.sub[N](i1, t0)
+
 
 '''
 
@@ -73,8 +82,7 @@ o0 = bv.mul[N](t0, t1)
 def test_add_comm(num_adds):
     N = 16
     obj = compile_program(add_file)
-    spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
-    #spec = obj.comb_dict[f"test.amul"][N]
+    spec = obj.get("test", f"add{num_adds+1}")[N]
     opts=SolverOpts(
         max_iters=1000,
         verbose=2,
@@ -86,7 +94,16 @@ def test_add_comm(num_adds):
 def test_amul_comm():
     N = 16
     obj = compile_program(add_file)
-    spec = obj.comb_dict[f"test.amul"][N]
+    spec = obj.get("test", "amul")[N]
     set_comm(spec)
     print(spec.comm_info)
     assert check_comm_equal(spec.comm_info, [[0, 2], [1, 3]])
+
+#Test non-commutative
+def test_foo_comm():
+    N = 16
+    obj = compile_program(add_file)
+    spec = obj.get("test", "foo")[N]
+    set_comm(spec)
+    print(spec.comm_info)
+    assert check_comm_equal(spec.comm_info, [[0, 2], [1]])

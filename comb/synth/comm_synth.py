@@ -25,7 +25,7 @@ def get_comm_info(spec: Comb, opts: SolverOpts):
 
     in_vars = [get_var(f"I{i}", n) for i, n in enumerate(iT)]
     base_outs = _make_list(spec_n.evaluate(*in_vars))
-    sets = {}
+    sets = {i:{i} for i in range(len(iT))}
     for n, ids in _list_to_dict(iT).items():
         if len(ids)==1:
             continue

@@ -1,4 +1,5 @@
 import collections
+import functools
 import itertools as it
 
 from hwtypes import SMTBitVector as SBV
@@ -12,6 +13,8 @@ from .pattern import PatternEncoding, Pattern
 from .solver_utils import get_var
 from .utils import flat, _to_int, _list_to_dict, type_to_nT
 from hwtypes import SMTBitVector as SBV
+import typing as tp
+
 
 VarPair = collections.namedtuple('VarPair', 'lvar, var')
 
@@ -138,6 +141,46 @@ class CombEncoding(PatternEncoding):
         P_used = (used == (2**self.tot_locs)-1)
         return P_used
 
+    #Restricts snks to only allow for same type sources
+    @property
+    def P_well_typed(self):
+        src_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.src_n.items()}
+        snk_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
+        well_typed = []
+        for T, snk_lvars in snk_lvars_T.items():
+            assert T in src_lvars_T
+            src_lvars = src_lvars_T[T]
+            for snk_lvar in snk_lvars:
+                well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars]))
+        return fc.And(well_typed)
+
+    #Every pairwise same op needs to have distinct inputs
+    @property
+    def P_cse(self):
+        op_ids = _list_to_dict([op.qualified_name for op in self.op_list])
+        P_cse = []
+        for op, ids in op_ids.items():
+            if len(ids)<2:
+                continue
+            for i0, i1 in it.combinations(ids, 2):
+                P_cse.append(fc.Or([lv0!=lv1 for lv0, lv1 in zip(self.op_in_lvars[i0], self.op_in_lvars[i1])]))
+        return fc.And(P_cse)
+
+    @property
+    def P_wfp(self):
+        P_wfp = [
+            self.P_in_range,
+            self.P_loc_unique,
+            self.P_multi_out,
+            self.P_well_typed,
+            self.P_acyc,
+            self.P_used_source,
+            self.P_cse,
+        ]
+        return fc.And(P_wfp)
+
+
+
     @property
     def P_sym_same_op(self):
         assert self.sym_opts.same_op
@@ -217,120 +260,109 @@ class CombEncoding(PatternEncoding):
         ret = fc.And(P_perms)
         return ret
 
-    @property
-    def P_wfp(self):
-        P_wfp = [
-            self.P_in_range,
-            self.P_loc_unique,
-            self.P_multi_out,
-            self.P_acyc,
-            self.P_used_source,
-        ]
-        return fc.And(P_wfp)
+    #def fix_comm(self, sol):
+    #    comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
+    #    v_sols = []
+    #    for i in comm_ids:
+    #        lvars = self.op_in_lvars[i]
+    #        lvals = [sol[lvar.value] for lvar in lvars]
+    #        vals = sorted([(int(sol[lvar.value].constant_value()), li) for li, lvar in enumerate(lvars)])
+    #        v_sols.append({lvars[si].value: lvals[oi] for si, (v, oi) in enumerate(vals)})
 
-    def fix_comm(self, sol):
-        comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
-        v_sols = []
-        for i in comm_ids:
-            lvars = self.op_in_lvars[i]
-            lvals = [sol[lvar.value] for lvar in lvars]
-            vals = sorted([(int(sol[lvar.value].constant_value()), li) for li, lvar in enumerate(lvars)])
-            v_sols.append({lvars[si].value: lvals[oi] for si, (v, oi) in enumerate(vals)})
-
-        new_sol = dict(sol)
-        for d in v_sols:
-            new_sol = {**new_sol, **d}
-        return new_sol
+    #    new_sol = dict(sol)
+    #    for d in v_sols:
+    #        new_sol = {**new_sol, **d}
+    #    return new_sol
 
 
-    def gen_all_program_orders(self, sol):
-        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
-        #Create Graph from sol
-        lvar_to_nid = {}
-        int_to_lval = {}
-        for v in input_lvars:
-            lvar_to_nid[v] = 'In'
-        assert len(hard_const_lvars) == 0
-        ln_to_nid = {}
+    #def gen_all_program_orders(self, sol):
+    #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+    #    #Create Graph from sol
+    #    lvar_to_nid = {}
+    #    int_to_lval = {}
+    #    for v in input_lvars:
+    #        lvar_to_nid[v] = 'In'
+    #    assert len(hard_const_lvars) == 0
+    #    ln_to_nid = {}
 
-        nids = []
-        for li, lvars in enumerate(op_out_lvars):
-            tmp_vals = tuple(_to_int(sol[lvar.value]) for lvar in lvars)
-            nid = tmp_vals
-            nids.append((tmp_vals[0], nid))
-            ln_to_nid[li] = nid
-            for v, lvar in zip(tmp_vals, lvars):
-                lvar_to_nid[v] = nid
-                int_to_lval[v] = sol[lvar.value]
-        nids = ["In"] + [v for _, v in sorted(nids)] + ["Out"]
-        g = nx.DiGraph()
-        #Add the edges
-        for ti, lvars in enumerate(op_in_lvars):
-            op_nid = ln_to_nid[ti]
-            tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
-            #Add edge to input
-            g.add_edge('In', op_nid)
-            for v, lvar in zip(tmp_vals, lvars):
-                assert v in lvar_to_nid
-                g.add_edge(lvar_to_nid[v], op_nid)
-                int_to_lval[v] = sol[lvar.value]
+    #    nids = []
+    #    for li, lvars in enumerate(op_out_lvars):
+    #        tmp_vals = tuple(_to_int(sol[lvar.value]) for lvar in lvars)
+    #        nid = tmp_vals
+    #        nids.append((tmp_vals[0], nid))
+    #        ln_to_nid[li] = nid
+    #        for v, lvar in zip(tmp_vals, lvars):
+    #            lvar_to_nid[v] = nid
+    #            int_to_lval[v] = sol[lvar.value]
+    #    nids = ["In"] + [v for _, v in sorted(nids)] + ["Out"]
+    #    g = nx.DiGraph()
+    #    #Add the edges
+    #    for ti, lvars in enumerate(op_in_lvars):
+    #        op_nid = ln_to_nid[ti]
+    #        tmp_vals = [_to_int(sol[lvar.value]) for lvar in lvars]
+    #        #Add edge to input
+    #        g.add_edge('In', op_nid)
+    #        for v, lvar in zip(tmp_vals, lvars):
+    #            assert v in lvar_to_nid
+    #            g.add_edge(lvar_to_nid[v], op_nid)
+    #            int_to_lval[v] = sol[lvar.value]
 
-        #Add Output edges
-        for oval in [_to_int(sol[lvar.value]) for lvar in output_lvars]:
-            assert oval in lvar_to_nid
-            g.add_edge(lvar_to_nid[oval], "Out")
+    #    #Add Output edges
+    #    for oval in [_to_int(sol[lvar.value]) for lvar in output_lvars]:
+    #        assert oval in lvar_to_nid
+    #        g.add_edge(lvar_to_nid[oval], "Out")
 
-        for k, lval in int_to_lval.items():
-            assert _to_int(lval) == k
+    #    for k, lval in int_to_lval.items():
+    #        assert _to_int(lval) == k
 
-        all_lvars = flat(op_in_lvars) + flat(op_out_lvars) + output_lvars
-        i_to_lvars = {}
-        for lvar in all_lvars:
-            v = int(sol[lvar.value].constant_value())
-            i_to_lvars.setdefault(v, []).append(lvar)
+    #    all_lvars = flat(op_in_lvars) + flat(op_out_lvars) + output_lvars
+    #    i_to_lvars = {}
+    #    for lvar in all_lvars:
+    #        v = int(sol[lvar.value].constant_value())
+    #        i_to_lvars.setdefault(v, []).append(lvar)
 
-        def sort_to_sol(sort):
-            v_sols = []
-            for from_nid, to_nid in zip(nids[1:-1], sort[1:-1]):
-                for from_val, to_val in zip(from_nid, to_nid):
-                    to_lval = int_to_lval[to_val]
-                    v_sols.append({lvar.value: to_lval for lvar in i_to_lvars[from_val]})
+    #    def sort_to_sol(sort):
+    #        v_sols = []
+    #        for from_nid, to_nid in zip(nids[1:-1], sort[1:-1]):
+    #            for from_val, to_val in zip(from_nid, to_nid):
+    #                to_lval = int_to_lval[to_val]
+    #                v_sols.append({lvar.value: to_lval for lvar in i_to_lvars[from_val]})
 
-            new_sol = dict(sol)
-            for d in v_sols:
-                new_sol = {**new_sol, **d}
-            return new_sol
+    #        new_sol = dict(sol)
+    #        for d in v_sols:
+    #            new_sol = {**new_sol, **d}
+    #        return new_sol
 
-        #Run the gen all topographical orderings algorithm
-        for sort in nx.all_topological_sorts(g):
-            new_sol = sort_to_sol(sort)
-            yield new_sol
+    #    #Run the gen all topographical orderings algorithm
+    #    for sort in nx.all_topological_sorts(g):
+    #        new_sol = sort_to_sol(sort)
+    #        yield new_sol
 
 
-    def gen_op_permutations(self, sol):
-        input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+    #def gen_op_permutations(self, sol):
+    #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
 
-        #Get indices of each commutative op
-        commute_idxs = []
-        for i, op in enumerate(self.op_list):
-            if op.comm_info:
-                commute_idxs.append(i)
+    #    #Get indices of each commutative op
+    #    commute_idxs = []
+    #    for i, op in enumerate(self.op_list):
+    #        if op.comm_info:
+    #            commute_idxs.append(i)
 
-        lvar_perms = []
-        lvar_list = []
-        for i in commute_idxs:
-            lvar_list += [lvar.value for lvar in op_in_lvars[i]]
-            lvals = [sol[lvar.value] for lvar in op_in_lvars[i]]
-            lvar_perms.append(set(it.permutations(lvals)))
+    #    lvar_perms = []
+    #    lvar_list = []
+    #    for i in commute_idxs:
+    #        lvar_list += [lvar.value for lvar in op_in_lvars[i]]
+    #        lvals = [sol[lvar.value] for lvar in op_in_lvars[i]]
+    #        lvar_perms.append(set(it.permutations(lvals)))
 
-        for lvals in it.product(*lvar_perms):
-            lval_list = flat([lval_tuple for lval_tuple in lvals])
-            new_vals = {lvar: lval for lvar, lval in zip(lvar_list, lval_list)}
-            new_sol = {**sol, **new_vals}
-            yield new_sol
-            #sols.append(new_sol)
-        #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
-        #return sols
+    #    for lvals in it.product(*lvar_perms):
+    #        lval_list = flat([lval_tuple for lval_tuple in lvals])
+    #        new_vals = {lvar: lval for lvar, lval in zip(lvar_list, lval_list)}
+    #        new_sol = {**sol, **new_vals}
+    #        yield new_sol
+    #        #sols.append(new_sol)
+    #    #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
+    #    #return sols
 
     def pattern_from_sol(self, sol):
         num_inputs = len(self.iT)
@@ -355,6 +387,78 @@ class CombEncoding(PatternEncoding):
             src = lval_to_src[lval]
             p.add_edge(src, (self.num_ops, i))
         return p
+
+
+    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
+        #Interior edges
+        interior_edges = []
+        for (li, lai), (ri, rai) in p.interior_edges:
+            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
+            r_csid = pid_to_csid[ri]
+            r_lvars = self.op_in_lvars[r_csid]
+            r_lvar = r_lvars[rai]
+            interior_edges.append(l_lvar==r_lvar)
+        #Exterior edges
+        in_lvars = {}
+        for (li, lai), (ri, rai) in p.in_edges:
+            assert li == -1
+            assert ri != p.num_ops
+            r_lvar = self.op_in_lvars[pid_to_csid[ri]][rai]
+            in_lvars.setdefault(lai,[]).append(r_lvar)
+        out_lvars = {}
+        for (li, lai), (ri, rai) in p.out_edges:
+            assert ri == p.num_ops
+            assert li != -1
+            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
+            assert rai not in out_lvars
+            out_lvars[rai] = l_lvar
+        in_conds = [fc.And([lv0==lv1 for lv0,lv1 in zip(lvars[:-1], lvars[1:])]) for lvars in in_lvars.values()]
+        in_lvars = {lai:lvars[0] for lai, lvars in in_lvars.items()}
+        return fc.And(in_conds + interior_edges), in_lvars, out_lvars
+
+    def match_rule_dag(self, dag, r_matches):
+        l_insides = [m[0] for m in r_matches]
+        l_ins = [m[1] for m in r_matches]
+        l_outs = [m[2] for m in r_matches]
+        ios = []
+        for d in dag:
+            (src, src_i), (snk, snk_i) = d
+            if src==-1:
+                l_src_lvar = src_i
+            else:
+                l_src_lvar = l_outs[src][src_i]
+            if snk == len(r_matches):
+                l_snk_lvar = self.output_lvars[snk_i]
+            else:
+                l_snk_lvar = l_ins[snk][snk_i]
+            ios.append(l_src_lvar == l_snk_lvar)
+        return fc.And([fc.And(l_insides), fc.And(ios)])
+
+    #Will yield all matches of the single pattern
+    def match_all_patterns(self, pat: Pattern):
+        pat_ops = _list_to_dict(pat.op_names)
+        cs_ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        ops = list(pat_ops.keys())
+        assert set(ops).issubset(set(cs_ops.keys()))
+        poss = [it.permutations(cs_ops[op], len(pat_ops[op])) for op in ops]
+        for cs_op_ids in it.product(*poss):
+            assert len(cs_op_ids) == len(ops)
+            for p in pat.enum_all_equal():
+                maps = [{pid:csid for pid,csid in zip(p.op_dict[op],ids)} for op, ids in zip(ops, cs_op_ids)]
+                pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
+                yield self.match_one_pattern(p, pid_to_csid)
+
+
+            #pc_ids = [{pi:ci for pi, ci in zip(pat_ops[op],ids)} for op, ids in zip(ops, cs_op_ids)]
+            #pid_to_csid = functools.reduce(lambda x,y: {**x,**y}, pc_ids)
+            #yield self.match_one_pattern(pat, pid_to_csid)
+
+    #Returns a formula that is true when the pattern matches at least once
+    def any_pat_match(self, pat: Pattern):
+        return fc.Or([cond for cond,_,_ in self.match_all_patterns(pat)])
+
+
+
 
 
     #def comb_from_solved(self, lvals, name: QSym):

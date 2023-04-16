@@ -9,7 +9,7 @@ from ..frontend.ir import AssignStmt, CombProgram
 from ..frontend.stdlib import make_bv_const
 from .pattern import PatternEncoding, Pattern
 from .solver_utils import get_var
-from .utils import flat, _to_int, _list_to_dict, type_to_nT, comb_type_to_nT
+from .utils import flat, _to_int, _list_to_dict, type_to_nT, types_to_nTs
 from hwtypes import SMTBitVector as SBV
 from collections import namedtuple
 
@@ -145,6 +145,7 @@ class DepthEncoding(PatternEncoding):
             self.P_depth_conn,
             self.P_depth_max,
             self.P_used_source,
+            self.P_cse,
         ]
         ret = fc.And(P_wfp)
         #print(ret.serialize())

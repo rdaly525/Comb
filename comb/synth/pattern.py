@@ -8,7 +8,8 @@ from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
 from .solver_utils import get_var
-from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT
+from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, types_to_nTs, add_cnts, \
+    ge0_cnts, sub_cnts, types_to_nT_cnts, flat
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -61,22 +62,36 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
                 return []
 
         if opts.same_op:
-            if l.op_names[l_opi] != r.op_names[r_opi]:
+            if l.op_names_with_io[l_opi] != r.op_names_with_io[r_opi]:
                 return []
         else:
             if l_opi != r_opi:
                 return []
-        l_nodes = [l.nodes[l_opi]]
-        #TODO only works for comm size 2 (or [0,1])
-        if opts.comm and l_opi in range(l.num_ops) and l.ops[l_opi].comm_info:
-            l_nodes.append(reversed(l.nodes[l_opi]))
+        l_poss_args = [l.nodes[l_opi]]
+        #Find all possible commititive permutations
+        if opts.comm and l_opi in range(l.num_ops):
+            l_args = l.nodes[l_opi] #[0,1,2,3]
+            comm_info = l.ops[l_opi].comm_info
+            assert all(isinstance(l, list) for l in comm_info)
+            assert r.ops[r_opi].comm_info == comm_info
+            #Append comm_info with extra args
+            cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
+            assert isinstance(cur_ais, set)
+            assert cur_ais == set(range(len(l_args)))
+            l_poss_args = []
+            for poss in it.product(*[it.permutations(comm) for comm in comm_info]):
+                comm_l_args = [None for _ in l_args]
+                for f,t in zip(flat(comm_info), flat(poss)):
+                    comm_l_args[t] = l_args[f]
+                assert all(v is not None for v in comm_l_args)
+                l_poss_args.append(comm_l_args)
 
         matched = []
         #For each comm ordering
-        for l_node in l_nodes:
+        for l_args in l_poss_args:
             ctxs = [ctx]
             #For each op argument
-            for l_src, r_src in zip(l_node, r.nodes[r_opi]):
+            for l_src, r_src in zip(l_args, r.nodes[r_opi]):
                 ctxs_ = []
                 for ctx_ in ctxs:
                     m_ctxs = match(l_src, r_src, ctx_)
@@ -108,9 +123,20 @@ class Pattern:
         self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
         self.root = (len(ops), 0) #TODO only works for single output
 
+    #Produces the maximum typing for these set of ops
+    #@cached_property
+    #def max_T(self):
+    #    [_list_to_counts(iTs) for iTs in self.op_iTs]
+
+
     @cached_property
     def op_names(self):
+        return [op.qualified_name for op in self.ops]
+
+    @cached_property
+    def op_names_with_io(self):
         return [op.qualified_name for op in self.ops] + ["IO"]
+
 
     @cached_property
     def num_ops(self):
@@ -129,25 +155,71 @@ class Pattern:
             snk_t = self.oT[snk[1]]
         else:
             snk_t = self.op_iTs[snk[0]][snk[1]]
-        assert src_t == snk_t
+        if src_t != snk_t:
+            raise ValueError()
+            assert src_t == snk_t
         self.edges.append((src, snk))
+        # snk, snk -> src
         self.nodes[snk[0]][snk[1]] = src
 
-    #@property
-    #def interior_edges(self):
-    #    yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
+    @property
+    def interior_edges(self):
+        yield from (e for e in self.edges if all(v in range(self.num_ops) for v in (e[0][0], e[1][0])))
 
-    #@property
-    #def in_edges(self):
-    #    yield from (e for e in self.edges if e[0][0]==-1)
+    @property
+    def in_edges(self):
+        yield from (e for e in self.edges if e[0][0]==-1)
 
-    #@property
-    #def out_edges(self):
-    #    yield from (e for e in self.edges if e[1][0]==self.num_ops)
+    @property
+    def out_edges(self):
+        yield from (e for e in self.edges if e[1][0]==self.num_ops)
 
     @cached_property
     def op_dict(self):
         return _list_to_dict(self.op_names)
+
+    @cached_property
+    def op_cnt(self):
+        return _list_to_counts(self.op_names)
+
+
+    def enum_all_equal(self):
+        #Does all the symmetries
+        for es_ip in self.enum_input_perm(self.edges):
+            for es_so in self.enum_same_op(es_ip):
+                for es_c in self.enum_comm(es_so):
+                    p = Pattern(self.iT, self.oT, self.ops)
+                    for e in es_c:
+                        p.add_edge(*e)
+                    yield p
+
+    def enum_input_perm(self, edges):
+        yield edges
+
+    def enum_comm(self, edges):
+        for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
+            map = {self.num_ops:{0:0}} #[opi][ai]
+            for opi, (op, poss) in enumerate(zip(self.ops, op_poss)):
+                map[opi] = {f:t for f,t in zip(flat(self.ops[opi].comm_info), flat(poss))}
+            es = []
+            for src, (snk_i, snk_a) in edges:
+                new_snk = (snk_i, map[snk_i][snk_a])
+                es.append((src, new_snk))
+            yield es
+
+    def enum_same_op(self, edges):
+        #First only do the comm_symmetries
+        ops = self.op_dict.keys()
+        self_ids = flat(self.op_dict.values())
+        for ids in it.product(*[it.permutations(self.op_dict[op]) for op in ops]):
+            op_map = {**{f:t for f,t in zip(self_ids, flat(ids))},-1:-1,self.num_ops:self.num_ops}
+            es = []
+            for (src_i, src_a), (snk_i, snk_a) in edges:
+                new_src = (op_map[src_i], src_a)
+                new_snk = (op_map[snk_i], snk_a)
+                es.append((new_src, new_snk))
+            yield es
+
 
     def equal(self, other, opts: SymOpts):
         matches = self.equal_with_match(other, opts)
@@ -185,7 +257,7 @@ class Pattern:
         return hash(str(self))
 
     #TODO verify this works
-    def to_comb(self, ns, name) -> CombProgram:
+    def to_comb(self, ns="C", name="C") -> CombProgram:
 
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(self.iT))}
@@ -244,6 +316,7 @@ class PatternEncoding:
         self.const_list = const_list
         self.prefix = prefix
         self.sym_opts = sym_opts
+
 
         if len(self.const_list) > 0:
             raise NotImplementedError()
@@ -317,27 +390,32 @@ class PatternEncoding:
     def num_ops(self):
         return len(self.op_list)
 
-    def pattern_from_sol(self, sol):
+    def pattern_from_sol(self, sol) -> Pattern:
         raise NotImplementedError()
 
-    #Makes sure the typing makes sense for the query
+    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
+        raise NotImplementedError()
+
+    def match_rule_dag(self, dag, r_matches):
+        raise NotImplementedError()
+
+    def match_all_patterns(self, pat: Pattern):
+        raise NotImplementedError()
+
+    def any_pat_match(self, pat: Pattern):
+        raise NotImplementedError()
+
+    @cached_property
     def types_viable(self):
-        raise NotImplementedError()
-        def cnt_vals(vals):
-            cnt = collections.defaultdict(int)
-            for v in vals:
-                cnt[v] += 1
-            return cnt
-
-        spec_iTs, spec_oTs = self.comb_type
-        spec_inputs = cnt_vals(i.type for i in spec_iTs)
-        spec_outputs = cnt_vals(o.type for o in spec_oTs)
-
-        op_inputs = cnt_vals(flat([[i.type for i in op.get_type()[0]] for op in self.op_list]))
-        op_outputs = cnt_vals(flat([[o.type for o in op.get_type()[1]] for op in self.op_list]))
-
-        if not all(t in op_inputs and op_inputs[t] >= cnt for t, cnt in spec_inputs.items()):
+        iTs = _list_to_counts(self.iT)
+        oTs = _list_to_counts(self.oT)
+        op_iTs = [types_to_nT_cnts(op.get_type()[0]) for op in self.op_list]
+        op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
+        snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))
+        srcs = add_cnts(iTs, functools.reduce(lambda a, b: add_cnts(a,b), op_oTs))
+        if set(snks.keys()) != set(srcs.keys()):
             return False
-        if not all(t in op_outputs and op_outputs[t] >= cnt for t, cnt in spec_outputs.items()):
-            return False
-        return True
+        return ge0_cnts(sub_cnts(snks, srcs))
+
+
+

@@ -1,8 +1,11 @@
+import functools
+
 from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
 from .pattern import Pattern, SymOpts, PatternEncoding
 from .comb_encoding import CombEncoding
-from .utils import _list_to_dict, bucket_combinations, flat, comb_type_to_nT, nT
+from .utils import _list_to_dict, bucket_combinations, flat, types_to_nTs, nT
+from .rule import Rule
 
 import hwtypes.smt_utils as fc
 import typing as tp
@@ -34,11 +37,10 @@ def enum_pattern_partitions(p: Pattern, partitions):
     #
     #I need another level of enumeration
     #I currently have a set of matching ops. Now i need to assign each of those ops to each pattern idx
-    if set(p.op_dict.keys()) != set(partitions.keys()):
+    if set(p.op_names) != set(partitions.keys()):
         raise ValueError()
-    assert set(p.op_dict.keys()) == set(partitions.keys())
     product_ids = []
-    for op, p_ids in p.op_dict.items():
+    for op, p_ids in _list_to_dict(p.op_names).items():
         cs_ids = partitions[op]
         assert len(p_ids) == len(cs_ids)
         product_ids.append(it.permutations(cs_ids))
@@ -83,63 +85,58 @@ def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int,
     #Exterior edges
     in_lvars = {}
     for (li, lai), (ri, rai) in p.in_edges:
-        assert li == "In"
-        assert ri != "Out"
+        assert li == -1
+        assert ri != p.num_ops
         r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
         in_lvars[lai] = r_lvar
     out_lvars = {}
     for (li, lai), (ri, rai) in p.out_edges:
-        assert ri == "Out"
-        assert li != "In"
+        assert ri == p.num_ops
+        assert li != -1
         l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
         out_lvars[lai] = l_lvar
     return fc.And(interior_edges), in_lvars, out_lvars
 
 
-def match_pattern(p: Pattern, cs: CombEncoding, ri_op_cnts):
-    for pid_to_csid in enum_pattern_partitions(p, ri_op_cnts):
-        yield match_one_pattern(p, cs, pid_to_csid)
-
-def enum_dags(goal_T, rules):
-    from .rule import Rule
-    rules: tp.List[Rule] = rules
-    goal_iT = comb_type_to_nT(goal_T[0])
-    goal_oT = comb_type_to_nT(goal_T[1])
-    rule_iTs = [comb_type_to_nT(r.comb_type[0]) for r in rules]
-    rule_oTs = [comb_type_to_nT(r.comb_type[1]) for r in rules]
-
-    if len(goal_iT) != 1:
-        raise NotImplementedError()
+def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
+    pat_iTs = [_list_to_dict(p.iT) for p in pats]
+    pat_oTs = [_list_to_dict(p.oT) for p in pats]
 
     #Create a set of all sources/snks sorted by type
-    srcs = {n:[("In", i) for i in ids] for n, ids in goal_iT.items()}
-    for ri, rule_oT in enumerate(rule_oTs):
-        for n, ids in rule_oT.items():
-            srcs.setdefault(n, []).extend((ri, i) for i in ids)
-    snks = {n:[("Out", i) for i in ids] for n, ids in goal_oT.items()}
-    for ri, rule_iT in enumerate(rule_iTs):
-        for n, ids in rule_iT.items():
-            snks.setdefault(n, []).extend((ri, i) for i in ids)
-
-    snk_list = []
-    src_poss = []
-    for n, n_snks in snks.items():
-        snk_list += n_snks
-        src_poss += [srcs[n] for _ in n_snks]
+    srcs = {n:[(-1, i) for i in ids] for n, ids in _list_to_dict(goal_iT).items()}
+    for pi, pat_oT in enumerate(pat_oTs):
+        for n, ids in pat_oT.items():
+            srcs.setdefault(n, []).extend((pi, i) for i in ids)
+    snks = {n:[(len(pats), i) for i in ids] for n, ids in _list_to_dict(goal_oT).items()}
+    for pi, pat_iT in enumerate(pat_iTs):
+        for n, ids in pat_iT.items():
+            snks.setdefault(n, []).extend((pi, i) for i in ids)
 
 
     #This strategy will produce invalid graphs
     #Easy filter to remove most of the bad connections
     def invalid_edge(src, snk):
-        return ((src[0] == snk[0])) or ((src[0], snk[0]) == ("In", "Out"))
-    def invalid_edges(src_list):
-        return any(invalid_edge(src, snk) for src, snk in zip(src_list, snk_list))
+        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
+    all_src = flat([srcs_ for srcs_ in srcs.values()])
+    def invalid_dag(edges):
+        used_srcs = set(src for src,_ in edges)
+        all_used = all(src in used_srcs for src in all_src)
+        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
+        return (not all_used) or bad_edge
+        #each source should be in edge list
 
-    ds = []
+    src_poss = []
+    snk_list = []
+    for n, n_snks in snks.items():
+        snk_list += n_snks
+        src_poss += [srcs[n] for _ in n_snks]
+
+    graphs = []
     for src_list in it.product(*src_poss):
-        if not invalid_edges(src_list):
-            ds.append(list(zip(src_list, snk_list)))
-    return ds
+        edges = list(zip(src_list, snk_list))
+        if not invalid_dag(edges):
+            graphs.append(edges)
+    return graphs
 
 class RuleSynth(Cegis):
     def __init__(
@@ -149,7 +146,7 @@ class RuleSynth(Cegis):
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
         pat_en_t: tp.Type[PatternEncoding],
-        sym_opts: SymOpts = SymOpts(),
+        sym_opts: SymOpts,
     ):
         l_sym_opts = sym_opts
         r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
@@ -157,134 +154,96 @@ class RuleSynth(Cegis):
         self.oT = oT
         lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
         rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=r_sym_opts)
-        self.lhs_cs = lhs_cs
-        self.rhs_cs = rhs_cs
+        if lhs_cs.types_viable and rhs_cs.types_viable:
+            self.lhs_cs = lhs_cs
+            self.rhs_cs = rhs_cs
 
-        P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
-        P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
+            P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
+            P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-        #Final query:
-        #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-        query = fc.And([
-            lhs_cs.P_sym,
-            rhs_cs.P_sym,
-            lhs_cs.P_wfp,
-            rhs_cs.P_wfp,
-            fc.Implies(
-                fc.And([
-                    lhs_cs.P_lib,
-                    lhs_cs.P_conn,
-                    rhs_cs.P_lib,
-                    rhs_cs.P_conn,
-                ]),
+            #Final query:
+            #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
+            query = fc.And([
+                lhs_cs.P_sym,
+                rhs_cs.P_sym,
+                lhs_cs.P_wfp,
+                rhs_cs.P_wfp,
                 fc.Implies(
-                    fc.And(P_inputs),
-                    fc.And(P_outputs),
+                    fc.And([
+                        lhs_cs.P_lib,
+                        lhs_cs.P_conn,
+                        rhs_cs.P_lib,
+                        rhs_cs.P_conn,
+                    ]),
+                    fc.Implies(
+                        fc.And(P_inputs),
+                        fc.And(P_outputs),
+                    )
                 )
-            )
-        ])
-        #print(query.serialize())
-        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-        super().__init__(query.to_hwtypes(), E_vars)
+            ])
+            #print(query.serialize())
+            E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
+            super().__init__(query.to_hwtypes(), E_vars)
 
-    def gen_all_sols(self, opts=SolverOpts()):
-        #iTs, oTs = self.lhs_cs.comb_type
-        #def enum_fun(sol):
-        #    #for sol in gen_input_perms(iTs, sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
-        #    #    sol = self.lhs_cs.fix_comm(sol)
-        #    #    sol = self.rhs_cs.fix_comm(sol)
-        #    #    yield sol
-        #    for lhs_t_sol in self.lhs_cs.gen_all_program_orders(sol):
-        #        for t_sol in self.rhs_cs.gen_all_program_orders(lhs_t_sol):
-        #            for sol in gen_input_perms(iTs, t_sol, self.lhs_cs.rhs_lvars, self.rhs_cs.rhs_lvars):
-        #                sol = self.lhs_cs.fix_comm(sol)
-        #                sol = self.rhs_cs.fix_comm(sol)
-        #                yield sol
-        #for i, sol in enumerate(self.cegis_all(opts, enum_fun=enum_fun)):
-        #    #sols = flat([self.cs.gen_op_permutations(sol) for sol in sols])
-        #    lhs_comb = self.lhs_cs.comb_from_solved(sol, name=QSym('solved', f"lhs_v{i}"))
-        #    rhs_comb = self.rhs_cs.comb_from_solved(sol, name=QSym('solved', f"rhs_v{i}"))
-        #    yield (lhs_comb, rhs_comb)
+    #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
+    #def _match_pattern(self, p: Pattern, ri_op_ids):
+    #    for pid_to_csid in enum_pattern_partitions(p, ri_op_ids):
+    #        yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
 
-        for sol, info in self.cegis_all(opts):
-            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
-            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
-            yield (lhs_pat, rhs_pat), info
+    #This enumerates all equiv patterns (from passed in pat) then matches on that
+    def match_pattern(self, pat: Pattern, r_op_ids:tp.Mapping[str,tp.Iterable[int]]):
+        ops = sorted(r_op_ids.keys())
+        for p in pat.enum_all_equal():
+            maps = [{pid:csid for pid,csid in zip(p.op_dict[op],r_op_ids[op])} for op in ops]
+            pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
+            yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
 
 
 
-    def add_rule_cover(self, cover):
-        from .rule import Rule
-        cover: tp.List[tp.Tuple[Rule, int]] = cover
-        rules = flat([[r for _ in range(cnt)] for r, cnt in cover])
-        #Need to get type info for everthing
-        #self_iT = comb_type_to_sT(self.comb_type[0])
-        #self_oT = comb_type_to_sT(self.comb_type[1])
 
-        #rule_iTs = [comb_type_to_sT(r.comb_type[0]) for r, _ in cover]
-        #rule_oTs = [comb_type_to_sT(r.comb_type[1]) for r, _ in cover]
+
+
+    #Note this is really only a LHS pat cover
+    def add_rule_cover(self, cover: tp.List[tp.Tuple[Pattern, int]]):
+        pats = flat([[p for _ in range(cnt)] for p, cnt in cover])
 
         #First goal: Enumerate over all the possible partitions.
         #for each rule, get the op dict count.
         lhs_rule_op_cnts = []
-        rhs_rule_op_cnts = []
-        for rule, rcnt in cover:
-            lhs_op_cnt = {op: len(ids) for op, ids in rule.lhs_pat.op_dict.items()}
-            rhs_op_cnt = {op: len(ids) for op, ids in rule.rhs_pat.op_dict.items()}
+        for pat, rcnt in cover:
+            lhs_op_cnt = pat.op_cnt
             for _ in range(rcnt):
                 lhs_rule_op_cnts.append(lhs_op_cnt)
-                rhs_rule_op_cnts.append(rhs_op_cnt)
+        assert len(lhs_rule_op_cnts) == len(pats)
 
         lhs_op_list = [op.qualified_name for op in self.lhs_cs.op_list]
-        rhs_op_list = [op.qualified_name for op in self.rhs_cs.op_list]
 
         matches = []
         for lhs_rule_partions in enum_rule_partitions(lhs_op_list, lhs_rule_op_cnts):
-            for rhs_rule_partions in enum_rule_partitions(rhs_op_list, rhs_rule_op_cnts):
-                r_matchers = []
-                for ri, rule in enumerate(rules):
-                    lhs_ri_op_cnts = {op:cnts[ri] for op, cnts in lhs_rule_partions.items() if len(cnts[ri]) > 0}
-                    rhs_ri_op_cnts = {op:cnts[ri] for op, cnts in rhs_rule_partions.items() if len(cnts[ri]) > 0}
-                    lhs_matcher = match_pattern(rule.lhs_pat, self.lhs_cs, lhs_ri_op_cnts)
-                    rhs_matcher = match_pattern(rule.rhs_pat, self.rhs_cs, rhs_ri_op_cnts)
-                    r_matchers.append(it.product(lhs_matcher, rhs_matcher))
-                for r_matches in it.product(*r_matchers):
-                    l_insides = [m[0][0] for m in r_matches]
-                    l_ins = [m[0][1] for m in r_matches]
-                    l_outs = [m[0][2] for m in r_matches]
-                    r_insides = [m[1][0] for m in r_matches]
-                    r_ins = [m[1][1] for m in r_matches]
-                    r_outs = [m[1][2] for m in r_matches]
-                    for dag in enum_dags(self.lhs_cs.comb_type, rules):
-                        ios = []
-                        for d in dag:
-                            (src, src_i), (snk, snk_i) = d
-                            if src=="In":
-                                l_src_lvar = src_i
-                                r_src_lvar = src_i
-                            else:
-                                l_src_lvar = l_outs[src][src_i]
-                                r_src_lvar = r_outs[src][src_i]
-                            if snk == "Out":
-                                l_snk_lvar = self.lhs_cs.output_lvars[snk_i]
-                                r_snk_lvar = self.rhs_cs.output_lvars[snk_i]
-                            else:
-                                l_snk_lvar = l_ins[snk][snk_i]
-                                r_snk_lvar = r_ins[snk][snk_i]
-                            ios.append(fc.And([l_src_lvar == l_snk_lvar, r_src_lvar == r_snk_lvar]))
-                        pat = fc.And([fc.And(l_insides), fc.And(r_insides), fc.And(ios)])
-                        matches.append(pat)
+            matchers = []
+            for pi, pat in enumerate(pats):
+                lhs_ri_op_ids = {op:cnts[pi] for op, cnts in lhs_rule_partions.items() if len(cnts[pi]) > 0}
+                lhs_matcher = self.match_pattern(pat, lhs_ri_op_ids)
+                matchers.append(lhs_matcher)
+            for r_matches in it.product(*matchers):
+                for dag in enum_dags(self.iT, self.oT, pats):
+                    match = self.lhs_cs.match_rule_dag(dag, r_matches)
+                    matches.append(match)
         f_matches = fc.Or(matches)
-        print(f"Excluded {len(matches)} Patterns")
+        print(f"Excluded Cover Patterns: {len(matches)}")
         self.query = self.query & ~(f_matches.to_hwtypes())
 
+    def exclude_pattern(self, lhs_pat:Pattern):
+        m = self.lhs_cs.any_pat_match(lhs_pat)
+        self.query = self.query & ~m.to_hwtypes()
 
 
-    def gen_all_program_orders(self, sol):
-        yield from it.product(
-            self.lhs_cs.gen_all_program_orders(sol),
-            self.rhs_cs.gen_all_program_orders(sol),
-        )
+
+    #def gen_all_program_orders(self, sol):
+    #    yield from it.product(
+    #        self.lhs_cs.gen_all_program_orders(sol),
+    #        self.rhs_cs.gen_all_program_orders(sol),
+    #    )
 
 def gen_input_perms(iTs, sol, l_lvars, r_lvars):
 

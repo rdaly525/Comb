@@ -77,3 +77,21 @@ def test_comm_edge():
     opts = SymOpts(comm=True,same_op=True, input_perm=False)
     assert pb.equal(pa, opts=opts)
     assert pa.equal(pb, opts=opts)
+
+
+def test_pat_enum():
+    N = 16
+    ops = [BV.add[N], BV.add[N]]
+    T = nT(N,False)
+    pat = Pattern([T]*3, [T], ops)
+    for e in [
+        ((-1, 0), (0, 0)),
+        ((-1, 1), (0, 1)),
+        ((-1, 2), (1, 0)),
+        ((0, 0), (1, 1)),
+        ((1, 0), (2, 0)),
+    ]:
+        pat.add_edge(*e)
+    for p in pat.enum_all_equal():
+        print(p)
+        print(p.to_comb())

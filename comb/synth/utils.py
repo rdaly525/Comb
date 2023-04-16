@@ -57,9 +57,14 @@ def nT_to_type(T: nT):
     return TypeCall(t, [IntValue(T.n)])
 
 
-def comb_type_to_nT(Ts):
+def types_to_nTs(Ts):
     Ns = [type_to_nT(t) for t in Ts]
     return _list_to_dict(Ns)
+
+def types_to_nT_cnts(Ts):
+    Ns = [type_to_nT(t) for t in Ts]
+    return _list_to_counts(Ns)
+
 
 def _to_int(x):
     assert x.is_constant()
@@ -88,3 +93,19 @@ def ret_list(f):
     def dec(*args, **kwargs):
         return _make_list(f(*args, **kwargs))
     return dec
+
+
+def sub_cnts(acnt, bcnt):
+    sub = {}
+    for k in (set(acnt.keys())|(set(bcnt.keys()))):
+        sub[k] = acnt.get(k,0) - bcnt.get(k,0)
+    return sub
+
+def add_cnts(acnt, bcnt):
+    sub = {}
+    for k in (set(acnt.keys())|(set(bcnt.keys()))):
+        sub[k] = acnt.get(k,0) + bcnt.get(k,0)
+    return sub
+
+def ge0_cnts(cnts):
+    return all(v>=0 for v in cnts.values())

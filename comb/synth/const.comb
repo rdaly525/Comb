@@ -1,0 +1,106 @@
+
+# const
+Comb bad.c0
+Param N: Int
+Param val: Int
+Out o : BV[N]
+o = [N]'h[val]
+
+
+# const
+Comb bad.c1
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
+# const
+Comb bad.c2
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+In i1 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
+# const
+Comb bad.c3
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
+# const
+Comb bad.c4
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
+# const
+Comb bad.c5
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+In i4 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
+
+
+
+# identity
+Comb bad.id1
+Param N: Int
+In i0 : BV[N]
+Out o : BV[N]
+o = i0
+
+# const
+Comb bad.id2
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+Out o : BV[N]
+o = i0
+
+# identity
+Comb bad.id3
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+Out o : BV[N]
+o = i0
+
+# identity
+Comb bad.id4
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+Out o : BV[N]
+o = i0
+
+# identity
+Comb bad.id5
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+In i4 : BV[N]
+Out o : BV[N]
+o = i0

@@ -90,7 +90,7 @@ BV = GlobalModules['bv']
 def test_add(pat_en_t, num_adds, comm, same_op, iperm, num_sols):
     N = 32
     obj = compile_program(add_file)
-    spec = obj.comb_dict[f"test.add{num_adds+1}"][N]
+    spec = obj.get("test",f"add{num_adds+1}")[N]
     ops = [BV.add[N]] * num_adds
     sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=iperm)
     sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
@@ -292,3 +292,40 @@ def _test_fulladder(pat_en_t):
         print(combi)
         res = verify(combi, fa)
         assert res is None
+
+
+#Bug where sub_sub does not equal the right thing
+bad = '''
+# const
+Comb bad.id2
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+Out o : BV[N]
+o = i1
+'''
+
+def test_sub_sub():
+    N = 16
+    obj = compile_program(bad)
+    spec = obj.get("bad", 'id2')[N]
+    ops = [BV.sub[N]]*2
+    sym_opts = SymOpts(comm=True, same_op=True, input_perm=True)
+    sq = SpecSynth(spec, ops, pat_en_t=CombEncoding, sym_opts=sym_opts)
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            timeout=10,
+            verbose=1,
+        ),
+    )
+    pats_ = []
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        print(pat)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, spec)
+        assert res is None
+        pats_.append(pat)
+    num_pats = len(pats_)
+    assert num_pats == 1
