@@ -334,7 +334,7 @@ class PatternEncoding:
     def num_ops(self):
         return len(self.op_list)
 
-    def pattern_from_sol(self, sol):
+    def pattern_from_sol(self, sol) -> Pattern:
         raise NotImplementedError()
 
     def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
@@ -343,7 +343,11 @@ class PatternEncoding:
     def match_rule_dag(self, dag, r_matches):
         raise NotImplementedError()
 
+    def match_all_patterns(self, pat: Pattern):
+        raise NotImplementedError()
 
+    def any_pat_match(self, pat: Pattern):
+        raise NotImplementedError()
 
 
     #Makes sure the typing makes sense for the query

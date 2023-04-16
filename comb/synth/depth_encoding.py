@@ -145,6 +145,7 @@ class DepthEncoding(PatternEncoding):
             self.P_depth_conn,
             self.P_depth_max,
             self.P_used_source,
+            self.P_cse,
         ]
         ret = fc.And(P_wfp)
         #print(ret.serialize())

@@ -219,6 +219,7 @@ class AdjEncoding(PatternEncoding):
             self.P_unique_sink,
             self.P_used_source,
             self.P_acyc,
+            self.P_cse,
         ]
         return fc.And(wfp)
 

@@ -32,6 +32,13 @@ Goal: 4/9: Optimize for results for presentation
         Similarly if I have a semantically matching pattern on the right, I can exclude smaller patterns on left (might not be true)
         What if I had some basic 'const instruction' parameterization in the ISA block? I could imagine something like programming adding 1 or 0
 
+    List of assumptions made on IR:
+        Constructed 0s will be eliminated
+        identity functions are eliminated
+        Identical computations will be eliminated
+            basic CSE will be performed
+
+
     Work queue:
         Get a better flow for logging results
         Write full instruction selection.
@@ -42,19 +49,17 @@ Goal: 4/9: Optimize for results for presentation
             Generalize the match code to any encoding
 
         Verify (exclude) patterns by using wfp and sym constraints
-        There is a dag construction error with a certain rule.
-            I missed a constraint in comb. I need to only allow for well typed
         dag enumeration is not excluding enough due to commutivity when comm constraint disabled
-
-        There is a rule with 0 it is calling equal.
-        Missing filtering
-        MOst rules are just varius ways to make 0
-        Some Compositions are not being excluded.
+            Enumerate all dags with pattern based on commutivity/same_op/other
         Find all the 0s by incrementally excluding them.
-        Put the matching code within the encoding class
+        Bug: sub + sub should be able to find (x,y) -> x identity. Currently it isn't
 
 
     DONE
+        Put the matching code within the encoding class
+        I should add a constraint to not do identical computation (called cse)
+        #The matching code might be buggy.
+            I am returning in returning io_lvars, I am not doing it correctly.
         Add constraint to cover calc to exclude based on typing impossibility
         Write Incremental Generative Filtering
         Write Preemptive Generative Filtering

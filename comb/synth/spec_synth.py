@@ -5,8 +5,8 @@ from hwtypes import smt_utils as fc
 from comb import Comb
 from .pattern import PatternEncoding, SymOpts, Pattern
 from .solver_utils import SolverOpts, Cegis
-from .utils import _make_list, type_to_nT
-
+from .utils import _make_list, type_to_nT, _list_to_dict
+import itertools as it
 
 class SpecSynth(Cegis):
     def __init__(
@@ -21,6 +21,7 @@ class SpecSynth(Cegis):
         iT, oT = spec.get_type()
         iT = [type_to_nT(t) for t in iT]
         oT = [type_to_nT(t) for t in oT]
+        sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
         self.pat_en = pat_en_t(iT, oT, op_list, const_list, sym_opts=sym_opts)
         self.spec = spec
         #Formal Spec (P_spec)
@@ -43,6 +44,11 @@ class SpecSynth(Cegis):
         #print(query.serialize())
         E_vars = self.pat_en.E_vars
         super().__init__(query.to_hwtypes(), E_vars)
+
+
+    def exclude_pattern(self, pat:Pattern):
+        m = self.pat_en.any_pat_match(pat)
+        self.query = self.query & ~m.to_hwtypes()
 
     def gen_all_sols(self, opts: SolverOpts = SolverOpts()) -> tp.List[Pattern]:
         for sol, info in self.cegis_all(opts):

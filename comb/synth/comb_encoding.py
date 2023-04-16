@@ -1,4 +1,5 @@
 import collections
+import functools
 import itertools as it
 
 from hwtypes import SMTBitVector as SBV
@@ -151,6 +152,33 @@ class CombEncoding(PatternEncoding):
                 well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars[T]]))
         return fc.And(well_typed)
 
+    #Every pairwise same op needs to have distinct inputs
+    @property
+    def P_cse(self):
+        op_ids = _list_to_dict([op.qualified_name for op in self.op_list])
+        P_cse = []
+        for op, ids in op_ids.items():
+            if len(ids)<2:
+                continue
+            for i0, i1 in it.combinations(ids, 2):
+                P_cse.append(fc.Or([lv0!=lv1 for lv0, lv1 in zip(self.op_in_lvars[i0], self.op_in_lvars[i1])]))
+        return fc.And(P_cse)
+
+    @property
+    def P_wfp(self):
+        P_wfp = [
+            self.P_in_range,
+            self.P_loc_unique,
+            self.P_multi_out,
+            self.P_well_typed,
+            self.P_acyc,
+            self.P_used_source,
+            self.P_cse,
+        ]
+        return fc.And(P_wfp)
+
+
+
     @property
     def P_sym_same_op(self):
         assert self.sym_opts.same_op
@@ -229,18 +257,6 @@ class CombEncoding(PatternEncoding):
             P_perms.append(fc.And(P_perm))
         ret = fc.And(P_perms)
         return ret
-
-    @property
-    def P_wfp(self):
-        P_wfp = [
-            self.P_in_range,
-            self.P_loc_unique,
-            self.P_multi_out,
-            self.P_well_typed,
-            self.P_acyc,
-            self.P_used_source,
-        ]
-        return fc.And(P_wfp)
 
     def fix_comm(self, sol):
         comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
@@ -386,14 +402,17 @@ class CombEncoding(PatternEncoding):
             assert li == -1
             assert ri != p.num_ops
             r_lvar = self.op_in_lvars[pid_to_csid[ri]][rai]
-            in_lvars[lai] = r_lvar
+            in_lvars.setdefault(lai,[]).append(r_lvar)
         out_lvars = {}
         for (li, lai), (ri, rai) in p.out_edges:
             assert ri == p.num_ops
             assert li != -1
             l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
-            out_lvars[lai] = l_lvar
-        return fc.And(interior_edges), in_lvars, out_lvars
+            assert rai not in out_lvars
+            out_lvars[rai] = l_lvar
+        in_conds = [fc.And([lv0==lv1 for lv0,lv1 in zip(lvars[:-1], lvars[1:])]) for lvars in in_lvars.values()]
+        in_lvars = {lai:lvars[0] for lai, lvars in in_lvars.items()}
+        return fc.And(in_conds + interior_edges), in_lvars, out_lvars
 
     def match_rule_dag(self, dag, r_matches):
         l_insides = [m[0] for m in r_matches]
@@ -412,6 +431,23 @@ class CombEncoding(PatternEncoding):
                 l_snk_lvar = l_ins[snk][snk_i]
             ios.append(l_src_lvar == l_snk_lvar)
         return fc.And([fc.And(l_insides), fc.And(ios)])
+
+    #Will yield all matches of the single pattern
+    def match_all_patterns(self, pat: Pattern):
+        pat_ops = _list_to_dict(pat.op_names)
+        cs_ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        ops = list(pat_ops.keys())
+        assert set(ops).issubset(set(cs_ops.keys()))
+        poss = [it.permutations(cs_ops[op], len(pat_ops[op])) for op in ops]
+        for cs_op_ids in it.product(*poss):
+            assert len(cs_op_ids) == len(ops)
+            pc_ids = [{pi:ci for pi, ci in zip(pat_ops[op],ids)} for op, ids in zip(ops, cs_op_ids)]
+            pid_to_csid = functools.reduce(lambda x,y: {**x,**y}, pc_ids)
+            yield self.match_one_pattern(pat, pid_to_csid)
+
+    #Returns a formula that is true when the pattern matches at least once
+    def any_pat_match(self, pat: Pattern):
+        return fc.Or([cond for cond,_,_ in self.match_all_patterns(pat)])
 
 
 
