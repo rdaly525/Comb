@@ -60,12 +60,12 @@ def test_isa(pat_en_t):
     #opMaxISA = {0:1, 1:0, 2:0, 3:1}
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     only_lhs_sym = False
-    res_dir = "/Users/rdaly/Comb/results/small"
+    res_dir = f"{dir}/../../results/small"
     for (E, to, maxIR, maxISA) in (
-        (1, 10, 2, 3),
+        (1, 20, 3, 3),
         #(0,10),
     ):
-        opts = SolverOpts(verbose=0, solver_name='z3', timeout=to, log=True)
+        opts = SolverOpts(verbose=0, solver_name='btor', timeout=to, log=True)
         for c, so, ip in (
             (1,0,0),
             (1,1,1),
@@ -103,15 +103,15 @@ def test_isa(pat_en_t):
                 #print("*"*80)
                 pass
             rd.rdb.pickle_time(file)
-            continue
-            #gen_time = time()
+            gen_time = time()
             #db = rd.rdb
-            #pre_rules = len(db)
+            pre_rules = len(rd.rdb)
             ##db.post_filter()
             ##post_time = time()
-            #gen_delta = round(gen_time - start_time, 4)
+            gen_delta = round(gen_time - start_time, 4)
             ##post_delta = round(post_time - gen_time, 4)
-            #print(f"PRE: ({pre_rules}, {gen_delta})")
+            print(f"PRE: ({pre_rules}, {gen_delta})")
+            continue
             ##print(f"POST: ({len(db)}, {post_delta})")
             #table = db.sort(maxIR, maxISA)
             #for l in range(1,maxIR+1):
