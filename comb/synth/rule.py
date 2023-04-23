@@ -56,12 +56,25 @@ class Rule:
             return False
         return any(lm==rm for lm, rm in it.product(l_matches,r_matches))
 
+import pickle
 
 class RuleDatabase:
     def __init__(self):
         self.rules: tp.List[Rule] = []
         self.costs: tp.List[int] = []
+        self.cover_times = {}
 
+    def pickle_time(self, file):
+        v = dict(
+            times=[(len(r.time), sum(r.time)) for r in self.rules],
+            covers=self.cover_times,
+        )
+        with open(file, 'wb') as f:
+            pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def add_cover_time(self, k, t):
+        n = len(self)
+        self.cover_times[k] = (t, n)
     def add_rule(self, rule: Rule, cost: int, filter=True):
         i = len(self.rules)
         rule.id = i

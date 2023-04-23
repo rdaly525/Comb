@@ -75,6 +75,10 @@ Out o0 : BV[N]
 t0 = bv.add[N](i0, i2)
 o0 = bv.sub[N](i1, t0)
 
+Comb test.C0
+Param N: Int
+Out o: BV[N]
+o = [N]'h0
 
 '''
 
@@ -100,10 +104,10 @@ def test_amul_comm():
     assert check_comm_equal(spec.comm_info, [[0, 2], [1, 3]])
 
 #Test non-commutative
-def test_foo_comm():
+def test_c0_comm():
     N = 16
     obj = compile_program(add_file)
-    spec = obj.get("test", "foo")[N]
+    spec = obj.get("test", "C0")[N]
     set_comm(spec)
     print(spec.comm_info)
-    assert check_comm_equal(spec.comm_info, [[0, 2], [1]])
+    assert check_comm_equal(spec.comm_info, [[]])

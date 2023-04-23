@@ -147,9 +147,13 @@ class RuleSynth(Cegis):
         rhs_op_list: tp.List[Comb],
         pat_en_t: tp.Type[PatternEncoding],
         sym_opts: SymOpts,
+        only_lhs_sym: bool = False
     ):
         l_sym_opts = sym_opts
-        r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
+        if only_lhs_sym:
+            r_sym_opts = SymOpts(False,False,False)
+        else:
+            r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
         self.iT = iT
         self.oT = oT
         lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
@@ -181,9 +185,31 @@ class RuleSynth(Cegis):
                     )
                 )
             ])
+
+            query = query.to_hwtypes()
+
+            #wfp = fc.And([
+            #    lhs_cs.P_sym,
+            #    rhs_cs.P_sym,
+            #    lhs_cs.P_wfp,
+            #    rhs_cs.P_wfp,
+            #])
+
+            #xl = fc.And([lhs_cs.P_lib, lhs_cs.P_conn]).to_hwtypes()
+            #xr = fc.And([rhs_cs.P_lib, rhs_cs.P_conn]).to_hwtypes()
+
+            ##Substitute all of Ir and Or in xr with Il and Ol
+            #subs = []
+            #for Il, Ir in zip(lhs_cs.input_vars, rhs_cs.input_vars):
+            #    subs.append((Il, Ir))
+            ##for Ol, Or in zip(lhs_cs.output_vars, rhs_cs.output_vars):
+            ##    subs.append((Ol, Or))
+            #sub_xr = xr.substitute(*subs)
+            #query = wfp.to_hwtypes() & (~(xl==sub_xr) | fc.And(P_outputs).to_hwtypes())
+
             #print(query.serialize())
             E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-            super().__init__(query.to_hwtypes(), E_vars)
+            super().__init__(query, E_vars)
 
     #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
     #def _match_pattern(self, p: Pattern, ri_op_ids):

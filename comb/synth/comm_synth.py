@@ -22,7 +22,8 @@ def get_comm_info(spec: Comb, opts: SolverOpts):
         spec_n = spec
     iT, oT = spec_n.get_type()
     iT = [type_to_nT(t) for t in iT]
-
+    if len(iT)==0:
+        return  ([],)
     in_vars = [get_var(f"I{i}", n) for i, n in enumerate(iT)]
     base_outs = _make_list(spec_n.evaluate(*in_vars))
     sets = {i:{i} for i in range(len(iT))}
