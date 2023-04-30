@@ -1,16 +1,16 @@
 import pickle
 import itertools as it
-res_dir = "/Users/rdaly/Comb/results/small"
+res_dir = "/Users/rdaly/Comb/results/small_btor"
 import plotly.express as px
 import plotly.graph_objects as go
 
-to = 10
-maxIR, maxISA = 2,3
+to = 20
+maxIR, maxISA = 3,3
 data = {}
 for E, c, so, ip in (
     (1,1,1,1),
     (1,0,0,1),
-    (1,0,1,0),
+    #(1,0,1,0),
     (1,1,0,0),
     (1,0,0,0),
     #(1,1,1,0),
@@ -39,5 +39,5 @@ fig.update_layout(
     xaxis_title="Number of unique rules",
     title="Cactus",
 )
-#fig.update_yaxes(type='log')
+fig.update_yaxes(type='log')
 fig.show()

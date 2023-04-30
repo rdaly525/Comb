@@ -1,3 +1,4 @@
+from comb.frontend.compiler import compile_program
 from comb.synth.comm_synth import get_comm_info
 from comb.synth.pattern import Pattern, SymOpts
 import typing as tp
@@ -18,6 +19,12 @@ class Rule:
         self.info = info
         self.comm_info = get_comm_info(lhs_pat.to_comb(), opts)
         self.eq_rules = []
+
+    def serialize(self, ns, i):
+        lhs = self.lhs.to_comb(ns, f"L{i}").serialize()
+        rhs = self.rhs.to_comb(ns, f"R{i}").serialize()
+        return lhs + "\n\n" + rhs
+
 
     def verify(self):
         lcomb = self.lhs.to_comb()
@@ -63,6 +70,36 @@ class RuleDatabase:
         self.rules: tp.List[Rule] = []
         self.costs: tp.List[int] = []
         self.cover_times = {}
+
+    def get(self, r: Rule):
+        for r_ in self.rules:
+            if r.equal(r_):
+                assert r_.equal(r)
+                return r_
+        return None
+
+    def save(self, ns, file):
+        with open(file, 'w') as f:
+            for ri, rule in enumerate(self.rules):
+                f.write(rule.serialize(ns, ri) + "\n\n\n")
+
+    def load(self, ns, file):
+        assert len(self.rules)==0
+        with open(file, 'r') as f:
+            obj = compile_program(f.read())
+        for ri in it.count(1):
+            lhs_comb = obj.get(ns, f"L{ri}")
+            rhs_comb = obj.get(ns, f"R{ri}")
+            self.add_rule(
+                Rule(
+                    ri,
+                    Pattern.from_comb(lhs_comb),
+                    Pattern.from_comb(rhs_comb),
+                    0,
+                    (),
+                ),
+                0
+            )
 
     def pickle_time(self, file):
         v = dict(

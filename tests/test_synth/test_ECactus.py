@@ -16,7 +16,7 @@ from comb.synth.utils import _list_to_counts
 dir = os.path.dirname(os.path.realpath(__file__))
 fname = f"{dir}/combs/simple.comb"
 import typing as tp
-
+import pickle
 
 from timeit import default_timer as time
 
@@ -36,10 +36,6 @@ def test_isa(pat_en_t):
     isa = isa[:num_isa]
 
     costs = costs[:num_isa]
-    if True:
-        ir = ir*4
-        isa = isa*4
-        costs = costs*4
     for op in [*ir, *isa]:
         set_comm(op)
     for i in (1,3):
@@ -60,20 +56,19 @@ def test_isa(pat_en_t):
     #const_synth = True
     const_synth = False
     opMaxIR = {0:1, 1:2, 2:2, 3:1}
-    opMaxIR = None
     opMaxISA = {0:1, 1:2, 2:2, 3:2}
-    opMaxISA = None
     #for c, so, ip in itertools.product((1, 0), repeat=3):
     only_lhs_sym = False
     res_dir = f"{dir}/../../results/small"
+    dbs = []
     for (E, to, maxIR, maxISA) in (
-        (1, 10, 1, 1),
-        (0, 10, 1, 1),
+        (1, 10, 3, 3),
+        (0, 10, 3, 3),
     ):
         opts = SolverOpts(verbose=0, solver_name='z3', timeout=to, log=True)
         for c, so, ip in (
-            (0,0,0),
-            #(1,0,0),
+            #(0,0,0),
+            (1,0,0),
             #(1,1,1),
             #(0,0,0),
             #(0,0,1),
@@ -81,8 +76,7 @@ def test_isa(pat_en_t):
             #(1,1,0),
             #(1,0,1),
         ):
-            pfile = f"{res_dir}/res{maxIR}_{maxISA}_{E}{c}{so}{ip}_{to}.pickle"
-            rfile = f"{res_dir}/res{maxIR}_{maxISA}_{E}{c}{so}{ip}_{to}.comb"
+            pfile = f"{res_dir}/Eres{maxIR}_{maxISA}_{c}{so}{ip}_{to}.pickle"
             print(f"\nEXCLUDE: {E}")
             print(f"\nSYM: ({c},{so},{ip})")
             sym_opts = SymOpts(comm=c, same_op=so, input_perm=ip)
@@ -110,30 +104,31 @@ def test_isa(pat_en_t):
                 #print(rule)
                 #print("*"*80)
                 pass
-            rd.rdb.pickle_time(pfile)
-            rd.rdb.save("rule", rfile)
-            gen_time = time()
-            #db = rd.rdb
-            pre_rules = len(rd.rdb)
-            ##db.post_filter()
-            ##post_time = time()
-            gen_delta = round(gen_time - start_time, 4)
-            ##post_delta = round(post_time - gen_time, 4)
-            print(f"PRE: ({pre_rules}, {gen_delta})")
-            continue
-            ##print(f"POST: ({len(db)}, {post_delta})")
-            #table = db.sort(maxIR, maxISA)
-            #for l in range(1,maxIR+1):
-            #    for r in range(1,maxISA+1):
-            #        print(f"[{l}][{r}] = {table[l][r]}")
+            #rd.rdb.pickle_time(pfile)
+            #rd.rdb.save("rule", rfile)
+            dbs.append(rd.rdb)
 
-            #for ri, rule in enumerate(db.rules):
-            #    print("*"*80)
-            #    print(rule)
-         #dbs = []
-        #for k,(p, db) in tot.items():
-        #    print(k, p)
-        #    #db.p()
-        #    dbs.append(db)
-        #dbs[0].diff(dbs[1])
+    edb = dbs[0]
+    nedb = dbs[1]
+    e_times = []
+    ne_times = []
+    ne_extra = []
+    for ner in nedb.rules:
+        er = edb.get(ner)
+        if er is None:
+            ne_extra.append(ner.time)
+        else:
+            e_times.append(er.time)
+            ne_times.append(ner.time)
+    v = dict(
+        e=e_times,
+        ne=ne_times,
+        nee=ne_extra,
+    )
+    with open(pfile, 'wb') as f:
+        pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
+
 

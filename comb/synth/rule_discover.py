@@ -86,13 +86,17 @@ class RuleDiscovery:
         for lN in range(1, self.maxL+1):
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             for lhs_ids in multicomb(lhs_mc_ids, lN):
-                assert all(id0<=id1 for id0,id1 in zip(lhs_ids[:-1],lhs_ids[1:]))
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
                 for rhs_ids in rhs_id_order:
+                    rhs_ops = [self.rhss[i] for i in rhs_ids]
                     if self.custom_filter(lhs_ids, rhs_ids):
                         continue
-                    yield (lhs_ids, rhs_ids)
+                    for (iT, oT) in self.gen_all_T2(lhs_ops, rhs_ops):
+                        k = (lhs_ids, rhs_ids, iT, oT)
+                        yield k
 
-    def num_combinations(self):
+
+    def num_queries(self):
         return sum(1 for _ in self.enum_buckets())
 
     def gen_all_T2(self, lhs_ops, rhs_ops):
