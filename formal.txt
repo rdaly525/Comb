@@ -55,6 +55,21 @@ flip o add == Add (Combinators)
 Structural Induction fdsasdfasf
 
 
+A(I1,O1,T1) P1(I1,O1,T1) => S1(O1,I1)
+A(I2,O2,T2) P2(I2,O2,T2) => S1(O2,I2)
+
+A(I1,O1,T1,I2,O2,T2) (P1(I1,O1,T1) & P2(I2,O2,T2)) => ((I1=I2) => (O1=O2))
+
+
+
+(C2 & L2) => S2
+
+
+
+
+
+
+
 
 
 

@@ -37,12 +37,12 @@ class ConstDiscover:
         with open(fname, 'r') as f:
             obj = compile_program(f.read())
         self.const_obj = obj
-        if self.maxIR > 4:
+        if self.maxIR > 5:
             raise NotImplementedError()
 
     def gen_const_specs(self, vals=[0]):
         #TODO use the typing of everything
-        N = 16
+        N = 8
         ea_consts = [] #extra arg
         const_specs = {} #Good specs for constants
         for val in vals:

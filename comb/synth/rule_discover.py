@@ -1,4 +1,5 @@
 import functools
+import timeit
 
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
@@ -52,10 +53,11 @@ class RuleDiscovery:
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
     custom_filter: tp.Callable = lambda x,y: False
-    pgf: bool = True #Preemtive Generative Filtering
-    igf: bool = True #Incremental Generative Filtering
+    pgf: bool = True
+    igf: bool = True
     const_synth: tp.Union[str, bool] = False
     const_vals: tp.Iterable[int] = (0,)
+    only_lhs_sym: bool = False
 
     def __post_init__(self):
         if self.opMaxL is None:
@@ -84,13 +86,17 @@ class RuleDiscovery:
         for lN in range(1, self.maxL+1):
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             for lhs_ids in multicomb(lhs_mc_ids, lN):
-                assert all(id0<=id1 for id0,id1 in zip(lhs_ids[:-1],lhs_ids[1:]))
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
                 for rhs_ids in rhs_id_order:
+                    rhs_ops = [self.rhss[i] for i in rhs_ids]
                     if self.custom_filter(lhs_ids, rhs_ids):
                         continue
-                    yield (lhs_ids, rhs_ids)
+                    for (iT, oT) in self.gen_all_T2(lhs_ops, rhs_ops):
+                        k = (lhs_ids, rhs_ids, iT, oT)
+                        yield k
 
-    def num_combinations(self):
+
+    def num_queries(self):
         return sum(1 for _ in self.enum_buckets())
 
     def gen_all_T2(self, lhs_ops, rhs_ops):
@@ -247,9 +253,6 @@ class RuleDiscovery:
             fc.And(iT_conds),
             cost <= exp_cost
         ])
-        #TODO
-        #print("DEBUG")
-        #print(f.serialize())
         for sol in smt_solve_all(f.to_hwtypes().value):
             r_cnt = {}
             for ri, rvar in rvars.items():
@@ -291,19 +294,24 @@ class RuleDiscovery:
                 print(f"Excluded Bad Patterns: {len(exclude_pats)}")
                 for rhs_ids in rhs_id_order:
                     rhs_ops = [self.rhss[i] for i in rhs_ids]
+                    if opts.log:
+                        print_kind(lhs_ids, rhs_ids)
                     for (iT, oT) in self.gen_all_T2(lhs_ops, rhs_ops):
+                        k = (lhs_ids, rhs_ids, iT, oT)
+                        if opts.log:
+                            print_iot(iT, oT)
                         if self.custom_filter(lhs_ids, rhs_ids):
                             continue
-                        if opts.log:
-                            print_kind(lhs_ids, rhs_ids)
 
                         #Discover all lhs pattern covers
                         if self.pgf:
+                            cstart = timeit.default_timer()
                             covers = list(self.all_rule_covers(lhs_ids, rhs_ids, iT, oT))
+                            ct = timeit.default_timer() - cstart
+                            self.rdb.add_cover_time(k, ct)
                         else:
                             covers = []
-                        if opts.log:
-                            print_iot(iT, oT)
+
                         info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
                         rs = RuleSynth(
                             iT,
@@ -312,6 +320,7 @@ class RuleDiscovery:
                             rhs_op_list=rhs_ops,
                             pat_en_t=self.pat_en_t,
                             sym_opts=self.sym_opts,
+                            only_lhs_sym=self.only_lhs_sym,
                         )
                         assert rs.lhs_cs.types_viable and rs.rhs_cs.types_viable
                         for cover in covers:

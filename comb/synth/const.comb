@@ -58,6 +58,19 @@ Out o : BV[N]
 o = [N]'h[val]
 
 
+# const
+Comb bad.c6
+Param N: Int
+Param val: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+In i4 : BV[N]
+In i5 : BV[N]
+Out o : BV[N]
+o = [N]'h[val]
+
 
 
 # identity
@@ -102,5 +115,18 @@ In i1 : BV[N]
 In i2 : BV[N]
 In i3 : BV[N]
 In i4 : BV[N]
+Out o : BV[N]
+o = i0
+
+
+# identity
+Comb bad.id6
+Param N: Int
+In i0 : BV[N]
+In i1 : BV[N]
+In i2 : BV[N]
+In i3 : BV[N]
+In i4 : BV[N]
+In i5 : BV[N]
 Out o : BV[N]
 o = i0

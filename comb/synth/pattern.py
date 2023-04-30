@@ -297,6 +297,9 @@ class Pattern:
         comb = CombProgram(QSym(ns, name), stmts)
         return comb
 
+    @staticmethod
+    def from_comb(comb: CombProgram) -> 'Pattern':
+        raise NotImplementedError()
 
 
 class PatternEncoding:
