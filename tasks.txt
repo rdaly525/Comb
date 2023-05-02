@@ -1,3 +1,14 @@
+Current tasks
+    get res_dup running for all tasks
+
+
+
+
+
+
+
+
+
 Current:
     Wrote sym_same_op for comb and adj
     Want to test it

@@ -3,6 +3,7 @@ import timeit
 
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, IntValue
+from comb.synth.comb_encoding import CombEncoding
 from comb.synth.const_synth import ConstDiscover
 from comb.synth.pattern import PatternEncoding, SymOpts
 from comb.synth.rule import Rule, RuleDatabase
@@ -45,19 +46,11 @@ def print_kind(l_ids, r_ids):
 class RuleDiscovery:
     lhss: tp.List[Comb]
     rhss: tp.List[Comb]
-    costs: tp.List[int]
     maxL: int
     maxR: int
-    pat_en_t: tp.Type[PatternEncoding]
-    sym_opts: SymOpts
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
-    custom_filter: tp.Callable = lambda x,y: False
-    pgf: bool = True
-    igf: bool = True
-    const_synth: tp.Union[str, bool] = False
-    const_vals: tp.Iterable[int] = (0,)
-    only_lhs_sym: bool = False
+    pat_en_t: tp.Type[PatternEncoding] = CombEncoding
 
     def __post_init__(self):
         if self.opMaxL is None:
@@ -69,7 +62,66 @@ class RuleDiscovery:
         self.rdb: RuleDatabase = RuleDatabase()
         self.lhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.lhss)}
         self.rhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.rhss)}
-        assert len(self.costs) == len(self.rhss)
+
+    def allT(self, lhs_ops, rhs_ops):
+        def get_cnt(op, k):
+            return {T:len(ids) for T, ids in types_to_nTs(op.get_type()[k]).items()}
+
+        def count(l):
+            ret = {}
+            for d in l:
+                for n, v in d.items():
+                    ret[n] = ret.get(n, 0) + v
+            return ret
+
+        lhs_iTs = count([get_cnt(op, 0) for op in lhs_ops])
+        lhs_oTs = count([get_cnt(op, 1) for op in lhs_ops])
+        rhs_iTs = count([get_cnt(op, 0) for op in rhs_ops])
+        rhs_oTs = count([get_cnt(op, 1) for op in rhs_ops])
+        assert all(len(Ts) <= 1 for Ts in (lhs_oTs,lhs_iTs,rhs_oTs,rhs_iTs))
+        T = list(lhs_oTs.keys())[0]
+        #assert all(T in Ts for Ts in (lhs_oTs,lhs_iTs,rhs_oTs,rhs_iTs))
+        l_max = lhs_iTs.get(T,0) - lhs_oTs[T] + 1
+        r_max = rhs_iTs[T] - rhs_oTs[T] + 1
+        i_max = min(l_max, r_max)
+        for n in reversed(range(1,i_max+1)):
+            yield ((T,)*n, (T,))
+
+    def gen_all_rules(self, E, ir_opts, narrow_opts, opts=SolverOpts()):
+        enum_time = 0
+        for lN in range(1, self.maxL+1):
+            lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
+            for lhs_ids in multicomb(lhs_mc_ids, lN):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                for rN in range(1, self.maxR+1):
+                    rhs_mc_ids = flat([[i for _ in range(self.opMaxR[i])] for i in range(len(self.rhss))])
+                    for rhs_ids in multicomb(rhs_mc_ids, rN):
+                        rhs_ops = [self.rhss[i] for i in rhs_ids]
+                        if opts.log:
+                            print_kind(lhs_ids, rhs_ids)
+                        for (iT, oT) in self.allT(lhs_ops, rhs_ops):
+                            #k = (lhs_ids, rhs_ids, iT, oT)
+                            if opts.log:
+                                print_iot(iT, oT)
+                            info = ((tuple(lhs_ids), tuple(rhs_ids)), (iT, oT))
+                            rs = RuleSynth(
+                                iT,
+                                oT,
+                                lhs_op_list=lhs_ops,
+                                rhs_op_list=rhs_ops,
+                                ir_opts=ir_opts,
+                                narrow_opts=narrow_opts,
+                                pat_en_t=self.pat_en_t,
+                            )
+                            for rule in rs.CEGISAll(E, opts):
+                                assert rule.verify()
+                                self.rdb.add_rule(rule, 0)
+                                yield rule
+                            if E:
+                                enum_time += sum(rs.enum_times)
+        self.rdb.add_enum_time(enum_time)
+
+
 
     #Returns the order of rhs ids sorted by cost
     def gen_rhs_order(self):
@@ -98,46 +150,6 @@ class RuleDiscovery:
 
     def num_queries(self):
         return sum(1 for _ in self.enum_buckets())
-
-    def gen_all_T2(self, lhs_ops, rhs_ops):
-        def get_cnt(op, k):
-            return {T:len(ids) for T, ids in types_to_nTs(op.get_type()[k]).items()}
-
-        def count(l):
-            ret = {}
-            for d in l:
-                for n, v in d.items():
-                    ret[n] = ret.get(n, 0) + v
-            return ret
-
-        lhs_iTs = count([get_cnt(op, 0) for op in lhs_ops])
-        lhs_oTs = count([get_cnt(op, 1) for op in lhs_ops])
-        rhs_iTs = count([get_cnt(op, 0) for op in rhs_ops])
-        rhs_oTs = count([get_cnt(op, 1) for op in rhs_ops])
-        if len(lhs_oTs) > 1 or len(rhs_oTs) > 1:
-            raise NotImplementedError()
-        max_lhs_oT = {T:1 for T in lhs_oTs.keys()}
-        max_lhs_iT = {T:(cnt-(lhs_oTs.get(T,0) - max_lhs_oT.get(T, 0))) for T,cnt in lhs_iTs.items()}
-        max_rhs_oT = {T:1 for T in rhs_oTs.keys()}
-        max_rhs_iT = {T:(cnt-(rhs_oTs.get(T,0) - max_rhs_oT.get(T, 0))) for T,cnt in rhs_iTs.items()}
-
-        i_keys = set(max_lhs_iT.keys()) | set(max_rhs_iT.keys())
-        o_keys = set(max_lhs_oT.keys()) | set(max_rhs_oT.keys())
-        max_iT = {T: min(max_lhs_iT.get(T, 0), max_rhs_iT.get(T, 0)) for T in i_keys}
-        max_oT = {T: min(max_lhs_oT.get(T, 0), max_rhs_oT.get(T, 0)) for T in o_keys}
-
-        i_poss = {T:list(reversed(range(1,m+1))) for T,m in max_iT.items()}
-        o_poss = {T:list(reversed(range(1,m+1))) for T,m in max_oT.items()}
-        for ivs in it.product(*list(i_poss.values())):
-            iT = []
-            for T, v in zip(i_poss.keys(), ivs):
-                iT += [T for _ in range(v)]
-            for ovs in it.product(*list(o_poss.values())):
-                oT = []
-                for T, v in zip(o_poss.keys(), ovs):
-                    oT += [T for _ in range(v)]
-                assert len(oT) == 1
-                yield (tuple(iT), tuple(oT))
 
     def gen_all_T1(self, ops):
         def get_cnt(op, k):
@@ -275,7 +287,7 @@ class RuleDiscovery:
         else:
             return ({}, {}), []
 
-    def gen_all(self, opts=SolverOpts()):
+    def gen_all_lc(self, opts=SolverOpts()):
         (ea_pats, const_specs), id_pats = self.get_ir_const(opts)
         lhs_exclude_pats = [id_pats] + list(ea_pats.values())
         #Update lhss

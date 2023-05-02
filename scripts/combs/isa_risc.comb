@@ -1,0 +1,37 @@
+# nand
+Comb isa.nand
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.and_[N](x0, x1)
+t1 = bv.not_[N](t0)
+o = t1
+
+# sub
+Comb isa.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.sub[N](x0, x1)
+o = t0
+
+# condition codes
+Comb isa.cmp_Z
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.sub[N](x0, x1)
+t1 = bv.eq[N](t0, [N]'h0)
+o = t1
+
+Comb isa.cmp_C
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.uge[N](x0, x1)
+o = t0
+

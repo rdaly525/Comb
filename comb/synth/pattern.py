@@ -1,14 +1,13 @@
 import functools
 from collections import namedtuple
-from functools import cache, cached_property
+from functools import cached_property
 import networkx as nx
 import hwtypes.smt_utils as fc
-from dataclasses import dataclass
-from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
+from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
 from .solver_utils import get_var
-from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, types_to_nTs, add_cnts, \
+from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, add_cnts, \
     ge0_cnts, sub_cnts, types_to_nT_cnts, flat
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
@@ -67,10 +66,10 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         else:
             if l_opi != r_opi:
                 return []
-        l_poss_args = [l.nodes[l_opi]]
+        l_poss_args = [l.children[l_opi]]
         #Find all possible commititive permutations
         if opts.comm and l_opi in range(l.num_ops):
-            l_args = l.nodes[l_opi] #[0,1,2,3]
+            l_args = l.children[l_opi] #[0,1,2,3]
             comm_info = l.ops[l_opi].comm_info
             assert all(isinstance(l, list) for l in comm_info)
             assert r.ops[r_opi].comm_info == comm_info
@@ -91,7 +90,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         for l_args in l_poss_args:
             ctxs = [ctx]
             #For each op argument
-            for l_src, r_src in zip(l_args, r.nodes[r_opi]):
+            for l_src, r_src in zip(l_args, r.children[r_opi]):
                 ctxs_ = []
                 for ctx_ in ctxs:
                     m_ctxs = match(l_src, r_src, ctx_)
@@ -103,64 +102,92 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         return matched
     return match(l_root, r_root, {})
 
+
+def filter_eq(f):
+    eq_set = set()
+    @functools.wraps(f)
+    def wrapped(*args, **kwargs):
+        for v in f(*args, **kwargs):
+            if v in eq_set:
+                continue
+            yield v
+    return wrapped
+
+#class Program:
+#    def __init__(self, ops: tp.List[Comb], P):
+#        self.ops = ops
+#        I, O, IK, OK = P
+#        assert len(IK) == len(ops)
+#        assert len(OK) == len(ops)
+#        for i, op in enumerate(ops):
+#            iT, oT = op.get_type()
+#            assert len(oT) == 1
+#            assert len(iT) == len(IK[i])
+#            iT = [type_to_nT(t) for t in iT]
+#            assert all(t==iT[0] for t in iT)
+#        self.NI =
+#        self.p = (tuple(I), O, tuple(tuple(IKi) for IKi in IK), tuple(OK))
+#
+#    def __eq__(self, other:Pattern):
+#        if not isinstance(other, Pattern)
+#        pat =
+def add_to_set(s, x):
+  l = len(s)
+  s.add(x)
+  return len(s) != l
+
 class Pattern:
-    def __init__(self, iT, oT, ops: tp.List[Comb]):
-        assert all(T.n >=0 for T in iT)
-        assert all(T.n >=0 for T in oT)
-        if len(oT) > 1:
-            raise NotImplementedError()
+    def __init__(self, iT, oT, ops: tp.List[Comb], P):
         self.iT = iT
         self.oT = oT
+        assert len(oT) == 1
+        self.T = oT[0]
+        assert all(self.T == T for T in self.iT)
         self.ops = ops
-        self.node_range = range(-1, len(ops)+1)
-        self.edges = []
-        self.op_iTs = []
-        self.op_oTs = []
-        for op in ops:
+        I, O, IK, OK = P
+        self.prog = (tuple(I), O[0], tuple(tuple(IKi) for IKi in IK), tuple(OKi[0] for OKi in OK))
+        I, O, IK, OK = self.prog
+        assert len(IK) == len(ops)
+        assert len(IK) == len(ops)
+        for i, op in enumerate(ops):
             iT, oT = op.get_type()
-            self.op_iTs.append([type_to_nT(t) for t in iT])
-            self.op_oTs.append([type_to_nT(t) for t in oT])
-        self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
-        self.root = (len(ops), 0) #TODO only works for single output
-
-    #Produces the maximum typing for these set of ops
-    #@cached_property
-    #def max_T(self):
-    #    [_list_to_counts(iTs) for iTs in self.op_iTs]
-
-
+            assert len(oT) == 1
+            assert len(iT) == len(IK[i])
+            iT = [type_to_nT(t) for t in iT]
+            assert all(t==iT[0] for t in iT)
+        self.NI = len(I)
+        self.num_ops = len(ops)
+        src_to_node = {i:(-1,i) for i in range(self.NI)}
+        src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
+        snk_to_node = {}
+        self.root = (len(ops), 0)
+        self.children = [[None for _ in IKi] for IKi in IK] + [[None]]
+        self.edges = []
+        for i, IKi in enumerate((*IK, (O,))):
+            for j, l in enumerate(IKi):
+                if l < self.NI:
+                    src = (-1, l)
+                else:
+                    assert l in OK
+                    src = (OK.index(l), 0)
+                snk = (i, j)
+                assert src is not None
+                self.edges.append((src, snk))
+                self.children[snk[0]][snk[1]] = src
+        assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
+        #Precompute comm info
+        self.comm = [op.comm_info for op in self.ops]
     @cached_property
     def op_names(self):
         return [op.qualified_name for op in self.ops]
 
     @cached_property
-    def op_names_with_io(self):
-        return [op.qualified_name for op in self.ops] + ["IO"]
-
+    def name(self):
+        return "[" + ",".join(s for s in self.op_names) + "]"
 
     @cached_property
-    def num_ops(self):
-        return len(self.ops)
-
-    def add_edge(self, src, snk):
-        assert len(src)==2 and len(snk)==2
-        assert src[0] in self.node_range
-        assert snk[0] in self.node_range
-        if src[0] == -1:
-            src_t = self.iT[src[1]]
-        else:
-            src_t = self.op_oTs[src[0]][src[1]]
-
-        if snk[0] == self.num_ops:
-            snk_t = self.oT[snk[1]]
-        else:
-            snk_t = self.op_iTs[snk[0]][snk[1]]
-        if src_t != snk_t:
-            raise ValueError()
-            assert src_t == snk_t
-        self.edges.append((src, snk))
-        # snk, snk -> src
-        self.nodes[snk[0]][snk[1]] = src
+    def op_names_with_io(self):
+        return [op.qualified_name for op in self.ops] + ["IO"]
 
     @property
     def interior_edges(self):
@@ -182,19 +209,55 @@ class Pattern:
     def op_cnt(self):
         return _list_to_counts(self.op_names)
 
-
-    def enum_all_equal(self):
-        #Does all the symmetries
-        for es_ip in self.enum_input_perm(self.edges):
+    def enum_all_equal(self, en_I):
+        eq_set = set()
+        for es_ip in self.enum_input_perm(self.edges, en_I):
             for es_so in self.enum_same_op(es_ip):
                 for es_c in self.enum_comm(es_so):
-                    p = Pattern(self.iT, self.oT, self.ops)
-                    for e in es_c:
-                        p.add_edge(*e)
-                    yield p
+                    for prog in self.enum_prog(es_c):
+                        #yield prog
+                        if add_to_set(eq_set, prog):
+                            yield prog
 
-    def enum_input_perm(self, edges):
-        yield edges
+    def enum_prog(self, edges):
+        I, O, IK, OK = self.prog
+        IK = [[None for _ in IKi] for IKi in IK]
+        OK = [None for _ in OK]
+        g = nx.DiGraph()
+        for (src, _), (snk, _) in edges:
+            g.add_edge(src, snk)
+        #Force inouts to be first
+        for opi in range(self.num_ops+1):
+            g.add_edge(-1, opi)
+
+        for order in nx.all_topological_sorts(g):
+            #OK = [o+self.NI for o in order]
+            for l, opi in enumerate(order[1:-1]):
+                OK[opi] = l + self.NI
+            #Set all of IK and O
+            for (srci, srca), (snki, snka) in edges:
+                if srci==-1:
+                    src_l = srca
+                else:
+                    src_l = OK[srci]
+                if snki==self.num_ops:
+                    assert snka == 0
+                    O = src_l
+                else:
+                    IK[snki][snka] = src_l
+            if not all(l is not None for l in OK):
+                print(OK)
+                raise ValueError
+            assert all(l is not None for l in OK)
+            assert all(all(l is not None for l in IKi) for IKi in IK)
+            yield (I, O, tuple(tuple(IKi) for IKi in IK), tuple(OKi for OKi in OK))
+
+
+    def enum_input_perm(self, edges, en):
+        if not en:
+            yield edges
+        else:
+            raise NotImplementedError
 
     def enum_comm(self, edges):
         for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
@@ -248,24 +311,28 @@ class Pattern:
     def gt(self, other, opts: SymOpts):
         raise NotImplementedError()
 
-
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
-        return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
+        #return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
+        return ret + "\n  " + str(self.prog)
 
     def __hash__(self):
         return hash(str(self))
 
     #TODO verify this works
     def to_comb(self, ns="C", name="C") -> CombProgram:
-
+        I, O, IK, OK = self.prog
+        T = self.T
         #Create symbol mapping
-        src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(self.iT))}
+        src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
         for opi in range(self.num_ops):
-            src_to_sym.update({(opi, i):Sym(f"t{opi}_{i}") for i in range(len(self.op_oTs[opi]))})
+            src_to_sym.update({(opi, 0):Sym(f"t{opi}_{0}")})
 
         snk_to_sym = {}
         for src, snk in self.edges:
+            if src not in src_to_sym:
+                print(src, snk)
+                raise ValueError
             assert src in src_to_sym
             snk_to_sym[snk] = src_to_sym[src]
         src_to_sym.update({(self.num_ops, i): Sym(f"O{i}") for i in range(len(self.oT))})
@@ -275,8 +342,8 @@ class Pattern:
 
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
-            lhss = [src_to_sym[(opi, i)] for i in range(len(self.op_oTs[opi]))]
-            args = [snk_to_sym[(opi, i)] for i in range(len(self.op_iTs[opi]))]
+            lhss = [src_to_sym[(opi, 0)]]
+            args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
         out_lhs = [src_to_sym[(self.num_ops, i)] for i in range(len(self.oT))]
@@ -286,7 +353,11 @@ class Pattern:
         g = nx.DiGraph()
         for (src, _), (snk, _) in self.edges:
             g.add_edge(src, snk)
-        order = list(nx.topological_sort(g))
+        try:
+            order = list(nx.topological_sort(g))
+        except nx.NetworkXException:
+            print(g)
+            raise ValueError
 
         #Could be a constant
         #Remove inputs from order
@@ -310,7 +381,6 @@ class PatternEncoding:
         op_list: tp.List[Comb],
         const_list: tp.Tuple[int] = (),
         prefix: str = "",
-        sym_opts: SymOpts = SymOpts(),
     ):
         self.iT = iT
         self.oT = oT
@@ -318,8 +388,6 @@ class PatternEncoding:
         self.op_list = op_list
         self.const_list = const_list
         self.prefix = prefix
-        self.sym_opts = sym_opts
-
 
         if len(self.const_list) > 0:
             raise NotImplementedError()
@@ -348,6 +416,29 @@ class PatternEncoding:
         self.op_out_vars = op_out_vars
         self.op_in_vars = op_in_vars
         self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
+
+
+    @property
+    def L(self):
+        raise NotImplementedError
+
+    def P_iropt(self, dce, cse):
+        assert not cse
+        P_iropt = []
+        if dce:
+            P_iropt.append(self.P_dse)
+        if cse:
+            P_iropt.append(self.P_cse)
+        return fc.And(P_iropt)
+
+    def P_narrow(self, C, K):
+        P_narrow = []
+        if C:
+            P_narrow.append(self.P_comm)
+        if K:
+            P_narrow.append(self.P_K)
+        return fc.And(P_narrow)
+
 
     @property
     def P_lib(self):
@@ -378,17 +469,6 @@ class PatternEncoding:
     def P_sym_input_perm(self):
         raise NotImplementedError()
 
-    @property
-    def P_sym(self):
-        P_sym = []
-        if self.sym_opts.comm:
-            P_sym.append(self.P_sym_comm)
-        if self.sym_opts.same_op:
-            P_sym.append(self.P_sym_same_op)
-        if self.sym_opts.input_perm:
-            P_sym.append(self.P_sym_input_perm)
-        return fc.And(P_sym)
-
     @cached_property
     def num_ops(self):
         return len(self.op_list)
@@ -411,7 +491,9 @@ class PatternEncoding:
     @cached_property
     def types_viable(self):
         iTs = _list_to_counts(self.iT)
+        assert len(iTs.keys())==1
         oTs = _list_to_counts(self.oT)
+        assert len(oTs.keys())==1
         op_iTs = [types_to_nT_cnts(op.get_type()[0]) for op in self.op_list]
         op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
         snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))
@@ -419,6 +501,5 @@ class PatternEncoding:
         if set(snks.keys()) != set(srcs.keys()):
             return False
         return ge0_cnts(sub_cnts(snks, srcs))
-
 
 

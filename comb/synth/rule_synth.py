@@ -1,4 +1,5 @@
 import functools
+import timeit
 
 from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
@@ -145,71 +146,74 @@ class RuleSynth(Cegis):
         oT: tp.List[nT],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
+        ir_opts,
+        narrow_opts,
         pat_en_t: tp.Type[PatternEncoding],
-        sym_opts: SymOpts,
-        only_lhs_sym: bool = False
     ):
-        l_sym_opts = sym_opts
-        if only_lhs_sym:
-            r_sym_opts = SymOpts(False,False,False)
-        else:
-            r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
         self.iT = iT
         self.oT = oT
-        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
-        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=r_sym_opts)
-        if lhs_cs.types_viable and rhs_cs.types_viable:
-            self.lhs_cs = lhs_cs
-            self.rhs_cs = rhs_cs
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
+        assert lhs_cs.types_viable and rhs_cs.types_viable
+        self.lhs_cs = lhs_cs
+        self.rhs_cs = rhs_cs
+        self.enum_times = []
+        self.ir_opts = ir_opts
+        self.narrow_opts = narrow_opts
 
-            P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
-            P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
+        P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
+        P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-            #Final query:
-            #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-            query = fc.And([
-                lhs_cs.P_sym,
-                rhs_cs.P_sym,
-                lhs_cs.P_wfp,
-                rhs_cs.P_wfp,
+        #Final query:
+        #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
+        query = fc.And([
+            lhs_cs.P_iropt(*ir_opts),
+            lhs_cs.P_narrow(*narrow_opts),
+            lhs_cs.P_wfp,
+            rhs_cs.P_iropt(*ir_opts),
+            rhs_cs.P_narrow(*narrow_opts),
+            rhs_cs.P_wfp,
+            fc.Implies(
+                fc.And([
+                    lhs_cs.P_lib,
+                    lhs_cs.P_conn,
+                    rhs_cs.P_lib,
+                    rhs_cs.P_conn,
+                ]),
                 fc.Implies(
-                    fc.And([
-                        lhs_cs.P_lib,
-                        lhs_cs.P_conn,
-                        rhs_cs.P_lib,
-                        rhs_cs.P_conn,
-                    ]),
-                    fc.Implies(
-                        fc.And(P_inputs),
-                        fc.And(P_outputs),
-                    )
+                    fc.And(P_inputs),
+                    fc.And(P_outputs),
                 )
-            ])
+            )
+        ])
+        #print(query.serialize())
+        #assert 0
+        query = query.to_hwtypes()
+        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
+        super().__init__(query, E_vars)
 
-            query = query.to_hwtypes()
 
-            #wfp = fc.And([
-            #    lhs_cs.P_sym,
-            #    rhs_cs.P_sym,
-            #    lhs_cs.P_wfp,
-            #    rhs_cs.P_wfp,
-            #])
+    # E whether represents to exclude all equivalent rules
+    def CEGISAll(self, E, opts: SolverOpts):
+        for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
+            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
+            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
+            rule = Rule(i, lhs_pat, rhs_pat, t)
+            yield rule
+            if E:
+                #Exclude full rule.
+                L_IR = self.lhs_cs.L
+                L_ISA = self.rhs_cs.L
+                start = timeit.default_timer()
+                rule_cond = rule.ruleL(L_IR, L_ISA)
+                delta = timeit.default_timer() - start
+                self.enum_times.append(delta)
+                self.query = self.query & ~rule_cond
 
-            #xl = fc.And([lhs_cs.P_lib, lhs_cs.P_conn]).to_hwtypes()
-            #xr = fc.And([rhs_cs.P_lib, rhs_cs.P_conn]).to_hwtypes()
 
-            ##Substitute all of Ir and Or in xr with Il and Ol
-            #subs = []
-            #for Il, Ir in zip(lhs_cs.input_vars, rhs_cs.input_vars):
-            #    subs.append((Il, Ir))
-            ##for Ol, Or in zip(lhs_cs.output_vars, rhs_cs.output_vars):
-            ##    subs.append((Ol, Or))
-            #sub_xr = xr.substitute(*subs)
-            #query = wfp.to_hwtypes() & (~(xl==sub_xr) | fc.And(P_outputs).to_hwtypes())
 
-            #print(query.serialize())
-            E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-            super().__init__(query, E_vars)
+
+
 
     #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
     #def _match_pattern(self, p: Pattern, ri_op_ids):

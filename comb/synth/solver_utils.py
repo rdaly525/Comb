@@ -58,7 +58,7 @@ class Cegis:
     query: ht.SMTBit
     E_vars: tp.Iterable['freevars']
 
-    def cegis(self, opts: SolverOpts = SolverOpts(), exclude_list=[]):
+    def cegis(self, prev_sol, opts: SolverOpts = SolverOpts()):
         if opts.verbose==2:
             show_e = True
             show_iter = True
@@ -69,14 +69,14 @@ class Cegis:
             show_e = False
             show_iter = False
         #assert opts.max_iters > 0
-        query = self.query.value
         #print("Query Size:", smt.get_formula_size(query))
-        for sol in exclude_list:
+        if prev_sol is not None:
+            query = self.query.value
             sol_term = smt.Bool(True)
-            for var, val in sol.items():
+            for var, val in prev_sol.items():
                 sol_term = smt.And(sol_term, smt.EqualsOrIff(var, val))
-            query = smt.And(query, smt.Not(sol_term))
-
+            self.query = ht.SMTBit(smt.And(query, smt.Not(sol_term)))
+        query = self.query.value
         #get exist vars:
         E_vars = set(var.value for var in self.E_vars)  # exist_vars
         A_vars = query.get_free_variables() - E_vars  # forall vars
@@ -118,10 +118,12 @@ class Cegis:
 
 
     #enum_fun takes a single solution and enumerates all 'permutations' of that solution to add to the exclude list
-    def cegis_all(self, opts: SolverOpts = SolverOpts(), enum_fun=None):
-        exclude_list = []
+    def cegis_all(self, exclude_prev: bool, opts: SolverOpts = SolverOpts()):
+        prev = None
         while True:
-            sol, t = self.cegis(opts, exclude_list=exclude_list)
+            sol, t = self.cegis(prev_sol=prev, opts=opts)
+            if sol is not None:
+                assert sol != prev
             if opts.log:
                 if isinstance(sol, IterLimitError):
                     k = 'MAX'
@@ -134,11 +136,8 @@ class Cegis:
                 break
             if sol is None:
                 break
-            if enum_fun is not None:
-                new_exclude = list(enum_fun(sol))
-                exclude_list += new_exclude
-            else:
-                exclude_list.append(sol)
+            if exclude_prev:
+                prev = sol
             yield sol, t
 
 

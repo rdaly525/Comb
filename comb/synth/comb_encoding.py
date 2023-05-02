@@ -64,9 +64,14 @@ class CombEncoding(PatternEncoding):
             for n, ids in _list_to_dict(oT).items():
                 self.src_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
+        assert len(self.src_n.keys())==1
+        assert len(self.snk_n.keys())==1
+        assert all(len(out_lvars)==1 for out_lvars in self.op_out_lvars)
 
 
-
+    @property
+    def L(self):
+        return self.input_lvars, self.output_lvars[0], self.op_in_lvars, [lvars[0] for lvars in self.op_out_lvars]
 
     @property
     def P_conn(self):
@@ -126,21 +131,6 @@ class CombEncoding(PatternEncoding):
             P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
         return fc.And(P_acyc)
 
-    @property
-    def P_used_source(self):
-        def rhss():
-            for lvar in flat(self.op_in_lvars):
-                yield lvar
-            for lvar in self.output_lvars:
-                yield lvar
-
-        #All vars are used
-        used = self.lvar_t(0)
-        for lvar_rhs in rhss():
-            used |= (self.lvar_t(1) << lvar_rhs)
-        P_used = (used == (2**self.tot_locs)-1)
-        return P_used
-
     #Restricts snks to only allow for same type sources
     @property
     def P_well_typed(self):
@@ -167,64 +157,23 @@ class CombEncoding(PatternEncoding):
         return fc.And(P_cse)
 
     @property
-    def P_wfp(self):
-        P_wfp = [
-            self.P_in_range,
-            self.P_loc_unique,
-            self.P_multi_out,
-            self.P_well_typed,
-            self.P_acyc,
-            self.P_used_source,
-            self.P_cse,
-        ]
-        return fc.And(P_wfp)
+    def P_dse(self):
+        def rhss():
+            for lvar in flat(self.op_in_lvars):
+                yield lvar
+            for lvar in self.output_lvars:
+                yield lvar
 
+        #All vars are used
+        used = self.lvar_t(0)
+        for lvar_rhs in rhss():
+            used |= (self.lvar_t(1) << lvar_rhs)
+        P_used = (used == (2**self.tot_locs)-1)
+        return P_used
 
 
     @property
-    def P_sym_same_op(self):
-        assert self.sym_opts.same_op
-        #Tactic: Same as the input_perm tactic
-
-        #For each op kind
-        ops = _list_to_dict([op.qualified_name for op in self.op_list])
-        P_same_op = []
-        for op_name, op_ids in ops.items():
-            if len(op_ids) == 1:
-                continue
-
-            op = self.op_list[op_ids[0]]
-            op_iT, op_oT = op.get_type()
-            if len(op_oT) > 1:
-                raise NotImplementedError()
-            n = type_to_nT(op_oT[0])
-            snks = sorted(self.snk_n[n].keys())
-            op_snks = []
-            for opi in op_ids:
-                op_snks += [snk for snk in snks if snk[0]==opi]
-            snks = op_snks + [snk for snk in snks if snk not in op_snks]
-            self.op_to_sorted_snks[op_name] = snks
-            ens = [] #ens[opi][snk]
-            for opi in op_ids:
-                src_lvar = self.op_out_lvars[opi][0]
-                lvars = {snk:self.snk_n[n][snk].lvar==src_lvar for snk in snks}
-                ens.append(lvars)
-
-            conds = []
-            used = [ht.SMTBit(0) for _ in op_ids]
-            for snk in snks:
-                lvars = [ens[opi][snk] for opi in range(len(op_ids))]
-                op_conds = []
-                for ui, u in enumerate(used[:-1]):
-                    op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
-                used = [u | lvars[ui] for ui, u in enumerate(used)]
-                conds.append(fc.And(op_conds))
-            P_same_op.append(fc.And(conds))
-        ret = fc.And(P_same_op)
-        return ret
-
-    @property
-    def P_sym_comm(self):
+    def P_comm(self):
         #Strict ordering on arguments of commutative ops
         P_comm = []
         for i, op in enumerate(self.op_list):
@@ -236,29 +185,56 @@ class CombEncoding(PatternEncoding):
         return fc.And(P_comm)
 
     @property
-    def P_sym_input_perm(self):
-        assert self.sym_opts.input_perm
-        input_T = _list_to_dict(self.iT)
+    def P_K(self):
+        #Strict ordering on same-kind ops
+        P_K = []
+        ops = _list_to_dict([op.qualified_name for op in self.op_list])
+        for op_name, op_ids in ops.items():
+            if len(op_ids) ==1:
+                continue
+            o_lvars = [self.op_out_lvars[i][0] for i in op_ids]
+            for lv0, lv1 in zip(o_lvars[:-1], o_lvars[1:]):
+                P_K.append(lv0 < lv1)
 
-        # Create a set of all sources/snks sorted by type
-        P_perms = []
-        for n, ids in input_T.items():
-            snk_dict = self.snk_n[n]
-            src_dict = self.src_n[n]
-            snks = sorted(snk_dict.keys())
-            P_perm = []
-            used = [ht.SMTBit(0) for _ in ids]
-            for snk in snks:
-                snk_lvar = snk_dict[snk].lvar
-                lvars = [snk_lvar == src_dict[(-1, id)].lvar for id in ids]
-                i_perm = []
-                for ui, u in enumerate(used[:-1]):
-                    i_perm.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
-                used = [u | lvars[ui] for ui, u in enumerate(used)]
-                P_perm.append(fc.And(i_perm))
-            P_perms.append(fc.And(P_perm))
-        ret = fc.And(P_perms)
-        return ret
+        return fc.And(P_K)
+
+    @property
+    def P_wfp(self):
+        P_wfp = [
+            self.P_in_range,
+            self.P_loc_unique,
+            self.P_multi_out,
+            self.P_well_typed,
+            self.P_acyc,
+        ]
+        return fc.And(P_wfp)
+
+
+
+    #@property
+    #def P_sym_input_perm(self):
+    #    assert self.sym_opts.input_perm
+    #    input_T = _list_to_dict(self.iT)
+
+    #    # Create a set of all sources/snks sorted by type
+    #    P_perms = []
+    #    for n, ids in input_T.items():
+    #        snk_dict = self.snk_n[n]
+    #        src_dict = self.src_n[n]
+    #        snks = sorted(snk_dict.keys())
+    #        P_perm = []
+    #        used = [ht.SMTBit(0) for _ in ids]
+    #        for snk in snks:
+    #            snk_lvar = snk_dict[snk].lvar
+    #            lvars = [snk_lvar == src_dict[(-1, id)].lvar for id in ids]
+    #            i_perm = []
+    #            for ui, u in enumerate(used[:-1]):
+    #                i_perm.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
+    #            used = [u | lvars[ui] for ui, u in enumerate(used)]
+    #            P_perm.append(fc.And(i_perm))
+    #        P_perms.append(fc.And(P_perm))
+    #    ret = fc.And(P_perms)
+    #    return ret
 
     #def fix_comm(self, sol):
     #    comm_ids = [i for i, op in enumerate(self.op_list) if op.comm_info]
@@ -378,14 +354,8 @@ class CombEncoding(PatternEncoding):
         for opi, lvals in enumerate(op_out_lvals):
             lval_to_src.update({lval:(opi, i) for i, lval in enumerate(lvals)})
 
-        p = Pattern(self.iT, self.oT, self.op_list)
-        for opi, lvals in enumerate(op_in_lvals):
-            for i, lval in enumerate(lvals):
-                src = lval_to_src[lval]
-                p.add_edge(src, (opi, i))
-        for i, lval in enumerate(output_lvals):
-            src = lval_to_src[lval]
-            p.add_edge(src, (self.num_ops, i))
+        P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals)
+        p = Pattern(self.iT, self.oT, self.op_list, P)
         return p
 
 
@@ -459,6 +429,48 @@ class CombEncoding(PatternEncoding):
 
 
 
+
+    #@property
+    #def P_sym_same_op(self):
+    #    assert self.sym_opts.same_op
+    #    #Tactic: Same as the input_perm tactic
+
+    #    #For each op kind
+    #    ops = _list_to_dict([op.qualified_name for op in self.op_list])
+    #    P_same_op = []
+    #    for op_name, op_ids in ops.items():
+    #        if len(op_ids) == 1:
+    #            continue
+
+    #        op = self.op_list[op_ids[0]]
+    #        op_iT, op_oT = op.get_type()
+    #        if len(op_oT) > 1:
+    #            raise NotImplementedError()
+    #        n = type_to_nT(op_oT[0])
+    #        snks = sorted(self.snk_n[n].keys())
+    #        op_snks = []
+    #        for opi in op_ids:
+    #            op_snks += [snk for snk in snks if snk[0]==opi]
+    #        snks = op_snks + [snk for snk in snks if snk not in op_snks]
+    #        self.op_to_sorted_snks[op_name] = snks
+    #        ens = [] #ens[opi][snk]
+    #        for opi in op_ids:
+    #            src_lvar = self.op_out_lvars[opi][0]
+    #            lvars = {snk:self.snk_n[n][snk].lvar==src_lvar for snk in snks}
+    #            ens.append(lvars)
+
+    #        conds = []
+    #        used = [ht.SMTBit(0) for _ in op_ids]
+    #        for snk in snks:
+    #            lvars = [ens[opi][snk] for opi in range(len(op_ids))]
+    #            op_conds = []
+    #            for ui, u in enumerate(used[:-1]):
+    #                op_conds.append(fc.Implies(~u, fc.And([~lvar for lvar in lvars[ui+1:]])))
+    #            used = [u | lvars[ui] for ui, u in enumerate(used)]
+    #            conds.append(fc.And(op_conds))
+    #        P_same_op.append(fc.And(conds))
+    #    ret = fc.And(P_same_op)
+    #    return ret
 
 
     #def comb_from_solved(self, lvals, name: QSym):

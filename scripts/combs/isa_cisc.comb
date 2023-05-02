@@ -1,0 +1,32 @@
+# sub
+Comb isa.sub
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = bv.neg[N](x)
+
+# add
+Comb isa.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# add3
+Comb isa.add3
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+In x2 : BV[N]
+Out o : BV[N]
+t0 = bv.add[N](x0, x1)
+o = bv.add[N](t0, x2)
+
+# mul
+#Comb isa.mul
+#Param N: Int
+#In x0 : BV[N]
+#In x1 : BV[N]
+#Out o : BV[N]
+#o = bv.mul[N](x0, x1)

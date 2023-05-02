@@ -1,0 +1,141 @@
+#Constants
+Comb irC.C
+Param N: Int
+Param val: Int
+Out o : BV[N]
+o = bv.const[N, val]()
+
+# bitwise
+
+Comb irBW.bvnot
+Param N: Int
+In x0 : BV[N]
+Out o : BV[N]
+o = bv.not_[N](x0)
+
+Comb irBW.bvand
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.and_[N](x0, x1)
+
+Comb irBW.bvor
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.or_[N](x0, x1)
+
+Comb irBW.bvxor
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.xor[N](x0, x1)
+
+
+#Comparison ops
+
+Comb irCMP.bveq
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.eq[N](x0, x1)
+
+Comb irCMP.bvneq
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.neq[N](x0, x1)
+
+Comb irCMP.bvult
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.ult[N](x0, x1)
+
+Comb irCMP.bvslt
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.slt[N](x0, x1)
+
+Comb irCMP.bvule
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.ule[N](x0, x1)
+
+Comb irCMP.bvsle
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sle[N](x0, x1)
+
+Comb irCMP.bvugt
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.ugt[N](x0, x1)
+
+Comb irCMP.bvsgt
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sgt[N](x0, x1)
+
+Comb irCMP.bvuge
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.uge[N](x0, x1)
+
+Comb irCMP.bvsge
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sge[N](x0, x1)
+
+
+#Arith
+# add
+Comb irAR.neg
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.neg[N](x0)
+
+Comb irAR.add
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# sub
+Comb irAR.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sub[N](x0, x1)
+
+# mul
+Comb irM.mul
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.mul[N](x0, x1)
