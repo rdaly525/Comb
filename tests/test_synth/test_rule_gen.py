@@ -110,7 +110,7 @@ def test_isa(pat_en_t):
                 #print(rule)
                 #print("*"*80)
                 pass
-            rd.rdb.pickle_time(pfile)
+            rd.rdb.pickle_info(pfile)
             rd.rdb.save("rule", rfile)
             gen_time = time()
             #db = rd.rdb

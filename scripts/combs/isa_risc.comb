@@ -1,3 +1,10 @@
+#id
+Comb isa.id
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = x
+
 # nand
 Comb isa.nand
 Param N: Int
@@ -17,7 +24,15 @@ Out o : BV[N]
 t0 = bv.sub[N](x0, x1)
 o = t0
 
+
 # condition codes
+Comb isa.flagInv
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+t0 = bv.xor[N](x, [N]'h1)
+o = t0
+
 Comb isa.cmp_Z
 Param N: Int
 In x0 : BV[N]
@@ -35,3 +50,18 @@ Out o : BV[N]
 t0 = bv.uge[N](x0, x1)
 o = t0
 
+Comb isa.cmp_N
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.nflag[N](x0, x1)
+o = t0
+
+Comb isa.cmp_V
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.nflag[N](x0, x1)
+o = t0

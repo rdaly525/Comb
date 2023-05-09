@@ -7,7 +7,8 @@ import hwtypes as ht
 from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
 from ..frontend.ir import AssignStmt, CombProgram
 from ..frontend.stdlib import make_bv_const
-from .pattern import PatternEncoding, Pattern
+from .pattern import Pattern
+from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
 from .utils import flat, _to_int, _list_to_dict, type_to_nT, types_to_nTs
 from hwtypes import SMTBitVector as SBV

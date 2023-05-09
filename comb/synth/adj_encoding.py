@@ -1,5 +1,6 @@
 
-from .pattern import PatternEncoding, Pattern
+from .pattern import Pattern
+from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
 import hwtypes as ht
 import hwtypes.smt_utils as fc

@@ -3,9 +3,10 @@ import timeit
 
 from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
-from .pattern import Pattern, SymOpts, PatternEncoding
+from .pattern import Pattern, enum_dags
+from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
-from .utils import _list_to_dict, bucket_combinations, flat, types_to_nTs, nT
+from .utils import _list_to_dict, bucket_combinations, flat, nT
 from .rule import Rule
 
 import hwtypes.smt_utils as fc
@@ -99,46 +100,6 @@ def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int,
     return fc.And(interior_edges), in_lvars, out_lvars
 
 
-def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
-    pat_iTs = [_list_to_dict(p.iT) for p in pats]
-    pat_oTs = [_list_to_dict(p.oT) for p in pats]
-
-    #Create a set of all sources/snks sorted by type
-    srcs = {n:[(-1, i) for i in ids] for n, ids in _list_to_dict(goal_iT).items()}
-    for pi, pat_oT in enumerate(pat_oTs):
-        for n, ids in pat_oT.items():
-            srcs.setdefault(n, []).extend((pi, i) for i in ids)
-    snks = {n:[(len(pats), i) for i in ids] for n, ids in _list_to_dict(goal_oT).items()}
-    for pi, pat_iT in enumerate(pat_iTs):
-        for n, ids in pat_iT.items():
-            snks.setdefault(n, []).extend((pi, i) for i in ids)
-
-
-    #This strategy will produce invalid graphs
-    #Easy filter to remove most of the bad connections
-    def invalid_edge(src, snk):
-        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
-    all_src = flat([srcs_ for srcs_ in srcs.values()])
-    def invalid_dag(edges):
-        used_srcs = set(src for src,_ in edges)
-        all_used = all(src in used_srcs for src in all_src)
-        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
-        return (not all_used) or bad_edge
-        #each source should be in edge list
-
-    src_poss = []
-    snk_list = []
-    for n, n_snks in snks.items():
-        snk_list += n_snks
-        src_poss += [srcs[n] for _ in n_snks]
-
-    graphs = []
-    for src_list in it.product(*src_poss):
-        edges = list(zip(src_list, snk_list))
-        if not invalid_dag(edges):
-            graphs.append(edges)
-    return graphs
-
 class RuleSynth(Cegis):
     def __init__(
         self,
@@ -194,26 +155,37 @@ class RuleSynth(Cegis):
 
 
     # E whether represents to exclude all equivalent rules
-    def CEGISAll(self, E, opts: SolverOpts):
+    def CEGISAll(self, E, LC, opts: SolverOpts):
+        self.enum_times = []
         for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
             lhs_pat = self.lhs_cs.pattern_from_sol(sol)
             rhs_pat = self.rhs_cs.pattern_from_sol(sol)
-            rule = Rule(i, lhs_pat, rhs_pat, t)
+            rule = Rule(lhs_pat, rhs_pat, i, t)
             yield rule
             if E:
                 #Exclude full rule.
-                L_IR = self.lhs_cs.L
-                L_ISA = self.rhs_cs.L
-                start = timeit.default_timer()
-                rule_cond = rule.ruleL(L_IR, L_ISA)
-                delta = timeit.default_timer() - start
-                self.enum_times.append(delta)
-                self.query = self.query & ~rule_cond
+                if LC:
+                    rp_cond, enum_time = self.patL(rule.lhs)
+                else:
+                    rp_cond, enum_time = self.ruleL(rule)
+                self.enum_times.append(enum_time)
+                self.query = self.query & ~rp_cond
 
+    def ruleL(self, rule:Rule):
+        L_IR = self.lhs_cs.L
+        L_ISA = self.rhs_cs.L
+        start = timeit.default_timer()
+        rule_cond = rule.ruleL(L_IR, L_ISA)
+        delta = timeit.default_timer() - start
+        return rule_cond, delta
 
-
-
-
+    #Only for IR pattern
+    def patL(self, pat: Pattern):
+        L_IR = self.lhs_cs.L
+        start = timeit.default_timer()
+        pat_cond = pat.patL(L_IR)
+        delta = timeit.default_timer() - start
+        return pat_cond, delta
 
     #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
     #def _match_pattern(self, p: Pattern, ri_op_ids):

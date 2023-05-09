@@ -9,7 +9,8 @@ import hwtypes as ht
 from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
 from ..frontend.ir import AssignStmt, CombProgram
 from ..frontend.stdlib import make_bv_const
-from .pattern import PatternEncoding, Pattern
+from .pattern import Pattern
+from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
 from .utils import flat, _to_int, _list_to_dict, type_to_nT
 from hwtypes import SMTBitVector as SBV
@@ -355,7 +356,7 @@ class CombEncoding(PatternEncoding):
             lval_to_src.update({lval:(opi, i) for i, lval in enumerate(lvals)})
 
         P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals)
-        p = Pattern(self.iT, self.oT, self.op_list, P)
+        p = Pattern(self.iT, self.oT, self.op_list, P, is_pat=False)
         return p
 
 
