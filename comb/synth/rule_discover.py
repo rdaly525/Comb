@@ -353,13 +353,32 @@ class RuleDiscovery:
 
     #Returns the order of rhs ids sorted by cost
     def gen_rhs_order(self, costs):
+        def cmp(v1, v2):
+            c1, ids1 = v1
+            c2, ids2 = v2
+            if c1 < c2:
+                return -1
+            elif c1 > c2:
+                return 1
+            if len(ids1) < len(ids2):
+                return -1
+            elif len(ids1) > len(ids2):
+                return 1
+            u1 = len(set(ids1))
+            u2 = len(set(ids2))
+            if u1 < u2:
+                return 1
+            else:
+                return -1
+
+
         rs = []
         for rN in range(1, self.maxR+1):
             rhs_mc_ids = flat([[i for _ in range(self.opMaxR[i])] for i in range(len(self.rhss))])
             for rhs_ids in multicomb(rhs_mc_ids, rN):
                 cost = sum(costs[i] for i in rhs_ids)
                 rs.append((cost,rhs_ids))
-        return [tuple(rhs_ids) for _, rhs_ids in sorted(rs)]
+        return [tuple(rhs_ids) for _, rhs_ids in sorted(rs, key=functools.cmp_to_key(cmp))]
 
     def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, opts=SolverOpts()):
         LC, E, comp = E_opts

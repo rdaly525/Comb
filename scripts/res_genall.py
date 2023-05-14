@@ -38,11 +38,11 @@ include_id = False
 verbose = 0
 isa_name = 'cmp'
 N = 3
-maxIR = 2
+maxIR = 1
 maxISA = 4
 opMaxIR = None
 opMaxISA = None
-timeout = 15
+timeout = 60
 res_dir = f"{dir}/../results/small"
 LC_test = 1
 #LC,E,CMP,C,K

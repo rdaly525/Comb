@@ -100,9 +100,11 @@ class Cegis:
                 E_res = solver.solve()
 
                 if not E_res:
+                    t = (timeit.default_timer()-start)
+                    #print('UNSAT',t, flush=True)
                     if show_iter:
                         print("UNSAT")
-                    return None, (timeit.default_timer()-start)
+                    return None, t
                 else:
                     E_guess = {v: solver.get_value(v) for v in E_vars}
                     if show_e and i%100==50:
@@ -110,9 +112,11 @@ class Cegis:
                     query_guess = query.substitute(E_guess).simplify()
                     model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
                     if model is None:
+                        t = (timeit.default_timer()-start)
+                        print('SAT',t, flush=True)
                         if show_iter:
                             print("SAT")
-                        return E_guess,  (timeit.default_timer()-start)
+                        return E_guess, t
                     else:
                         A_vals = {v: model.get_value(v) for v in A_vars}
                         solver.add_assertion(query.substitute(A_vals).simplify())
