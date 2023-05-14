@@ -1,12 +1,10 @@
 # condition codes
-Comb isa.flag_nand
+Comb isa.flag_not
 Param N: Int
 In x : BV[N]
-In y : BV[N]
 Out o : BV[N]
-t0 = bv.and_[N](x, y)
-t1 = bv.xor[N](t0, [N]'h1)
-o = t1
+t0 = bv.xor[N](x, [N]'h1)
+o = t0
 
 Comb isa.cmp_Z
 Param N: Int
