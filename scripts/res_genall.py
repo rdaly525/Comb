@@ -6,41 +6,43 @@ from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 from timeit import default_timer as time
 
+from comb.synth.verify import verify
+
 dir = os.path.dirname(os.path.realpath(__file__))
 ir_fname = f"{dir}/combs/ir.comb"
 irK = {}
 with open(ir_fname, 'r') as f:
-    obj = compile_program(f.read())
-    irK['C'] = obj.get_from_ns('irC')[0]
-    irK['BW'] = obj.get_from_ns('irBW')
-    irK['CE'] = obj.get_from_ns('irCE')
-    irK['CS'] = obj.get_from_ns('irCS')
-    irK['CU'] = obj.get_from_ns('irCU')
-    irK['AR'] = obj.get_from_ns('irAR')
-    irK['M'] = obj.get_from_ns('irM')
+    ir_obj = compile_program(f.read())
+    irK['C'] = ir_obj.get_from_ns('irC')[0]
+    irK['BW'] = ir_obj.get_from_ns('irBW')
+    irK['CE'] = ir_obj.get_from_ns('irCE')
+    irK['CS'] = ir_obj.get_from_ns('irCS')
+    irK['CU'] = ir_obj.get_from_ns('irCU')
+    irK['AR'] = ir_obj.get_from_ns('irAR')
+    irK['M'] = ir_obj.get_from_ns('irM')
 
 dce = 1
 cse = 0
 #consts = [0,1,-1]
-consts = [0]
+consts = [0,1]
 #ir_kinds = ['C', 'BW', 'CE', 'CU', 'CS', 'AR', 'M']
-ir_kinds = ['CS']
+ir_kinds = ['CE', 'CS', 'CU']
 #ir_kinds = ['CMP']
 #id, nand sub, ~, Z, C, N, V
 #costs = [1, 5, 25, 2, 26, 26, 26, 26]
-costs = [50, 50, 50, 1, 3, 50, 3, 3]
-#costs = [1, 1, 1, 1, 1]
+#costs = [50, 50, 50, 1, 1, 50, 1, 1]
+costs = [1, 1, 1, 1, 1]
 log = False
 print_rules = True
 include_id = False
-verbose = 1
-risc = 1
-N = 4
-maxIR = 1
+verbose = 0
+isa_name = 'cmp'
+N = 3
+maxIR = 2
 maxISA = 4
 opMaxIR = None
 opMaxISA = None
-timeout = 20
+timeout = 15
 res_dir = f"{dir}/../results/small"
 LC_test = 1
 #LC,E,CMP,C,K
@@ -69,22 +71,40 @@ for k in ir_kinds:
         ir.extend(irK[k][N, c] for c in consts)
     else:
         ir.extend([inst[N] for inst in irK[k]])
-if risc:
-    isa_fname = f"{dir}/combs/isa_risc.comb"
-else:
-    isa_fname = f"{dir}/combs/isa_cisc.comb"
+isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
-    obj = compile_program(f.read())
-isa = [c[N] for c in obj.get_from_ns("isa")]
-if not include_id:
-    isa = isa[1:]
-    costs = costs[1:]
+    isa_obj = compile_program(f.read())
+isa = [c[N] for c in isa_obj.get_from_ns("isa")]
 solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
+
+
+#slt_file = '''
+#Comb t.slt
+#Param N: Int
+#In x: BV[N]
+#In y: BV[N]
+#Out o: BV[N]
+#n = isa.cmp_N[N](x,y)
+#v = isa.cmp_V[N](x,y)
+#eq = isa.cmp_Z[N](n,v)
+#o = isa.flag_nand[N](eq,eq)
+#'''
+##
+#obj = compile_program(slt_file, [isa_obj])
+#sge = obj.get('t','slt')[N]
+#print(sge)
+#ir_sge = ir_obj.get('irCS', 'bvslt')[N]
+#ce = verify(sge, ir_sge, solver_opts)
+#print(ce)
+#assert ce is None
+#assert 0
+
+
 for LC,E,CMP, C, K in params:
     if not LC_test:
         assert not LC
     print("F:", LC_test, LC, E, CMP, C, K)
-    file = f"{res_dir}/res{N}_{risc}_{maxIR}_{maxISA}_{LC_test}_{LC}{E}{CMP}{C}{K}_{timeout}"
+    file = f"{res_dir}/res{N}_{isa_name}_{maxIR}_{maxISA}_{LC_test}_{LC}{E}{CMP}{C}{K}_{timeout}"
     pfile = f"{file}.pickle"
     rfile = f"{file}.comb"
     #sym_opts = SymOpts(comm=c, same_op=so, input_perm=False)

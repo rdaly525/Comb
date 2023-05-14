@@ -4,10 +4,13 @@ from comb.frontend.ir import CombProgram, AssignStmt, CallExpr, _flat, Obj
 from comb.synth.utils import _make_list
 from DagVisitor import Visitor
 from comb.frontend.stdlib import GlobalModules
+import typing as tp
+
 class SymRes(Visitor):
 
-    def __init__(self, modules):
+    def __init__(self, modules, objs:tp.List[Obj]=[]):
         self.modules = modules
+        self.eobjs = objs
 
     def run(self, node: Node):
         assert isinstance(node, Node)
@@ -30,7 +33,13 @@ class SymRes(Visitor):
         elif qsym.module in self.modules:
             comb = self.modules[qsym.module].comb_from_sym(qsym)
         else:
-            raise ValueError("Missing module ", qsym.module)
+            comb = None
+            for eobj in self.eobjs:
+                comb = eobj.get(qsym.module, qsym.name)
+                if comb is not None:
+                    break
+            if comb is None:
+                raise ValueError("Missing qsym ", qsym)
         self.new_node[qsym] = comb
 
     def visit_ASTCallExpr(self, expr: ASTCallExpr):

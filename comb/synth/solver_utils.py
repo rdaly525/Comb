@@ -90,8 +90,9 @@ class Cegis:
             start = timeit.default_timer()
             for i in it.count(1):
                 if (timeit.default_timer()-start > opts.timeout):
-                    if show_iter:
-                        print("TO")
+                    print('TO', flush=True)
+                    #if show_iter:
+                    #    print("TO")
                     return IterLimitError(), opts.timeout
 
                 if show_iter and i%10==0:
