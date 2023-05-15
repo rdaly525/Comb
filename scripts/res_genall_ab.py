@@ -40,12 +40,12 @@ verbose = 0
 isa_name = 'ab'
 N = 4
 maxIR = 2
-maxISA = 5
+maxISA = 4
 opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/real"
-LC_test = 1
+LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
