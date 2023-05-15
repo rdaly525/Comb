@@ -274,10 +274,9 @@ class RuleDiscovery:
 
 
     # Finds all combinations of rules that exactly match the lhs and rhs
-    def all_lc_composite_msets(self, lhs_ids, rhs_ids, iT, costs, opts:SolverOpts):
+    def all_lc_composite_msets(self, lhs_ids, cur_cost, iT, opts:SolverOpts):
         NI = len(iT)
         lhs_op_cnt = _list_to_counts([self.lhss[lid].qualified_name for lid in lhs_ids])
-        cur_cost = sum(costs[rid] for rid in rhs_ids)
         #rhs_op_cnt = _list_to_counts([self.rhss[rid].qualified_name for rid in rhs_ids])
 
         #Prefiltering
@@ -288,7 +287,7 @@ class RuleDiscovery:
             ri_to_k[ri] = (k, i)
             l_eq = rule.lhs.op_cnt == lhs_op_cnt
             if l_eq and rule.cost <= cur_cost and rule.NI >= NI:
-                #print("RCNT", {ri:1}, flush=True)
+                print(f"R1", {ri:1}, end=", ")
                 yield [(rule.lhs, 1)]
                 continue
             l_subseteq = _m_subset(rule.lhs.op_cnt, lhs_op_cnt)
@@ -342,7 +341,7 @@ class RuleDiscovery:
                 rval = _to_int(sol[rvar.value])
                 if rval != 0:
                     r_cnt[ri] = rval
-            print("RCNT", r_cnt,flush=True)
+            print("RM", r_cnt, end=", ")
             #lhs_pats = [(self.rdb.rules[ri].lhs, cnt) for ri, cnt in r_cnt.items()]
             mset = []
             for ri, cnt in r_cnt.items():
@@ -393,6 +392,7 @@ class RuleDiscovery:
                     kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
                     kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
                     print(kstr,flush=True)
+                    cur_cost = sum(costs[rid] for rid in rhs_ids)
                     for (iT, oT) in self.allT(lhs_ops, rhs_ops):
                         new_rules = []
                         NI = len(iT)
@@ -412,12 +412,14 @@ class RuleDiscovery:
                         )
                         existing_pats = []
                         start = timeit.default_timer()
-                        for mset in self.all_lc_composite_msets(lhs_ids, rhs_ids, iT, costs, opts):
+                        for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, opts):
                             lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
                             dags = enum_dags(NI, lhs_pats)
                             for dag in dags:
                                 lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                 existing_pats.append(lhs_pat)
+                        if len(existing_pats) > 0:
+                            print()
                         comp_time = timeit.default_timer() - start
                         if comp:
                             if LC:
@@ -440,6 +442,7 @@ class RuleDiscovery:
                                     rs.query = rs.query & ~rule_cond
                         sat_time = []
                         for rule in rs.CEGISAll(E, LC, opts):
+                            rule.cost = cur_cost
                             sat_time.append(rule.time)
                             assert rule.verify()
                             if self.is_new_pat(rule.lhs, existing_pats):
