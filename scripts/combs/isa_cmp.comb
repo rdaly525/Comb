@@ -31,10 +31,10 @@ Out o : BV[N]
 t0 = bv.nflag[N](x0, x1)
 o = t0
 
-Comb isa.cmp_V
-Param N: Int
-In x0 : BV[N]
-In x1 : BV[N]
-Out o : BV[N]
-t0 = bv.vflag[N](x0, x1)
-o = t0
+#Comb isa.cmp_V
+#Param N: Int
+#In x0 : BV[N]
+#In x1 : BV[N]
+#Out o : BV[N]
+#t0 = bv.vflag[N](x0, x1)
+#o = t0

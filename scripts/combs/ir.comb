@@ -57,20 +57,20 @@ In x0 : BV[N]
 In x1 : BV[N]
 Out o : BV[N]
 o = bv.slt[N](x0, x1)
-#
-#Comb irCS.bvsgt
-#Param N: Int
-#In x0 : BV[N]
-#In x1 : BV[N]
-#Out o : BV[N]
-#o = bv.sgt[N](x0, x1)
 
-#Comb irCS.bvsle
-#Param N: Int
-#In x0 : BV[N]
-#In x1 : BV[N]
-#Out o : BV[N]
-#o = bv.sle[N](x0, x1)
+Comb irCS.bvsgt
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sgt[N](x0, x1)
+
+Comb irCS.bvsle
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sle[N](x0, x1)
 
 Comb irCS.bvsge
 Param N: Int
