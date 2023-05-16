@@ -40,7 +40,7 @@ verbose = 0
 isa_name = 'ab'
 N = 4
 maxIR = 2
-maxISA = 3
+maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
@@ -62,8 +62,7 @@ all_params = (
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
-    #(0,0,0,0,0),
-    (0,0,0,1,1),
+    (0,0,0,0,0),
 )
 
 params = lc_params if LC_test else all_params
