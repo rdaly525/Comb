@@ -27,7 +27,7 @@ cse = 0
 consts = [-1]
 #ir_kinds = ['C', 'BW', 'CE', 'CU', 'CS', 'AR', 'M']
 #ir_kinds = ['CE', 'CS', 'CU']
-ir_kinds = ['C', 'BW', 'AR']
+ir_kinds = ['BW', 'AR']
 #ir_kinds = ['CMP']
 #id, nand sub, ~, Z, C, N, V
 #costs = [1, 5, 25, 2, 26, 26, 26, 26]
@@ -40,7 +40,7 @@ verbose = 0
 isa_name = 'ab'
 N = 4
 maxIR = 2
-maxISA = 4
+maxISA = 3
 opMaxIR = None
 opMaxISA = None
 timeout = 12
@@ -58,11 +58,11 @@ lc_params = (
 )
 all_params = (
     (0,1,1,1,1),
-    (0,1,1,0,0),
-    (0,0,1,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
-    (0,0,0,0,0),
+    #(0,1,1,0,0),
+    #(0,0,1,0,0),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
+    #(0,0,0,0,0),
 )
 
 params = lc_params if LC_test else all_params
@@ -141,3 +141,5 @@ for LC,E,CMP, C, K in params:
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
     db.pickle_info(pfile)
+    delta = time()-start_time
+    print("TOTTIME:", delta)
