@@ -222,6 +222,9 @@ class RuleDiscovery:
                     for rhs_ids in multicomb(rhs_mc_ids, rN):
                         rhs_ops = [self.rhss[i] for i in rhs_ids]
                         #rhs_op_names = [op.qualified_name for op in rhs_ops]
+                        kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
+                        kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
+                        print(kstr,flush=True)
                         if opts.log:
                             print_kind(lhs_ids, rhs_ids)
                         for (iT, oT) in self.allT(lhs_ops, rhs_ops):

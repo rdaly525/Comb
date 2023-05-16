@@ -38,14 +38,14 @@ print_rules = True
 include_id = False
 verbose = 0
 isa_name = 'cmp'
-N = 3
+N = 4
 maxIR = 2
 maxISA = 3
 opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/real"
-LC_test = 1
+LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
@@ -58,11 +58,11 @@ lc_params = (
 )
 all_params = (
     (0,1,1,1,1),
-    (0,1,1,0,0),
-    (0,0,1,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
-    (0,0,0,0,0),
+    #(0,1,1,0,0),
+    #(0,0,1,0,0),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
+    #(0,0,0,0,0),
 )
 
 params = lc_params if LC_test else all_params
