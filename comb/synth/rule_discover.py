@@ -212,6 +212,7 @@ class RuleDiscovery:
     def gen_all_rules(self, E_opts, ir_opts, narrow_opts, opts=SolverOpts()):
         LC, E, comp = E_opts
         assert not LC
+        ruleid = 0
         for lN in range(1, self.maxL+1):
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             for lhs_ids in multicomb(lhs_mc_ids, lN):
@@ -265,6 +266,8 @@ class RuleDiscovery:
                                 sat_time.append(rule.time)
                                 assert rule.verify()
                                 if self.is_new_rule(rule, existing_rules):
+                                    rule.id = ruleid
+                                    ruleid += 1
                                     new_rules.append(rule)
                                     existing_rules.append(rule)
                                     yield rule
