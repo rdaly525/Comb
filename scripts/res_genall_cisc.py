@@ -32,8 +32,8 @@ include_id = False
 verbose = 0
 isa_name = 'cisc'
 N = 4
-maxIR = 1
-maxISA = 1
+maxIR = 3
+maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
@@ -42,8 +42,8 @@ LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
-    (1,1,0,1,1),
-    (0,1,1,1,1),
+    #(1,1,0,1,1),
+    #(0,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -69,7 +69,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
 
 
 #slt_file = '''
