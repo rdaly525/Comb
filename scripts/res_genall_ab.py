@@ -24,14 +24,8 @@ with open(ir_fname, 'r') as f:
 dce = 1
 cse = 0
 #consts = [0,1,-1]
-consts = [-1]
-#ir_kinds = ['C', 'BW', 'CE', 'CU', 'CS', 'AR', 'M']
-#ir_kinds = ['CE', 'CS', 'CU']
+consts = []
 ir_kinds = ['BW', 'AR']
-#ir_kinds = ['CMP']
-#id, nand sub, ~, Z, C, N, V
-#costs = [1, 5, 25, 2, 26, 26, 26, 26]
-#costs = [50, 50, 50, 1, 1, 50, 1, 1]
 costs = [1, 1]
 log = False
 print_rules = True
@@ -40,12 +34,12 @@ verbose = 0
 isa_name = 'ab'
 N = 4
 maxIR = 2
-maxISA = 3
+maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/real"
-LC_test = 1
+LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
@@ -57,10 +51,10 @@ lc_params = (
     #(0,0,0,0,0),
 )
 all_params = (
-    #(0,1,1,1,1),
-    (0,0,0,0,0),
-    #(0,1,1,0,0),
-    #(0,0,1,0,0),
+    (0,1,1,1,1),
+    #(0,0,0,0,0),
+    (0,1,1,0,0),
+    (0,1,0,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
 )
