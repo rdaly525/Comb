@@ -40,7 +40,7 @@ verbose = 0
 isa_name = 'cmp'
 N = 4
 maxIR = 2
-maxISA = 4
+maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
@@ -48,9 +48,9 @@ res_dir = f"{dir}/../results/real"
 LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
-    (1,1,1,1,1),
+    #(1,1,1,1,1),
     #(1,1,0,1,1),
-    #(0,1,1,1,1),
+    (0,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
