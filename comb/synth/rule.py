@@ -184,7 +184,9 @@ class RuleDatabase:
             for i, rule in enumerate(rules):
                 yield (k, i, rule)
 
-
+    @property
+    def num_rules(self):
+        return sum(len(rs) for rs in self.rules.values())
 
     #This only works for non-lowcost
     #def add_rule(self, rule: Rule):

@@ -10,18 +10,20 @@ import plotly.graph_objects as go
 #ir_kinds = ['C', 'BW', 'CMP', 'AR']
 # The above was used for the 1->3
 
-#isa_name = 'cmp'
-isa_name = 'ab'
+log_plot = True
+isa_name = 'cmp'
+#isa_name = 'ab'
+isa_name = 'cisc'
 N = 4
-maxIR = 2
-maxISA = 3
+maxIR = 3
+maxISA = 2
 timeout = 12
 LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
-    (0,1,1,1,1),
-    (1,1,0,1,1),
     (1,1,1,1,1),
+    #(1,1,0,1,1),
+    (0,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -29,10 +31,10 @@ lc_params = (
 )
 all_params = (
     (0,0,0,0,0),
-    (0,0,0,0,1),
-    (0,0,0,1,0),
-    (0,1,0,0,0),
-    (0,1,1,0,0),
+    #(0,0,0,0,1),
+    #(0,0,0,1,0),
+    #(0,1,0,0,0),
+    #(0,1,1,0,0),
     (0,1,1,1,1),
 )
 params = lc_params if LC_test else all_params
@@ -76,11 +78,14 @@ for LC,E,CMP, C, K in params:
 
     data[opts] = cum
 
-x = data[(0,1,1,1,1)][-1][1]
-#x = data[(0,0,0,0,0)][-1][1]
+if LC_test:
+    x = data[(0,1,1,1,1)][-1][1]
+else:
+    x = data[(0,0,0,0,0)][-1][1]
 
 for k in params:
     print(k, (x/data[k][-1][1]))
+
 names = {
     (0,0,0,0,0): "Incremental solve",
     (0,1,0,0,0): "Dup Exclusion",
@@ -109,17 +114,23 @@ for i, (k, v) in enumerate(data.items()):
         marker_size=12,
     )
     fig['data'][-1]['showlegend']=False
+
+if LC_test:
+    xtit = "Number of Lowest Cost Rules"
+else:
+    xtit = "Number of Unique Rules"
+
 fig.update_layout(
     yaxis_title="Cummulative SAT Time (min)",
-    #xaxis_title="Number of Lowest Cost Rules",
-    xaxis_title="Number of Unique Rules",
+    xaxis_title=xtit,
     title="Cactus",
 )
 s = 100
-#fig.update_yaxes(type='log')
+if log_plot:
+    fig.update_yaxes(type='log')
 fig.update_layout(
     autosize=False,
     width=8*s,
     height=5*s,
 )
-fig.show()
+#fig.show()
