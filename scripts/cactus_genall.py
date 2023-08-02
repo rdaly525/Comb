@@ -13,17 +13,17 @@ import plotly.graph_objects as go
 log_plot = True
 isa_name = 'cmp'
 #isa_name = 'ab'
-isa_name = 'cisc'
+#isa_name = 'cisc'
 N = 4
-maxIR = 3
-maxISA = 2
+maxIR = 2
+maxISA = 3
 timeout = 12
 LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
-    (1,1,1,1,1),
-    #(1,1,0,1,1),
     (0,1,1,1,1),
+    (1,1,0,1,1),
+    (1,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -92,9 +92,9 @@ names = {
     (0,1,1,0,0): "Dup + Comp Exclusion",
     (0,0,0,1,0): "Commutative Narrowing",
     (0,0,0,0,1): "Same-Inst Narrowing",
-    (0,1,1,1,1): "Dup + Comp Exclusion + Narrowing",
-    (1,1,1,1,1): "Low Cost Composite and Duplicate Exclusion",
-    (1,1,0,1,1): "Low Cost Duplicate Exclusion",
+    (0,1,1,1,1): "All Unique",
+    (1,1,1,1,1): "IR Dup + Comp Exclusion",
+    (1,1,0,1,1): "IR Dup Exclusion",
 }
 
 
@@ -111,7 +111,7 @@ for i, (k, v) in enumerate(data.items()):
         mode='markers',
         line=dict(color=c[i]),
         marker_symbol='circle-dot',
-        marker_size=12,
+        marker_size=8,
     )
     fig['data'][-1]['showlegend']=False
 
@@ -133,4 +133,14 @@ fig.update_layout(
     width=8*s,
     height=5*s,
 )
-#fig.show()
+fig.update_layout(
+    font=dict(
+        size=18,
+    ),
+    legend=dict(
+        x=0,
+        y=1,
+        bgcolor='rgba(0,0,0,0)'
+    )
+)
+fig.show()
