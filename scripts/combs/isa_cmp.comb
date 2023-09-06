@@ -1,0 +1,40 @@
+# condition codes
+Comb isa.flag_not
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+t0 = bv.xor[N](x, [N]'h1)
+o = t0
+
+Comb isa.cmp_Z
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.sub[N](x0, x1)
+t1 = bv.eq[N](t0, [N]'h0)
+o = t1
+
+Comb isa.cmp_C
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.uge[N](x0, x1)
+o = t0
+
+Comb isa.cmp_N
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.nflag[N](x0, x1)
+o = t0
+
+#Comb isa.cmp_V
+#Param N: Int
+#In x0 : BV[N]
+#In x1 : BV[N]
+#Out o : BV[N]
+#t0 = bv.vflag[N](x0, x1)
+#o = t0

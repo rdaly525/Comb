@@ -1,10 +1,12 @@
 import functools
+import timeit
 
 from ..frontend.ast import Comb
 from .solver_utils import Cegis, SolverOpts
-from .pattern import Pattern, SymOpts, PatternEncoding
+from .pattern import Pattern, enum_dags
+from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
-from .utils import _list_to_dict, bucket_combinations, flat, types_to_nTs, nT
+from .utils import _list_to_dict, bucket_combinations, flat, nT
 from .rule import Rule
 
 import hwtypes.smt_utils as fc
@@ -98,46 +100,6 @@ def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int,
     return fc.And(interior_edges), in_lvars, out_lvars
 
 
-def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
-    pat_iTs = [_list_to_dict(p.iT) for p in pats]
-    pat_oTs = [_list_to_dict(p.oT) for p in pats]
-
-    #Create a set of all sources/snks sorted by type
-    srcs = {n:[(-1, i) for i in ids] for n, ids in _list_to_dict(goal_iT).items()}
-    for pi, pat_oT in enumerate(pat_oTs):
-        for n, ids in pat_oT.items():
-            srcs.setdefault(n, []).extend((pi, i) for i in ids)
-    snks = {n:[(len(pats), i) for i in ids] for n, ids in _list_to_dict(goal_oT).items()}
-    for pi, pat_iT in enumerate(pat_iTs):
-        for n, ids in pat_iT.items():
-            snks.setdefault(n, []).extend((pi, i) for i in ids)
-
-
-    #This strategy will produce invalid graphs
-    #Easy filter to remove most of the bad connections
-    def invalid_edge(src, snk):
-        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
-    all_src = flat([srcs_ for srcs_ in srcs.values()])
-    def invalid_dag(edges):
-        used_srcs = set(src for src,_ in edges)
-        all_used = all(src in used_srcs for src in all_src)
-        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
-        return (not all_used) or bad_edge
-        #each source should be in edge list
-
-    src_poss = []
-    snk_list = []
-    for n, n_snks in snks.items():
-        snk_list += n_snks
-        src_poss += [srcs[n] for _ in n_snks]
-
-    graphs = []
-    for src_list in it.product(*src_poss):
-        edges = list(zip(src_list, snk_list))
-        if not invalid_dag(edges):
-            graphs.append(edges)
-    return graphs
-
 class RuleSynth(Cegis):
     def __init__(
         self,
@@ -145,71 +107,85 @@ class RuleSynth(Cegis):
         oT: tp.List[nT],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
+        ir_opts,
+        narrow_opts,
         pat_en_t: tp.Type[PatternEncoding],
-        sym_opts: SymOpts,
-        only_lhs_sym: bool = False
     ):
-        l_sym_opts = sym_opts
-        if only_lhs_sym:
-            r_sym_opts = SymOpts(False,False,False)
-        else:
-            r_sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
         self.iT = iT
         self.oT = oT
-        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", sym_opts=l_sym_opts)
-        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", sym_opts=r_sym_opts)
-        if lhs_cs.types_viable and rhs_cs.types_viable:
-            self.lhs_cs = lhs_cs
-            self.rhs_cs = rhs_cs
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
+        assert lhs_cs.types_viable and rhs_cs.types_viable
+        self.lhs_cs = lhs_cs
+        self.rhs_cs = rhs_cs
+        self.enum_times = []
+        self.ir_opts = ir_opts
+        self.narrow_opts = narrow_opts
 
-            P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
-            P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
+        P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
+        P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
-            #Final query:
-            #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-            query = fc.And([
-                lhs_cs.P_sym,
-                rhs_cs.P_sym,
-                lhs_cs.P_wfp,
-                rhs_cs.P_wfp,
+        #Final query:
+        #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
+        query = fc.And([
+            lhs_cs.P_iropt(*ir_opts),
+            lhs_cs.P_narrow(*narrow_opts),
+            lhs_cs.P_wfp,
+            rhs_cs.P_iropt(*ir_opts),
+            rhs_cs.P_narrow(*narrow_opts),
+            rhs_cs.P_wfp,
+            fc.Implies(
+                fc.And([
+                    lhs_cs.P_lib,
+                    lhs_cs.P_conn,
+                    rhs_cs.P_lib,
+                    rhs_cs.P_conn,
+                ]),
                 fc.Implies(
-                    fc.And([
-                        lhs_cs.P_lib,
-                        lhs_cs.P_conn,
-                        rhs_cs.P_lib,
-                        rhs_cs.P_conn,
-                    ]),
-                    fc.Implies(
-                        fc.And(P_inputs),
-                        fc.And(P_outputs),
-                    )
+                    fc.And(P_inputs),
+                    fc.And(P_outputs),
                 )
-            ])
+            )
+        ])
+        #print(query.serialize())
+        #assert 0
+        query = query.to_hwtypes()
+        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
+        super().__init__(query, E_vars)
 
-            query = query.to_hwtypes()
 
-            #wfp = fc.And([
-            #    lhs_cs.P_sym,
-            #    rhs_cs.P_sym,
-            #    lhs_cs.P_wfp,
-            #    rhs_cs.P_wfp,
-            #])
+    # E whether represents to exclude all equivalent rules
+    def CEGISAll(self, E, LC, opts: SolverOpts):
+        self.enum_times = []
+        for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
+            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
+            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
+            rule = Rule(lhs_pat, rhs_pat, i, t)
+            yield rule
+            if E:
+                #Exclude full rule.
+                if LC:
+                    rp_cond, enum_time = self.patL(rule.lhs)
+                else:
+                    rp_cond, enum_time = self.ruleL(rule)
+                self.enum_times.append(enum_time)
+                self.query = self.query & ~rp_cond
 
-            #xl = fc.And([lhs_cs.P_lib, lhs_cs.P_conn]).to_hwtypes()
-            #xr = fc.And([rhs_cs.P_lib, rhs_cs.P_conn]).to_hwtypes()
+    def ruleL(self, rule:Rule):
+        L_IR = self.lhs_cs.L
+        L_ISA = self.rhs_cs.L
+        start = timeit.default_timer()
+        rule_cond = rule.ruleL(L_IR, L_ISA)
+        delta = timeit.default_timer() - start
+        return rule_cond, delta
 
-            ##Substitute all of Ir and Or in xr with Il and Ol
-            #subs = []
-            #for Il, Ir in zip(lhs_cs.input_vars, rhs_cs.input_vars):
-            #    subs.append((Il, Ir))
-            ##for Ol, Or in zip(lhs_cs.output_vars, rhs_cs.output_vars):
-            ##    subs.append((Ol, Or))
-            #sub_xr = xr.substitute(*subs)
-            #query = wfp.to_hwtypes() & (~(xl==sub_xr) | fc.And(P_outputs).to_hwtypes())
-
-            #print(query.serialize())
-            E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-            super().__init__(query, E_vars)
+    #Only for IR pattern
+    def patL(self, pat: Pattern):
+        L_IR = self.lhs_cs.L
+        start = timeit.default_timer()
+        pat_cond = pat.patL(L_IR)
+        delta = timeit.default_timer() - start
+        return pat_cond, delta
 
     #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
     #def _match_pattern(self, p: Pattern, ri_op_ids):

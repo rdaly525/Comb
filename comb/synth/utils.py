@@ -5,6 +5,11 @@ import itertools as it
 
 from comb.frontend.ast import Type, BoolType, TypeCall, BVType, IntValue, CBVType
 
+def _m_subseteq(a, b):
+    return all(cnt <= b.get(k,0) for k,cnt in a.items())
+
+def _m_subset(a, b):
+    return all(cnt < b.get(k,0) for k,cnt in a.items())
 
 def _list_to_counts(vals):
     ret = {}
@@ -109,3 +114,10 @@ def add_cnts(acnt, bcnt):
 
 def ge0_cnts(cnts):
     return all(v>=0 for v in cnts.values())
+
+
+def add_to_set(s, x):
+    #Returns true if it was added to set.
+    l = len(s)
+    s.add(x)
+    return len(s) != l

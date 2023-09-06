@@ -1,3 +1,36 @@
+Current tasks
+    get res_dup running for all tasks
+    Create ability to enumerate and remove composite rules.
+
+    I need to count the unique rules and total time per query.
+    I also need to filter out composite rules. This is the hard task.:
+    Kill all birds with one stone:
+        create new db per query.
+        always solve for all the mset covers per query and record the time.
+        Add rules the old way but filter/accumulate duplicates.
+            (Also record the time it takes to filter duplicates)
+            Also filter based on composites. This function will leverage the msets
+            I can add them to a different part of the DB
+        Then add this minimal set to the master db.
+
+    #This is needed for the composite exclusion
+    comps :: (mset, N) -> {All composite patterns}.
+
+
+
+    enum_graphs:: (mset, N) -> {Pattern}
+    This requires inlining patterns. Might be gnarly, but probably not too bad.
+    inline :: Pattern -> Pattern
+
+    #Then I can write to actually filter
+    is_cmp :: Rule -> {all_cmps} -> Bool
+
+
+
+
+
+
+
 Current:
     Wrote sym_same_op for comb and adj
     Want to test it

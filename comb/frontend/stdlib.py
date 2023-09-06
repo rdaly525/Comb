@@ -153,6 +153,36 @@ def create_BVBinary(class_name: str, fun, comm):
     BVBin.__name__ = "BV"+class_name.capitalize()
     return BVBin()
 
+def create_BVComp(class_name: str, fun, comm):
+    class BVComp(CombPrimitive):
+        name = QSym('bv', class_name)
+        param_types = [IntType()]
+        comm_info = ([0,1],) if comm else ([0], [1])
+        num_inputs = 2
+        num_outputs = 1
+
+        def get_type(self, N: Expr):
+            BVCall = TypeCall(BVType(), [N])
+            return [BVCall, BVCall], [BVCall]
+
+        def eval(self, *args, pargs):
+            assert len(pargs)==1 and len(args)==2
+            N = pargs[0]
+            if isinstance(N, IntValue) and isinstance(N.value, int):
+                if all(isinstance(arg, BVValue) for arg in args):
+                    bv0 = ht.SMTBitVector[N.value](0)
+                    bv1 = ht.SMTBitVector[N.value](1)
+                    v = fun(args[0].value, args[1].value)
+                    assert isinstance(v, ht.SMTBit)
+                    return [BVValue(v.ite(bv1, bv0))]
+            return CallExpr(self, pargs, args)
+
+        def partial_eval(self, N):
+            return CombSpecialized(self, [N])
+
+    BVComp.__name__ = "BV"+class_name.capitalize()
+    return BVComp()
+
 _binops = dict(
     add=(lambda x, y: x + y, True),
     sub=(lambda x, y: x - y, False),
@@ -163,12 +193,24 @@ _binops = dict(
     lshr=(lambda x, y: x << y, True),
 )
 
+_cmpops = dict(
+    eq=(lambda x, y: x==y, True),
+    neq=(lambda x, y: ~(x==y), True),
+    ult=(lambda x, y: x.bvult(y), False),
+    slt=(lambda x, y: x.bvslt(y), False),
+    ule=(lambda x, y: x.bvule(y), False),
+    sle=(lambda x, y: x.bvsle(y), False),
+    ugt=(lambda x, y: x.bvugt(y), False),
+    sgt=(lambda x, y: x.bvsgt(y), False),
+    uge=(lambda x, y: x.bvuge(y), False),
+    sge=(lambda x, y: x.bvsge(y), False),
+)
+
 _unary_ops = dict(
     identity=lambda x: x,
     neg=lambda x: -x,
     not_=lambda x: ~x,
 )
-
 
 
 from peak import family_closure, Peak
@@ -205,6 +247,68 @@ class BVSlice(CombPeak):
     def __init__(self):
         super().__init__(slice_peak, 3, lambda o, l, h: (o, o - (h-l)))
 
+class BVNFlag(CombPrimitive):
+    name = QSym('bv', 'nflag')
+    param_types = [IntType()]
+    comm_info = ([0], [1])
+    num_inputs = 2
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [BVCall, BVCall], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                x = args[0].value
+                y = args[1].value
+                n = (x-y)[-1]
+                bv0 = ht.SMTBitVector[N.value](0)
+                bv1 = ht.SMTBitVector[N.value](1)
+                return [BVValue(n.ite(bv1, bv0))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
+
+class BVVFlag(CombPrimitive):
+    name = QSym('bv', 'vflag')
+    param_types = [IntType()]
+    comm_info = ([0], [1])
+    num_inputs = 2
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [BVCall, BVCall], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            n = N.value
+            if all(isinstance(arg, BVValue) for arg in args):
+                x = args[0].value
+                y = args[1].value
+                a = (x-y).bvsge(0)
+                b = (x.bvsge(y))
+                v = (a^b)
+                #v = (x.bvsgt(y) & (x-y)[-1]) | (x.bvsle(y) & ~(x-y)[-1])
+
+                #xy = x.sext(1)-y.sext(1)
+                #v = xy.slt(-(2**(n-1))) | xy.sge(2**(n-1))
+                bv0 = ht.SMTBitVector[N.value](0)
+                bv1 = ht.SMTBitVector[N.value](1)
+                return [BVValue(v.ite(bv1, bv0))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
+
+
 
 class BitVectorModule(Module):
     # Types
@@ -215,9 +319,13 @@ class BitVectorModule(Module):
             abs_const=AbsConst(),
             concat=BVConcat(),
             slice=BVSlice(),
+            nflag=BVNFlag(),
+            vflag=BVVFlag(),
         )
         for name, (fun, comm) in _binops.items():
             opdict[name] = create_BVBinary(name, fun, comm)
+        for name, (fun, comm) in _cmpops.items():
+            opdict[name] = create_BVComp(name, fun, comm)
         for name, fun in _unary_ops.items():
             opdict[name] = create_BVUnary(name, fun)
         self.opdict = opdict

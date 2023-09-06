@@ -4,7 +4,7 @@ from pysmt.logics import QF_BV
 
 from .solver_utils import SolverOpts
 from ..frontend.ast import Comb
-from .utils import _make_list
+from .utils import _make_list, _to_int
 
 
 def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts()):
@@ -29,5 +29,5 @@ def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts()):
         res = solver.solve()
         if res is False:
             return None
-        vals = {v.value: v.value.constant_value() for v in inputs}
+        vals = {v.value: _to_int(solver.get_value(v.value)) for v in inputs}
         return vals

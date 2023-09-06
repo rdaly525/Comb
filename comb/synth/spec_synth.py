@@ -3,7 +3,8 @@ import typing as tp
 from hwtypes import smt_utils as fc
 
 from comb import Comb
-from .pattern import PatternEncoding, SymOpts, Pattern
+from .pattern import SymOpts, Pattern
+from .pattern_encoding import PatternEncoding
 from .solver_utils import SolverOpts, Cegis
 from .utils import _make_list, type_to_nT, _list_to_dict
 import itertools as it

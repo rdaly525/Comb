@@ -3,7 +3,8 @@ import typing as tp
 
 from more_itertools import distinct_combinations as multicomb
 from comb import Comb
-from .pattern import PatternEncoding, SymOpts
+from .pattern import SymOpts
+from .pattern_encoding import PatternEncoding
 from .solver_utils import SolverOpts
 from .spec_synth import SpecSynth
 from .utils import flat, _list_to_counts, sub_cnts, ge0_cnts

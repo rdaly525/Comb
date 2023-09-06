@@ -1,0 +1,69 @@
+#id
+Comb isa.id
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = x
+
+# nand
+Comb isa.nand
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.and_[N](x0, x1)
+t1 = bv.not_[N](t0)
+o = t1
+
+# sub
+Comb isa.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.sub[N](x0, x1)
+o = t0
+
+
+# condition codes
+Comb isa.flag_nand
+Param N: Int
+In x : BV[N]
+In y : BV[N]
+Out o : BV[N]
+t0 = bv.and_[N](x, y)
+t1 = bv.xor[N](t0, [N]'h1)
+o = t1
+
+Comb isa.cmp_Z
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.sub[N](x0, x1)
+t1 = bv.eq[N](t0, [N]'h0)
+o = t1
+
+Comb isa.cmp_C
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.uge[N](x0, x1)
+o = t0
+
+Comb isa.cmp_N
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.nflag[N](x0, x1)
+o = t0
+
+Comb isa.cmp_V
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+t0 = bv.vflag[N](x0, x1)
+o = t0

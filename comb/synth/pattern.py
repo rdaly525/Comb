@@ -1,15 +1,13 @@
 import functools
 from collections import namedtuple
-from functools import cache, cached_property
+from functools import cached_property
 import networkx as nx
-import hwtypes.smt_utils as fc
-from dataclasses import dataclass
-from ..frontend.ast import Comb, Type, Sym, QSym, InDecl, OutDecl
+from hwtypes import smt_utils as fc
+
+from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
-from .solver_utils import get_var
-from .utils import _make_list, type_to_nT, _list_to_dict, nT_to_type, nT, _list_to_counts, types_to_nTs, add_cnts, \
-    ge0_cnts, sub_cnts, types_to_nT_cnts, flat
+from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set
 from ..frontend.ir import CombProgram, AssignStmt
 import itertools as it
 
@@ -67,10 +65,10 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         else:
             if l_opi != r_opi:
                 return []
-        l_poss_args = [l.nodes[l_opi]]
+        l_poss_args = [l.children[l_opi]]
         #Find all possible commititive permutations
         if opts.comm and l_opi in range(l.num_ops):
-            l_args = l.nodes[l_opi] #[0,1,2,3]
+            l_args = l.children[l_opi] #[0,1,2,3]
             comm_info = l.ops[l_opi].comm_info
             assert all(isinstance(l, list) for l in comm_info)
             assert r.ops[r_opi].comm_info == comm_info
@@ -91,7 +89,7 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         for l_args in l_poss_args:
             ctxs = [ctx]
             #For each op argument
-            for l_src, r_src in zip(l_args, r.nodes[r_opi]):
+            for l_src, r_src in zip(l_args, r.children[r_opi]):
                 ctxs_ = []
                 for ctx_ in ctxs:
                     m_ctxs = match(l_src, r_src, ctx_)
@@ -103,64 +101,96 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
         return matched
     return match(l_root, r_root, {})
 
+
+def filter_eq(f):
+    eq_set = set()
+    @functools.wraps(f)
+    def wrapped(*args, **kwargs):
+        for v in f(*args, **kwargs):
+            if v in eq_set:
+                continue
+            yield v
+    return wrapped
+
+#class Program:
+#    def __init__(self, ops: tp.List[Comb], P):
+#        self.ops = ops
+#        I, O, IK, OK = P
+#        assert len(IK) == len(ops)
+#        assert len(OK) == len(ops)
+#        for i, op in enumerate(ops):
+#            iT, oT = op.get_type()
+#            assert len(oT) == 1
+#            assert len(iT) == len(IK[i])
+#            iT = [type_to_nT(t) for t in iT]
+#            assert all(t==iT[0] for t in iT)
+#        self.NI =
+#        self.p = (tuple(I), O, tuple(tuple(IKi) for IKi in IK), tuple(OK))
+#
+#    def __eq__(self, other:Pattern):
+#        if not isinstance(other, Pattern)
+#        pat =
+
 class Pattern:
-    def __init__(self, iT, oT, ops: tp.List[Comb]):
-        assert all(T.n >=0 for T in iT)
-        assert all(T.n >=0 for T in oT)
-        if len(oT) > 1:
-            raise NotImplementedError()
+    def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat):
         self.iT = iT
         self.oT = oT
+        assert len(oT) == 1
+        self.T = oT[0]
+        assert all(self.T == T for T in self.iT)
         self.ops = ops
-        self.node_range = range(-1, len(ops)+1)
-        self.edges = []
-        self.op_iTs = []
-        self.op_oTs = []
-        for op in ops:
+        self.num_ops = len(ops)
+        self.NI = len(iT)
+        self.op_NI = [len(op.get_type()[0]) for op in ops]
+        if is_pat:
+            self.edges = P
+        else:
+            self.init_prog(P)
+
+        self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None]]
+        for src, (snki, snka) in self.edges:
+            self.children[snki][snka] = src
+        assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
+        self.root = (len(ops), 0)
+
+    def init_prog(self, P):
+        I, O, IK, OK = P
+        I, O, IK, OK = (tuple(I), O[0], tuple(tuple(IKi) for IKi in IK), tuple(OKi[0] for OKi in OK))
+        ops = self.ops
+        assert len(IK) == len(ops)
+        assert all(len(IKi)==NI for IKi, NI in zip(IK, self.op_NI))
+        for i, op in enumerate(ops):
             iT, oT = op.get_type()
-            self.op_iTs.append([type_to_nT(t) for t in iT])
-            self.op_oTs.append([type_to_nT(t) for t in oT])
-        self.nodes = {**{i:[None for _ in self.op_iTs[i]] for i in range(len(ops))}, len(ops):[None for _ in oT]}
-        self.root = (len(ops), 0) #TODO only works for single output
-
-    #Produces the maximum typing for these set of ops
-    #@cached_property
-    #def max_T(self):
-    #    [_list_to_counts(iTs) for iTs in self.op_iTs]
-
+            assert len(oT) == 1
+            assert len(iT) == len(IK[i])
+            iT = [type_to_nT(t) for t in iT]
+            assert all(t==iT[0] for t in iT)
+        src_to_node = {i:(-1,i) for i in range(self.NI)}
+        src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
+        #snk_to_node = {}
+        self.edges = []
+        for i, IKi in enumerate((*IK, (O,))):
+            for j, l in enumerate(IKi):
+                if l < self.NI:
+                    src = (-1, l)
+                else:
+                    assert l in OK
+                    src = (OK.index(l), 0)
+                snk = (i, j)
+                assert src is not None
+                self.edges.append((src, snk))
 
     @cached_property
     def op_names(self):
         return [op.qualified_name for op in self.ops]
 
     @cached_property
-    def op_names_with_io(self):
-        return [op.qualified_name for op in self.ops] + ["IO"]
-
+    def name(self):
+        return "[" + ",".join(s for s in self.op_names) + "]"
 
     @cached_property
-    def num_ops(self):
-        return len(self.ops)
-
-    def add_edge(self, src, snk):
-        assert len(src)==2 and len(snk)==2
-        assert src[0] in self.node_range
-        assert snk[0] in self.node_range
-        if src[0] == -1:
-            src_t = self.iT[src[1]]
-        else:
-            src_t = self.op_oTs[src[0]][src[1]]
-
-        if snk[0] == self.num_ops:
-            snk_t = self.oT[snk[1]]
-        else:
-            snk_t = self.op_iTs[snk[0]][snk[1]]
-        if src_t != snk_t:
-            raise ValueError()
-            assert src_t == snk_t
-        self.edges.append((src, snk))
-        # snk, snk -> src
-        self.nodes[snk[0]][snk[1]] = src
+    def op_names_with_io(self):
+        return [op.qualified_name for op in self.ops] + ["IO"]
 
     @property
     def interior_edges(self):
@@ -182,19 +212,77 @@ class Pattern:
     def op_cnt(self):
         return _list_to_counts(self.op_names)
 
+    #def enum_all_equal(self, en_I):
+    #    eq_set = set()
+    #    for es_ip in self.enum_input_perm(self.edges, en_I):
+    #        for es_so in self.enum_same_op(es_ip):
+    #            for es_c in self.enum_comm(es_so):
+    #                for prog in self.enum_prog(es_c):
+    #                    #yield prog
+    #                    if add_to_set(eq_set, prog):
+    #                        yield prog
 
-    def enum_all_equal(self):
-        #Does all the symmetries
-        for es_ip in self.enum_input_perm(self.edges):
-            for es_so in self.enum_same_op(es_ip):
-                for es_c in self.enum_comm(es_so):
-                    p = Pattern(self.iT, self.oT, self.ops)
-                    for e in es_c:
-                        p.add_edge(*e)
-                    yield p
+    def enum_CK(self):
+         for es_so in self.enum_same_op(self.edges):
+            for es_c in self.enum_comm(es_so):
+                yield es_c
 
-    def enum_input_perm(self, edges):
-        yield edges
+
+
+    def enum_prog(self, edges):
+        I = tuple(i for i in range(self.NI))
+        IK = [[None for _ in range(NI)] for NI in self.op_NI]
+        OK = [None for _ in range(self.num_ops)]
+        O = None
+        g = nx.DiGraph()
+        for (src, _), (snk, _) in edges:
+            g.add_edge(src, snk)
+        #Force inouts to be first
+        for opi in range(self.num_ops+1):
+            g.add_edge(-1, opi)
+
+        for order in nx.all_topological_sorts(g):
+            #OK = [o+self.NI for o in order]
+            for l, opi in enumerate(order[1:-1]):
+                OK[opi] = l + self.NI
+            #Set all of IK and O
+            for (srci, srca), (snki, snka) in edges:
+                if srci==-1:
+                    src_l = srca
+                else:
+                    src_l = OK[srci]
+                if snki==self.num_ops:
+                    assert snka == 0
+                    O = src_l
+                else:
+                    IK[snki][snka] = src_l
+            if not all(l is not None for l in OK):
+                print(OK)
+                raise ValueError
+            assert all(l is not None for l in OK)
+            assert all(all(l is not None for l in IKi) for IKi in IK)
+            yield (I, O, tuple(tuple(IKi) for IKi in IK), tuple(OKi for OKi in OK))
+
+
+    #For programs
+    def enum_input_perm(self, PL):
+        I = PL[0]
+        NI = len(I)
+        NL = len(PL[3])
+        for iperm in it.permutations(I):
+            map = {i:j for i, j in enumerate(iperm)}
+            mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
+            yield IPerm(PL, mapL)
+
+
+    def patL(self, L):
+        allp = []
+        for PL in all_prog(self.enum_CK(), self.enum_prog):
+            for PL_ in self.enum_input_perm(PL):
+                allp.append(onepat(PL_, L))
+        return fc.Or(allp).to_hwtypes()
+
+
 
     def enum_comm(self, edges):
         for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
@@ -221,15 +309,19 @@ class Pattern:
             yield es
 
 
-    def equal(self, other, opts: SymOpts):
+    def equal(self, other: 'Pattern'):
+        opts = SymOpts(comm=True, same_op=True)
         matches = self.equal_with_match(other, opts)
-        if opts.input_perm:
-            raise NotImplementedError()
-            inputs = [(-1, i) for i in range(len(self.iT))]
-            matched_inputs = (matches[input] for input in inputs)
-            return set(inputs) == set(matched_inputs)
-        else:
-            return any(all((-1, i)==match[(-1,i)] for i in range(len(self.iT))) for match in matches)
+        return len(matches)>0
+    #def equal(self, other, opts: SymOpts):
+    #    matches = self.equal_with_match(other, opts)
+    #    if opts.input_perm:
+    #        raise NotImplementedError()
+    #        inputs = [(-1, i) for i in range(len(self.iT))]
+    #        matched_inputs = (matches[input] for input in inputs)
+    #        return set(inputs) == set(matched_inputs)
+    #    else:
+    #        return any(all((-1, i)==match[(-1,i)] for i in range(len(self.iT))) for match in matches)
 
     #Returns if the patterns are equal and the input matches
     def equal_with_match(self, other: 'Pattern', opts: SymOpts):
@@ -248,24 +340,29 @@ class Pattern:
     def gt(self, other, opts: SymOpts):
         raise NotImplementedError()
 
-
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
-        return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
+        #return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
+        return ret + "\n  " + str(self.prog)
 
     def __hash__(self):
         return hash(str(self))
 
     #TODO verify this works
     def to_comb(self, ns="C", name="C") -> CombProgram:
-
+        prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
+        I, O, IK, OK = prog
+        T = self.T
         #Create symbol mapping
-        src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(self.iT))}
+        src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
         for opi in range(self.num_ops):
-            src_to_sym.update({(opi, i):Sym(f"t{opi}_{i}") for i in range(len(self.op_oTs[opi]))})
+            src_to_sym.update({(opi, 0):Sym(f"t{opi}_{0}")})
 
         snk_to_sym = {}
         for src, snk in self.edges:
+            if src not in src_to_sym:
+                print(src, snk)
+                raise ValueError
             assert src in src_to_sym
             snk_to_sym[snk] = src_to_sym[src]
         src_to_sym.update({(self.num_ops, i): Sym(f"O{i}") for i in range(len(self.oT))})
@@ -275,8 +372,8 @@ class Pattern:
 
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
-            lhss = [src_to_sym[(opi, i)] for i in range(len(self.op_oTs[opi]))]
-            args = [snk_to_sym[(opi, i)] for i in range(len(self.op_iTs[opi]))]
+            lhss = [src_to_sym[(opi, 0)]]
+            args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
         out_lhs = [src_to_sym[(self.num_ops, i)] for i in range(len(self.oT))]
@@ -286,7 +383,11 @@ class Pattern:
         g = nx.DiGraph()
         for (src, _), (snk, _) in self.edges:
             g.add_edge(src, snk)
-        order = list(nx.topological_sort(g))
+        try:
+            order = list(nx.topological_sort(g))
+        except nx.NetworkXException:
+            print(g)
+            raise ValueError
 
         #Could be a constant
         #Remove inputs from order
@@ -302,123 +403,170 @@ class Pattern:
         raise NotImplementedError()
 
 
-class PatternEncoding:
-    def __init__(
-        self,
-        iT: tp.List[nT],
-        oT: tp.List[nT],
-        op_list: tp.List[Comb],
-        const_list: tp.Tuple[int] = (),
-        prefix: str = "",
-        sym_opts: SymOpts = SymOpts(),
-    ):
-        self.iT = iT
-        self.oT = oT
-        assert all(isinstance(T, nT) for T in [*iT, *oT])
-        self.op_list = op_list
-        self.const_list = const_list
-        self.prefix = prefix
-        self.sym_opts = sym_opts
+#Assume 1 output
+def enum_dags(NI, pats: tp.List[Pattern]):
+    NIs = [len(p.iT) for p in pats]
+    Npat = len(NIs)
 
+    #Create a set of all sources/snks sorted by type
+    srcs = [(-1, i) for i in range(NI)] + [(i,0) for i in range(Npat)]
+    snks = [(Npat, 0)]
+    for i, NIi in enumerate(NIs):
+        snks.extend((i, j) for j in range(NIi))
 
-        if len(self.const_list) > 0:
-            raise NotImplementedError()
-        #Spec, and ops cannot have params
-        if any(comb.has_params for comb in self.op_list):
-            raise ValueError("Cannot synth with non-concrete parameters")
-
-        # Structure
-        input_vars = [get_var(f"{prefix}_In[{i}]", T) for i, T in enumerate(iT)]
-        self.input_vars = input_vars
-
-        Ninputs = len(input_vars)
-        hard_consts = self.const_list
-        Nconsts = len(hard_consts)
-        output_vars = [get_var(f"{prefix}_Out[{i}]", T) for i, T in enumerate(oT)]
-        self.output_vars = output_vars
-        op_out_vars = []
-        op_in_vars = []
-        for opi, op in enumerate(self.op_list):
-            assert isinstance(op, Comb)
-            op_iTs, op_oTs = op.get_type()
-            op_in_vars.append([get_var(f"{prefix}_OpIn[{opi}][{i}]", T) for i, T in enumerate(op_iTs)])
-            op_out_vars.append([get_var(f"{prefix}_OpOut[{opi}][{i}]", T) for i, T in enumerate(op_oTs)])
-        self.input_vars = input_vars
-        self.output_vars = output_vars
-        self.op_out_vars = op_out_vars
-        self.op_in_vars = op_in_vars
-        self.vars = (input_vars, hard_consts, output_vars, op_out_vars, op_in_vars)
-
-    @property
-    def P_lib(self):
-        P_lib = []
-        for i, op in enumerate(self.op_list):
-            ovars = _make_list(op.evaluate(*self.op_in_vars[i]))
-            for j, op_out_var in enumerate(ovars):
-                P_lib.append(self.op_out_vars[i][j] == op_out_var)
-        return fc.And(P_lib)
-
-    @property
-    def P_conn(self):
-        raise NotImplementedError()
-
-    @property
-    def P_wfp(self):
-        raise NotImplementedError()
-
-    @property
-    def P_sym_same_op(self):
-        raise NotImplementedError()
-
-    @property
-    def P_sym_comm(self):
-        raise NotImplementedError()
-
-    @property
-    def P_sym_input_perm(self):
-        raise NotImplementedError()
-
-    @property
-    def P_sym(self):
-        P_sym = []
-        if self.sym_opts.comm:
-            P_sym.append(self.P_sym_comm)
-        if self.sym_opts.same_op:
-            P_sym.append(self.P_sym_same_op)
-        if self.sym_opts.input_perm:
-            P_sym.append(self.P_sym_input_perm)
-        return fc.And(P_sym)
-
-    @cached_property
-    def num_ops(self):
-        return len(self.op_list)
-
-    def pattern_from_sol(self, sol) -> Pattern:
-        raise NotImplementedError()
-
-    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
-        raise NotImplementedError()
-
-    def match_rule_dag(self, dag, r_matches):
-        raise NotImplementedError()
-
-    def match_all_patterns(self, pat: Pattern):
-        raise NotImplementedError()
-
-    def any_pat_match(self, pat: Pattern):
-        raise NotImplementedError()
-
-    @cached_property
-    def types_viable(self):
-        iTs = _list_to_counts(self.iT)
-        oTs = _list_to_counts(self.oT)
-        op_iTs = [types_to_nT_cnts(op.get_type()[0]) for op in self.op_list]
-        op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
-        snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))
-        srcs = add_cnts(iTs, functools.reduce(lambda a, b: add_cnts(a,b), op_oTs))
-        if set(snks.keys()) != set(srcs.keys()):
+    #This strategy will produce invalid graphs
+    #Easy filter to remove most of the bad connections
+    def invalid_edge(src, snk):
+        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
+    def valid_dag(edges):
+        used_srcs = set(src for src,_ in edges)
+        all_used = all(src in used_srcs for src in srcs)
+        if not all_used:
             return False
-        return ge0_cnts(sub_cnts(snks, srcs))
+        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
+        return not bad_edge
+
+    src_poss = [srcs for _ in snks]
+    graphs = []
+    for src_list in it.product(*src_poss):
+        edges = list(zip(src_list, snks))
+        if valid_dag(edges):
+            if is_dag(edges):
+                graphs.append(edges)
+    return graphs
+
+def is_dag(edges):
+    g = nx.DiGraph()
+    for (src, _), (snk, _) in edges:
+        g.add_edge(src, snk)
+    return nx.is_directed_acyclic_graph(g)
+
+
+def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
+    op_names = [op.qualified_name for op in ops]
+    #Find one allocation of pat ops to ops
+    op_map = [None for _ in op_names]
+    pmap = {}
+    for pi, pat in enumerate(pats):
+        for opi, pat_op in enumerate(pat.op_names):
+            for i, op in enumerate(op_names):
+                if (op_map[i] is None) and op==pat_op:
+                    op_map[i] = (pi, opi)
+                    pmap[(pi, opi)] = i
+                    break
+    assert all(m is not None for m in op_map)
+    pat_edges = {}
+    edges = []
+    for pi, pat in enumerate(pats):
+        i_edges = {}
+        o_srcs = []
+        m_edges = []
+        for (srci, srca), (snki, snka) in pat.edges:
+            if snki == pat.num_ops:
+                assert (pi, srci) in pmap
+                new_srci = pmap[(pi, srci)]
+                o_srcs.append((new_srci, srca))
+            elif srci == -1:
+                assert (pi, snki) in pmap
+                new_snki = pmap[(pi, snki)]
+                i_edges.setdefault(srca,[]).append((new_snki, snka))
+            else:
+                assert (pi, srci) in pmap
+                assert (pi, snki) in pmap
+                new_srci = pmap[(pi, srci)]
+                new_snki = pmap[(pi, snki)]
+                m_edges.append(((new_srci, srca), (new_snki, snka)))
+        assert len(o_srcs)==1
+        edges.extend(m_edges)
+        pat_edges[pi] = (i_edges, o_srcs[0])
+    for (srci, srca), (snki, snka) in dag:
+        if srci==-1:
+            src = (srci, srca)
+            i_edges, _ = pat_edges[snki]
+            for snk in i_edges[snka]:
+                edges.append((src, snk))
+        elif snki == len(pats):
+            snk = (len(op_names), 0)
+            _, o_src = pat_edges[srci]
+            edges.append((o_src, snk))
+        else:
+            _, src = pat_edges[srci]
+            i_edges, _ = pat_edges[snki]
+            for snk in i_edges[snka]:
+                edges.append((src, snk))
+    return Pattern(iT, oT, ops, edges, is_pat=True)
 
 
 
+
+
+
+
+
+
+
+
+#def enum_dags(goal_iT, goal_oT, pats: tp.List[Pattern]):
+#    pat_iTs = [_list_to_dict(p.iT) for p in pats]
+#    pat_oTs = [_list_to_dict(p.oT) for p in pats]
+#
+#    #Create a set of all sources/snks sorted by type
+#    srcs = {n:[(-1, i) for i in ids] for n, ids in _list_to_dict(goal_iT).items()}
+#    for pi, pat_oT in enumerate(pat_oTs):
+#        for n, ids in pat_oT.items():
+#            srcs.setdefault(n, []).extend((pi, i) for i in ids)
+#    snks = {n:[(len(pats), i) for i in ids] for n, ids in _list_to_dict(goal_oT).items()}
+#    for pi, pat_iT in enumerate(pat_iTs):
+#        for n, ids in pat_iT.items():
+#            snks.setdefault(n, []).extend((pi, i) for i in ids)
+#
+#
+#    #This strategy will produce invalid graphs
+#    #Easy filter to remove most of the bad connections
+#    def invalid_edge(src, snk):
+#        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
+#    all_src = flat([srcs_ for srcs_ in srcs.values()])
+#    def invalid_dag(edges):
+#        used_srcs = set(src for src,_ in edges)
+#        all_used = all(src in used_srcs for src in all_src)
+#        bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
+#        return (not all_used) or bad_edge
+#        #each source should be in edge list
+#
+#    src_poss = []
+#    snk_list = []
+#    for n, n_snks in snks.items():
+#        snk_list += n_snks
+#        src_poss += [srcs[n] for _ in n_snks]
+#
+#    graphs = []
+#    for src_list in it.product(*src_poss):
+#        edges = list(zip(src_list, snk_list))
+#        if not invalid_dag(edges):
+#            graphs.append(edges)
+#    return graphs
+def all_prog(pat_enum, prog_enum):
+    #Only enumerate unique programs
+    eq = set()
+    for pat in pat_enum:
+        for prog in prog_enum(pat):
+            if add_to_set(eq, prog):
+                yield prog
+
+
+def onepat(P, L):
+    #Output
+    cond = [P[1]==L[1]]
+
+    #K ins
+    cond.append(fc.And([fc.And([Pij==Lij for Pij, Lij in zip(Pi, Li)]) for Pi, Li in zip(P[2], L[2])]))
+
+    #K outs
+    cond.append(fc.And([Pi==Li for Pi, Li in zip(P[3], L[3])]))
+    return fc.And(cond).to_hwtypes()
+
+
+def IPerm(P, map):
+    O = map[P[1]]
+    IK = [[map[IKij] for IKij in IKi] for IKi in P[2]]
+    return P[0], O, IK, P[3]
