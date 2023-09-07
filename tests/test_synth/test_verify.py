@@ -25,8 +25,8 @@ o = bv.mul[N](a, b_p_c)
 
 def test_dist():
     obj1 = compile_program(file1)
-    c1 = obj1.comb_dict['test.dist1']
-    c2 = obj1.comb_dict['test.dist2']
+    c1 = obj1.get('test', 'dist1')
+    c2 = obj1.get('test', 'dist2')
     N = 16
     res = verify(c1[N], c2[N])
     assert res is None

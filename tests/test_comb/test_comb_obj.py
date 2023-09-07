@@ -24,8 +24,8 @@ o = bv.add[16](t0, t0)
 ])
 def test_obj(p):
     obj: Obj = compile_program(p)
-    assert 'test.t1' in obj.comb_dict
-    assert 'test.t2' in obj.comb_dict
+    assert obj.get('test', 't1')
+    assert obj.get('test', 't2')
     p1 = obj.serialize()
     obj1 = compile_program(p)
-    assert obj1.serialize()==p1
+    assert obj1.serialize() == p1

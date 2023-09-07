@@ -193,6 +193,7 @@ class RuleSynth(Cegis):
     #        yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
 
     #This enumerates all equiv patterns (from passed in pat) then matches on that
+    #DEPRECATED
     def match_pattern(self, pat: Pattern, r_op_ids:tp.Mapping[str,tp.Iterable[int]]):
         ops = sorted(r_op_ids.keys())
         for p in pat.enum_all_equal():
@@ -206,6 +207,7 @@ class RuleSynth(Cegis):
 
 
     #Note this is really only a LHS pat cover
+    #DEPRECATED
     def add_rule_cover(self, cover: tp.List[tp.Tuple[Pattern, int]]):
         pats = flat([[p for _ in range(cnt)] for p, cnt in cover])
 

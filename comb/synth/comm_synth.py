@@ -10,6 +10,8 @@ from .solver_utils import SolverOpts, Cegis, get_var, smt_is_sat
 from .utils import _make_list, type_to_nT, _list_to_dict, _to_int
 import itertools as it
 
+from ..frontend.ast import IntType
+
 
 def _swap(vals, ia, ib):
     assert ia < ib
@@ -22,6 +24,8 @@ def get_comm_info(spec: Comb, opts: SolverOpts):
     else:
         spec_n = spec
     iT, oT = spec_n.get_type()
+    if any([isinstance(t, IntType) for t in iT]):
+        return tuple([[i] for i in range(len(iT))])
     iT = [type_to_nT(t) for t in iT]
     if len(iT)==0:
         return  ([],)
