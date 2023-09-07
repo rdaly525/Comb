@@ -25,9 +25,10 @@ def verify(ss, opts, gold, debug=False):
             print(r)
     assert cnt == gold
 
+
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
-    #CombEncoding,
+    CombEncoding,
+    #AdjEncoding,
     #DepthEncoding,
 ])
 @pytest.mark.parametrize("num_adds, comm, same_op, input_perm, num_sols", [
@@ -82,8 +83,8 @@ def test_add(pat_en_t, num_adds, comm, same_op, input_perm, num_sols):
 
 
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
-    #CombEncoding,
+    CombEncoding,
+    #AdjEncoding,
     #DepthEncoding,
 ])
 @pytest.mark.parametrize("comm, same_op, input_perm, num_sols", [

@@ -1,0 +1,49 @@
+#IR
+
+# and
+Comb ir.and
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.and_[N](x0, x1)
+
+# add
+Comb ir.add
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# sub
+Comb ir.sub
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.sub[N](x0, x1)
+
+# ISA
+# add
+Comb isa.add
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.add[N](x0, x1)
+
+# Neg
+Comb isa.neg
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+o = bv.neg[N](x)
+
+# and
+Comb isa.and
+Param N: Int
+In x0 : BV[N]
+In x1 : BV[N]
+Out o : BV[N]
+o = bv.and_[N](x0, x1)
