@@ -65,8 +65,6 @@ class CombEncoding(PatternEncoding):
             for n, ids in _list_to_dict(oT).items():
                 self.src_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
-        assert len(self.src_n.keys())==1
-        assert len(self.snk_n.keys())==1
         assert all(len(out_lvars)==1 for out_lvars in self.op_out_lvars)
 
 

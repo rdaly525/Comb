@@ -15,15 +15,15 @@ class SpecSynth(Cegis):
         spec: Comb,
         op_list: tp.List[Comb],
         pat_en_t: tp.Type[PatternEncoding],
-        sym_opts: SymOpts = SymOpts(),
+        ir_opts: tp.Tuple[int],
+        narrow_opts: tp.Tuple[int],
         const_list: tp.Tuple[int] = (),
     ):
         assert issubclass(pat_en_t, PatternEncoding)
         iT, oT = spec.get_type()
         iT = [type_to_nT(t) for t in iT]
         oT = [type_to_nT(t) for t in oT]
-        sym_opts = SymOpts(sym_opts.comm, sym_opts.same_op, False)
-        self.pat_en = pat_en_t(iT, oT, op_list, const_list, sym_opts=sym_opts)
+        self.pat_en = pat_en_t(iT, oT, op_list, const_list)
         if self.pat_en.types_viable:
             self.spec = spec
             #Formal Spec (P_spec)
@@ -36,7 +36,8 @@ class SpecSynth(Cegis):
             #  Exists(L) Forall(V) P_wfp(L) & (P_lib & P_conn) => P_spec
 
             query = And([
-                self.pat_en.P_sym,
+                self.pat_en.P_iropt(*ir_opts),
+                self.pat_en.P_narrow(*narrow_opts),
                 self.pat_en.P_wfp,
                 fc.Implies(
                     And([self.pat_en.P_lib, self.pat_en.P_conn]),

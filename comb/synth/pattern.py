@@ -135,9 +135,7 @@ class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat):
         self.iT = iT
         self.oT = oT
-        assert len(oT) == 1
         self.T = oT[0]
-        assert all(self.T == T for T in self.iT)
         self.ops = ops
         self.num_ops = len(ops)
         self.NI = len(iT)
@@ -342,8 +340,7 @@ class Pattern:
 
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
-        #return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
-        return ret + "\n  " + str(self.prog)
+        return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
 
     def __hash__(self):
         return hash(str(self))
