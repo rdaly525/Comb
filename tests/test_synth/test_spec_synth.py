@@ -247,9 +247,6 @@ def test_c_fma(pat_en_t):
 
 
 
-
-
-
 fa_f = '''\
 Comb test.fa
 In ci : BV[1] 
@@ -263,8 +260,6 @@ a_and_b = bv.and_[1](a, b)
 t = bv.and_[1](ci, a_xor_b)
 co = bv.or_[1](t, a_and_b)
 '''
-
-
 
 import hwtypes as ht
 @pytest.mark.skip(reason="Broken")
@@ -307,6 +302,54 @@ def test_fulladder(pat_en_t):
         res = verify(combi, spec)
         assert res is None
 
+add_ext_f = '''\
+Comb test.add_ext
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N+1]
+a_ext = bv.concat[N,1](a, bv.slice[N,N-1,N](a))
+b_ext = bv.concat[N,1](b, bv.slice[N,N-1,N](b))
+o = bv.add[N+1](a_ext, b_ext)
+'''
+
+import hwtypes as ht
+@pytest.mark.parametrize("pat_en_t", [
+    #AdjEncoding,
+    CombEncoding,
+    #DepthEncoding,
+])
+def test_add_ext(pat_en_t):
+    N, C, K, dce, cse = 4, 1, 1, 1, 0
+    obj = compile_program(add_ext_f)
+    spec = obj.get("test", "add_ext")[N]
+    ops = [BV.concat[N,1]]*2 + [BV.slice[N,N-1,N]]*2 + [BV.add[N+1]]
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=2000,
+            verbose=1,
+        ),
+    )
+    pats = list(pats)
+    num_pats = len(pats)
+    print("SOLS:", num_pats)
+    #not accounting for program enumeration
+    assert num_pats == 12 
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, spec)
+        assert res is None
 
 bad = '''
 # const

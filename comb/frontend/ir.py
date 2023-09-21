@@ -211,13 +211,12 @@ class CombProgram(Comb):
         f = f_fc.to_hwtypes()
         if f.value.is_constant() and f.value.constant_value() is True:
             return
-        print(f_fc.serialize())
         with smt.Solver(name='z3') as solver:
             solver.add_assertion((~f).value)
             res = solver.solve()
             if res is False:
                 return
-            raise TypeError(f"TC: Type check failed: \n{f.serialize()}")
+            raise TypeError(f"TC: Type check failed: \n{f_fc.serialize()}")
 
 class Obj(Node):
     def __init__(self, combs: tp.List[Comb]):

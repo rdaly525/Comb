@@ -12,7 +12,7 @@ from ..frontend.stdlib import make_bv_const
 from .pattern import Pattern
 from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
-from .utils import flat, _to_int, _list_to_dict, type_to_nT
+from .utils import flat, _to_int, _list_to_dict, type_to_nT, nT_to_type
 from hwtypes import SMTBitVector as SBV
 import typing as tp
 
@@ -472,45 +472,45 @@ class CombEncoding(PatternEncoding):
     #    return ret
 
 
-    #def comb_from_solved(self, lvals, name: QSym):
-    #    spec_iTs, spec_oTs = self.comb_type
+    def comb_from_solved(self, lvals, name: QSym = QSym("Default", "P")):
+       spec_iTs, spec_oTs = self.iT, self.oT 
 
-    #    input_vars, hard_consts, output_vars, op_out_vars, op_in_vars = self.vars
-    #    input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
-    #    num_inputs = len(spec_iTs)
-    #    #Fill in all the lvars
-    #    output_lvars = [_to_int(lvals[lvar.value]) for lvar in output_lvars]
-    #    def name_from_loc(loc, src=None):
-    #        if loc < num_inputs:
-    #            return Sym(f"I{loc}")
-    #        elif loc < num_inputs + len(hard_consts):
-    #            assert src is not None
-    #            i, j = src
-    #            iT = self.op_list[i].get_type()[0][j].type
-    #            if isinstance(iT, TypeCall):
-    #                assert isinstance(iT.type, BVType)
-    #                N = iT.pargs[0].value
-    #                const_val = hard_consts[loc - num_inputs]
-    #                return make_bv_const(N, const_val)
-    #            else:
-    #                raise NotImplementedError()
-    #        else:
-    #            loc = loc - (num_inputs + len(hard_consts))
-    #            return Sym(f"t{loc}")
+       input_vars, hard_consts, output_vars, op_out_vars, op_in_vars = self.vars
+       input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
+       num_inputs = len(spec_iTs)
+       #Fill in all the lvars
+       output_lvars = [_to_int(lvals[lvar.value]) for lvar in output_lvars]
+       def name_from_loc(loc, src=None):
+           if loc < num_inputs:
+               return Sym(f"I{loc}")
+           elif loc < num_inputs + len(hard_consts):
+               assert src is not None
+               i, j = src
+               iT = self.op_list[i].get_type()[0][j].type
+               if isinstance(iT, TypeCall):
+                   assert isinstance(iT.type, BVType)
+                   N = iT.pargs[0].value
+                   const_val = hard_consts[loc - num_inputs]
+                   return make_bv_const(N, const_val)
+               else:
+                   raise NotImplementedError()
+           else:
+               loc = loc - (num_inputs + len(hard_consts))
+               return Sym(f"t{loc}")
 
-    #    out_lvar_vals = {}
-    #    in_lvar_vals = {}
-    #    for i in range(len(op_out_lvars)):
-    #        out_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_out_lvars[i]]
-    #        in_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_in_lvars[i]]
+       out_lvar_vals = {}
+       in_lvar_vals = {}
+       for i in range(len(op_out_lvars)):
+           out_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_out_lvars[i]]
+           in_lvar_vals[i] = [_to_int(lvals[lvar.value]) for lvar in op_in_lvars[i]]
 
-    #    inputs = [InDecl(name_from_loc(i), T) for i, T in enumerate(spec_iTs)]
-    #    outputs = [OutDecl(name_from_loc(output_lvars[i]), T) for i, T in enumerate(spec_oTs)]
-    #    stmts = []
-    #    for i, out_lvars in sorted(out_lvar_vals.items(), key=lambda item: item[1][0]):
-    #        lhss = [name_from_loc(loc) for loc in out_lvars]
-    #        op = self.op_list[i]
-    #        args = [name_from_loc(loc, src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
-    #        stmts.append(AssignStmt(lhss, [op.call_expr([], args)]))
-    #    comb = CombProgram(name, [*inputs, *outputs, *stmts])
-    #    return comb
+       inputs = [InDecl(name_from_loc(i), nT_to_type(T)) for i, T in enumerate(spec_iTs)]
+       outputs = [OutDecl(name_from_loc(output_lvars[i]), nT_to_type(T)) for i, T in enumerate(spec_oTs)]
+       stmts = []
+       for i, out_lvars in sorted(out_lvar_vals.items(), key=lambda item: item[1][0]):
+           lhss = [name_from_loc(loc) for loc in out_lvars]
+           op = self.op_list[i]
+           args = [name_from_loc(loc, src=(i,j)) for j, loc in enumerate(in_lvar_vals[i])]
+           stmts.append(AssignStmt(lhss, [op.call_expr([], args)]))
+       comb = CombProgram(name, [*inputs, *outputs, *stmts])
+       return comb
