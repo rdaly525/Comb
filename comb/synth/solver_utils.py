@@ -56,7 +56,10 @@ def get_model(query, vars, solver_name, logic):
 @dataclass
 class Cegis:
     query: ht.SMTBit
+    synth: ht.SMTBit
+    verif: ht.SMTBit
     E_vars: tp.Iterable['freevars']
+    input_vars: tp.Iterable['inputvars']
 
     def cegis(self, prev_sol, opts: SolverOpts = SolverOpts()):
         if opts.verbose==2:
@@ -121,12 +124,81 @@ class Cegis:
                         A_vals = {v: model.get_value(v) for v in A_vars}
                         solver.add_assertion(query.substitute(A_vals).simplify())
 
+    def cegis_new(self, prev_sol, opts: SolverOpts = SolverOpts()):
+        if opts.verbose==2:
+            show_e = True
+            show_iter = True
+        elif opts.verbose:
+            show_e = False
+            show_iter = True
+        else:
+            show_e = False
+            show_iter = False
+        #assert opts.max_iters > 0
+        #print("Query Size:", smt.get_formula_size(query))
+        if prev_sol is not None:
+            synth = self.synth.value
+            sol_term = smt.Bool(True)
+            for var, val in prev_sol.items():
+                sol_term = smt.And(sol_term, smt.EqualsOrIff(var, val))
+            self.synth = ht.SMTBit(smt.And(synth, smt.Not(sol_term)))
+        synth = self.synth.value
+        verif = self.verif.value
+        #get exist vars:
+        E_vars = set(var.value for var in self.E_vars)  # exist_vars
+        A_vars = synth.get_free_variables() - E_vars  # forall vars
+        input_vars = [var.value for var in self.input_vars]
+        dep_vars = A_vars - set(input_vars)
+
+        with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+            solver.add_assertion(smt.Bool(True))
+
+            # Start with checking all A vals beings 0
+            input_vals = {v: _int_to_pysmt(0, v.get_type()) for v in input_vars}
+            solver.add_assertion(synth.substitute(input_vals).simplify())
+            start = timeit.default_timer()
+            for i in it.count(1):
+                if (timeit.default_timer()-start > opts.timeout):
+                    print('TO', flush=True)
+                    #if show_iter:
+                    #    print("TO")
+                    return IterLimitError(), opts.timeout
+
+                if show_iter and i%10==0:
+                    print(f".{i}", end='', flush=True)
+                E_res = solver.solve()
+
+                if not E_res:
+                    t = (timeit.default_timer()-start)
+                    #print('UNSAT',t, flush=True)
+                    if show_iter:
+                        print("UNSAT")
+                    return None, t
+                else:
+                    E_guess = {v: solver.get_value(v) for v in E_vars}
+                    if show_e and i%100==50:
+                        print_e(E_guess)
+                    query_guess = verif.substitute(E_guess).simplify()
+                    model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
+                    if model is None:
+                        t = (timeit.default_timer()-start)
+                        print('SAT',t, flush=True)
+                        if show_iter:
+                            print("SAT")
+                        return E_guess, t
+                    else:
+                        input_vals = {v: model.get_value(v) for v in input_vars}
+                        dep_vals = {v: get_var(f"{v}_{i}", v.bv_width()).value for v in dep_vars}
+                        solver.add_assertion(synth.substitute(input_vals).substitute(dep_vals).simplify())
 
     #enum_fun takes a single solution and enumerates all 'permutations' of that solution to add to the exclude list
-    def cegis_all(self, exclude_prev: bool, opts: SolverOpts = SolverOpts()):
+    def cegis_all(self, exclude_prev: bool, opts: SolverOpts = SolverOpts(), new_impl = False):
         prev = None
         while True:
-            sol, t = self.cegis(prev_sol=prev, opts=opts)
+            if new_impl:
+                sol, t = self.cegis_new(prev_sol=prev, opts=opts)
+            else:
+                sol, t = self.cegis(prev_sol=prev, opts=opts)
             if sol is not None:
                 assert sol != prev
             if opts.log:
@@ -191,7 +263,7 @@ def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
 
 def _int_to_pysmt(x: int, sort):
     if sort.is_bv_type():
-        return smt.BV(x % sort.width, sort.width)
+        return smt.BV(x % (1 << sort.width), sort.width)
     else:
         assert sort.is_bool_type()
         return smt.Bool(bool(x))

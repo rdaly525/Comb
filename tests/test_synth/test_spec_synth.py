@@ -262,7 +262,6 @@ co = bv.or_[1](t, a_and_b)
 '''
 
 import hwtypes as ht
-@pytest.mark.skip(reason="Broken")
 @pytest.mark.parametrize("pat_en_t", [
     #AdjEncoding,
     CombEncoding,
@@ -291,16 +290,16 @@ def test_fulladder(pat_en_t):
             verbose=1,
         ),
     )
-    pats = list(pats)
-    num_pats = len(pats)
-    print("SOLS:", num_pats)
-    assert num_pats == 1 #not correct
+    num_pats = 0
     for pi, pat in enumerate(pats):
         print(pi, "*"*80)
         combi = pat.to_comb("t", f"P{pi}")
         print(combi)
         res = verify(combi, spec)
         assert res is None
+        num_pats += 1
+    print("SOLS:", num_pats)
+    assert num_pats == 33 
 
 add_ext_f = '''\
 Comb test.add_ext

@@ -26,11 +26,11 @@ class SpecSynth(Cegis):
         self.pat_en = pat_en_t(iT, oT, op_list, const_list)
         if self.pat_en.types_viable:
             self.spec = spec
+            input_vars = self.pat_en.input_vars
             #Formal Spec (P_spec)
             P_spec = []
-            for (i, ov) in enumerate(_make_list(self.spec.evaluate(*self.pat_en.input_vars))):
+            for (i, ov) in enumerate(_make_list(self.spec.evaluate(*input_vars))):
                 P_spec.append(self.pat_en.output_vars[i] == ov)
-
             And = fc.And
             #Final query:
             #  Exists(L) Forall(V) P_wfp(L) & (P_lib & P_conn) => P_spec
@@ -44,9 +44,24 @@ class SpecSynth(Cegis):
                     And(P_spec)
                 )
             ])
+
+            synth = And([
+                self.pat_en.P_iropt(*ir_opts),
+                self.pat_en.P_narrow(*narrow_opts),
+                self.pat_en.P_wfp,
+                self.pat_en.P_lib, 
+                self.pat_en.P_conn,
+                And(P_spec)
+            ])
+
+            verif = fc.Implies(
+                        And([self.pat_en.P_lib, self.pat_en.P_conn]),
+                        And(P_spec)
+                    )
+
             #print(query.serialize())
             E_vars = self.pat_en.E_vars
-            super().__init__(query.to_hwtypes(), E_vars)
+            super().__init__(query.to_hwtypes(), synth.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
     def exclude_pattern(self, pat:Pattern):
@@ -57,7 +72,7 @@ class SpecSynth(Cegis):
         if not self.pat_en.types_viable:
             print("SPECSYNTH TYPES NOT VIABLE")
             return
-        for sol, info in self.cegis_all(True, opts):
+        for sol, info in self.cegis_all(True, opts, new_impl = True):
             yield self.pat_en.pattern_from_sol(sol)
 
     # Tactic. Generate all the non-permuted solutions.
