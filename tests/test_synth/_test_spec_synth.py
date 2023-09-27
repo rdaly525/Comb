@@ -260,8 +260,8 @@ o = bv.or_[1](t0, t1)
 
 import hwtypes as ht
 @pytest.mark.parametrize("pat_en_t", [
-    #AdjEncoding,
     CombEncoding,
+    #AdjEncoding,
     #DepthEncoding,
 ])
 def _test_fulladder(pat_en_t):

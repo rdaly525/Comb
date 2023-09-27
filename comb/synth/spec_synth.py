@@ -36,7 +36,7 @@ class SpecSynth(Cegis):
             #  Exists(L) Forall(V) P_wfp(L) & (P_lib & P_conn) => P_spec
 
             query = And([
-                self.pat_en.P_sym,
+                #self.pat_en.P_sym,
                 self.pat_en.P_wfp,
                 fc.Implies(
                     And([self.pat_en.P_lib, self.pat_en.P_conn]),

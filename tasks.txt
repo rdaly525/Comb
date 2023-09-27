@@ -1,20 +1,20 @@
 Tasks:
     Get the Free Var Optimization working
         -Add opt for enumerating program topologies with a formula
-    Tests are broken.
     Nicity: Abstract Pattern class dependent on the encoding
     Fix CEGISAll to actually do incremental
-    Current
+    Many deprecated tests need to be updated
+    Lots of scattered prints need to be removed
+
+
+    Current:
+
+
 
     Done
+        Tests are broken. (Fixed a few, and depcreated a bunch
         Fix test_comb/test_comb
         Fix test_comb_obj
-
-
-
-
-
-
 
 
 

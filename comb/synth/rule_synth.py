@@ -128,11 +128,11 @@ class RuleSynth(Cegis):
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
         query = fc.And([
-            lhs_cs.P_iropt(*ir_opts),
-            lhs_cs.P_narrow(*narrow_opts),
+            #lhs_cs.P_iropt(*ir_opts),
+            #lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
-            rhs_cs.P_iropt(*ir_opts),
-            rhs_cs.P_narrow(*narrow_opts),
+            #rhs_cs.P_iropt(*ir_opts),
+            #rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
             fc.Implies(
                 fc.And([
