@@ -1,0 +1,53 @@
+Comb ir.msbs
+Param N: Int
+In x : BV[N]
+Out o : BV[N-1]
+o = bv.slice[N, 1, N](x)
+
+Comb ir.lsb
+Param N: Int
+In x : BV[N]
+Out o : BV[1]
+o = bv.slice[N, 0, 1](x)
+
+Comb ir.concat
+Param N: Int
+In lsb : BV[1]
+In msbs : BV[N-1]
+Out o : BV[N]
+o = bv.concat[1, N-1](lsb, msbs)
+
+Comb ir.msb_to_lsb
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+msb = bv.slice[N,N-1,N](x)
+lsbs = bv.slice[N,0,N-1](x)
+o = bv.concat[1,N-1](msb,lsbs)
+
+Comb isa.lsbs
+Param N: Int
+In x : BV[N]
+Out o : BV[N-1]
+o = bv.slice[N, 0, N-1](x)
+
+Comb isa.msb
+Param N: Int
+In x : BV[N]
+Out o : BV[1]
+o = bv.slice[N, N-1, N](x)
+
+Comb isa.concat
+Param N: Int
+In lsbs : BV[N-1]
+In msb : BV[1]
+Out o : BV[N]
+o = bv.concat[N-1,1](lsbs, msb)
+
+Comb isa.lsb_to_msb
+Param N: Int
+In x : BV[N]
+Out o : BV[N]
+lsb = bv.slice[N,0,1](x)
+msbs = bv.slice[N,1,N](x)
+o = bv.concat[N-1,1](msbs,lsb)

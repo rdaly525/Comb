@@ -53,13 +53,10 @@ def count(l):
             ret[n] = ret.get(n, 0) + v
     return ret
 
-def I_max(ops):
+def T_count(ops):
     iTs = count([get_cnt(op, 0) for op in ops])
     oTs = count([get_cnt(op, 1) for op in ops])
-    assert all(len(Ts) <= 1 for Ts in (oTs,iTs))
-    T = list(oTs.keys())[0]
-    #assert all(T in Ts for Ts in (lhs_oTs,lhs_iTs,rhs_oTs,rhs_iTs))
-    return iTs.get(T,0), oTs[T], T
+    return iTs, oTs
 
 @dataclass
 class RuleDiscovery:
@@ -84,14 +81,32 @@ class RuleDiscovery:
 
 
     def allT(self, lhs_ops, rhs_ops, num_out=1):
-        lNI, lNO, lT = I_max(lhs_ops)
-        rNI, rNO, rT = I_max(rhs_ops)
-        assert lT == rT
-        l_I_max = lNI - lNO + num_out
-        r_I_max = rNI - rNO + num_out
-        i_max = min(l_I_max, r_I_max)
-        for n in reversed(range(1, i_max+1)):
-            yield ((lT,)*n, (lT,))
+        #TODO: generalize to multiple outputs
+        assert num_out == 1
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+        rop_iTs, rop_oTs = T_count(rhs_ops)
+        for oT in lop_oTs.keys():
+            max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
+            iTs, maxcounts = list(max_iTs.keys()), list(max_iTs.values())
+
+            for counts in it.product(*(range(n, -1, -1) for n in maxcounts)):
+                # TODO: need to think about this iteration order to ensure general rules are synthesized first
+
+                if all(c == 0 for c in counts):
+                    continue
+
+                iTs_all = flat((iTs[i],)*n for i,n in enumerate(counts))
+
+                lsrcs = set(iTs_all) | set(lop_oTs.keys())
+                lsncs = set([oT]) | set(lop_iTs.keys())
+                rsrcs = set(iTs_all) | set(rop_oTs.keys())
+                rsncs = set([oT]) | set(rop_iTs.keys())
+
+                if (not lsncs <= lsrcs) or (not rsncs <= rsrcs):
+                    continue
+
+                yield (tuple(iTs_all), (oT,))
 
     #Finds all composite rules
 
@@ -110,7 +125,8 @@ class RuleDiscovery:
             l_eq = rule.lhs.op_cnt == lhs_op_cnt
             r_eq = rule.rhs.op_cnt == rhs_op_cnt
             if l_eq and r_eq and rule.NI >= NI:
-                print("RCNT", {ri:1},flush=True)
+                if opts.log:
+                    print("RCNT", {ri:1},flush=True)
                 yield [(rule, 1)]
                 continue
             l_subseteq = _m_subset(rule.lhs.op_cnt, lhs_op_cnt)
@@ -225,13 +241,13 @@ class RuleDiscovery:
                         #rhs_op_names = [op.qualified_name for op in rhs_ops]
                         kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
                         kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
-                        print(kstr,flush=True)
                         if opts.log:
+                            print(kstr,flush=True)
                             print_kind(lhs_ids, rhs_ids)
                         for (iT, oT) in self.allT(lhs_ops, rhs_ops):
                             new_rules = []
                             NI = len(iT)
-                            k = (tuple(lhs_ids), tuple(rhs_ids), NI)
+                            k = (tuple(lhs_ids), tuple(rhs_ids), iT)
                             if opts.log:
                                 print_iot(iT, oT)
                             rs = RuleSynth(
@@ -254,7 +270,7 @@ class RuleDiscovery:
                                     rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
                                     existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
                             comp_time = timeit.default_timer() - start
-                            if len(existing_rules) > 0:
+                            if len(existing_rules) > 0 and opts.log:
                                 print("CMPTIME", round(comp_time,3), flush=True)
                             if comp:
                                 for crule in existing_rules:
@@ -397,12 +413,13 @@ class RuleDiscovery:
                     rhs_ops = [self.rhss[i] for i in rhs_ids]
                     kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
                     kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
-                    print(kstr,flush=True)
+                    if opts.log:
+                        print(kstr,flush=True)
                     cur_cost = sum(costs[rid] for rid in rhs_ids)
                     for (iT, oT) in self.allT(lhs_ops, rhs_ops):
                         new_rules = []
                         NI = len(iT)
-                        k = (tuple(lhs_ids), tuple(rhs_ids), NI)
+                        k = (tuple(lhs_ids), tuple(rhs_ids), iT)
 
                         #kstr += f":{NI}"
                         if opts.log:
@@ -424,8 +441,6 @@ class RuleDiscovery:
                             for dag in dags:
                                 lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                 existing_pats.append(lhs_pat)
-                        if len(existing_pats) > 0:
-                            print()
                         comp_time = timeit.default_timer() - start
                         if comp:
                             if LC:
