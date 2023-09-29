@@ -25,9 +25,9 @@ isa = [c[N] for c in obj.get_from_ns("isa")]
 print([c.name for c in isa])
 costs = [11, 8, 30]
 
-assert ir[0].comm_info == ([0,1],) # Add
-assert ir[1].comm_info == ([0,1],) # Sub
-assert ir[2].comm_info == ([1], [0]) # And
+assert ir[0].comm_info == ([0,1],) # And
+assert ir[1].comm_info == ([0,1],) # Add
+assert ir[2].comm_info == ([1], [0]) # Sub
 assert isa[0].comm_info == ([0,1],) # Add
 assert isa[1].comm_info == ([0],) # Neg
 assert isa[2].comm_info == ([0, 1],) # And
@@ -81,6 +81,66 @@ def test_genall(LC_test, LC, E, CMP, C, K):
     print("TOTTIME:", delta)
 
 
+N = 3
+fname = f"{dir}/combs/bit_movement.comb"
+with open(fname, 'r') as f:
+    obj = compile_program(f.read())
+ir = [c[N] for c in obj.get_from_ns("ir")]
+isa = [c[N] for c in obj.get_from_ns("isa")]
+print([c.name for c in isa])
+costs = [1,1,2,2]
+@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K", [
+    (1,1,1,1,1,1),
+    (0,0,1,1,1,1),
+])
+def test_bit_movement(LC_test, LC, E, CMP, C, K):
+    costs = [1,1,2,2]
+    if not LC_test:
+        assert not LC
+    print("F:", LC_test, LC, E, CMP, C, K)
+
+    maxIR = 3
+    maxISA = 3
+    opMaxIR = None
+    opMaxISA = None
+    dce = 1
+    cse = 0
+    start_time = time()
+    rd = RuleDiscovery(
+        lhss=ir,
+        rhss=isa,
+        maxL=maxIR,
+        maxR=maxISA,
+        opMaxL=opMaxIR,
+        opMaxR=opMaxISA,
+    )
+    ir_opts = (dce, cse)
+    narrow_opts = (C, K)
+    E_opts = (LC, E, CMP)
+    if LC_test:
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, solver_opts)
+    else:
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, solver_opts)
+    num_rules = 0
+    for ri, rule in enumerate(ga):
+        print("RULE", ri, flush=True)
+        print(rule)
+        print("*"*80)
+        num_rules += 1
+    db = rd.rdb
+    for k, info in db.time_info.items():
+        num_unique = info["u"]
+        extra = info['e']
+        sat_time = info['st']
+        extra_time = info['et']
+        assert extra >=0
+        print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
+    delta = time()-start_time
+    print("TOTTIME:", delta)
+    if LC_test:
+        assert num_rules == 19
+    else: 
+        assert num_rules == 22
 
 from timeit import default_timer as time
 

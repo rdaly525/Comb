@@ -76,8 +76,7 @@ class CombEncoding(PatternEncoding):
     def P_conn(self):
         P_conn = []
         for n, src_dict in self.src_n.items():
-            assert n in self.snk_n
-            snk_dict = self.snk_n[n]
+            snk_dict = self.snk_n.get(n,{})
             for src_v, snk_v in it.product(src_dict.values(), snk_dict.values()):
                 P_conn.append(fc.Implies(src_v.lvar==snk_v.lvar, src_v.var==snk_v.var))
         return fc.And(P_conn)
