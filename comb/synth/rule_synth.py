@@ -151,7 +151,7 @@ class RuleSynth(Cegis):
         #assert 0
         query = query.to_hwtypes()
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-        super().__init__(query, E_vars)
+        super().__init__(query, None, None, E_vars, None)
 
 
     # E whether represents to exclude all equivalent rules
