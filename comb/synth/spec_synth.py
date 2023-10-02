@@ -35,7 +35,20 @@ class SpecSynth(Cegis):
             #Final query:
             #  Exists(L) Forall(V) P_wfp(L) & (P_lib & P_conn) => P_spec
 
-            query = And([
+
+            synth_base = And([
+                self.pat_en.P_iropt(*ir_opts),
+                self.pat_en.P_narrow(*narrow_opts),
+                self.pat_en.P_wfp,
+            ])
+
+            synth_constrain = And([
+                self.pat_en.P_lib, 
+                self.pat_en.P_conn,
+                And(P_spec)
+            ])
+
+            verif = And([
                 self.pat_en.P_iropt(*ir_opts),
                 self.pat_en.P_narrow(*narrow_opts),
                 self.pat_en.P_wfp,
@@ -45,23 +58,9 @@ class SpecSynth(Cegis):
                 )
             ])
 
-            synth = And([
-                self.pat_en.P_iropt(*ir_opts),
-                self.pat_en.P_narrow(*narrow_opts),
-                self.pat_en.P_wfp,
-                self.pat_en.P_lib, 
-                self.pat_en.P_conn,
-                And(P_spec)
-            ])
-
-            verif = fc.Implies(
-                        And([self.pat_en.P_lib, self.pat_en.P_conn]),
-                        And(P_spec)
-                    )
-
             #print(query.serialize())
             E_vars = self.pat_en.E_vars
-            super().__init__(query.to_hwtypes(), synth.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
+            super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
     def exclude_pattern(self, pat:Pattern):
@@ -72,7 +71,7 @@ class SpecSynth(Cegis):
         if not self.pat_en.types_viable:
             print("SPECSYNTH TYPES NOT VIABLE")
             return
-        for sol, info in self.cegis_all(True, opts, new_impl = True):
+        for sol, info in self.cegis_all(True, opts):
             yield self.pat_en.pattern_from_sol(sol)
 
     # Tactic. Generate all the non-permuted solutions.

@@ -79,9 +79,8 @@ class RuleDiscovery:
         self.lhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.lhss)}
         self.rhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.rhss)}
 
-    def allT(self, lhs_ops, rhs_ops, max_outputs = 1):
+    def allT(self, lhs_ops, rhs_ops, max_outputs):
         # generate all possible program input and output type combinations
-        assert max_outputs == 1
 
         lop_iTs, lop_oTs = T_count(lhs_ops)
         rop_iTs, rop_oTs = T_count(rhs_ops)

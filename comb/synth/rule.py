@@ -64,8 +64,8 @@ class Rule:
     def enum_input_perm(self, PL, PR):
         I = PL[0]
         NI = len(I)
-        NL = len(PL[3])
-        NR = len(PR[3])
+        NL = sum([len(x) for x in PL[3]])
+        NR = sum([len(x) for x in PR[3]])
         for iperm in it.permutations(I):
             map = {i:j for i, j in enumerate(iperm)}
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
@@ -74,8 +74,6 @@ class Rule:
 
 
     def ruleL(self, L_IR, L_ISA):
-
-
         #enums patterns
         l_enum = all_prog(self.lhs.enum_CK(), self.lhs.enum_prog)
         r_enum = all_prog(self.rhs.enum_CK(), self.rhs.enum_prog)
