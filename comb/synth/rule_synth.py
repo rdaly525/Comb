@@ -122,17 +122,37 @@ class RuleSynth(Cegis):
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
 
+        input_vars = [*lhs_cs.input_vars, *rhs_cs.input_vars]
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
         P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
-        query = fc.And([
+        synth_base = fc.And([
             lhs_cs.P_iropt(*ir_opts),
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
             rhs_cs.P_iropt(*ir_opts),
-            rhs_cs.P_narrow(*narrow_opts),
+            #we dont want to constrain the output order of the rhs, since that could
+            #make certain rules we want unsynthesizable
+            rhs_cs.P_narrow(*narrow_opts[:-1], 0),
+            rhs_cs.P_wfp,
+        ])
+
+        synth_constrain = fc.And([
+            lhs_cs.P_lib,
+            lhs_cs.P_conn,
+            rhs_cs.P_lib,
+            rhs_cs.P_conn,
+            fc.And(P_outputs),
+        ])
+
+        verif = fc.And([
+            lhs_cs.P_iropt(*ir_opts),
+            lhs_cs.P_narrow(*narrow_opts),
+            lhs_cs.P_wfp,
+            rhs_cs.P_iropt(*ir_opts),
+            rhs_cs.P_narrow(*narrow_opts[:-1], 0), #see above comment
             rhs_cs.P_wfp,
             fc.Implies(
                 fc.And([
@@ -149,9 +169,8 @@ class RuleSynth(Cegis):
         ])
         #print(query.serialize())
         #assert 0
-        query = query.to_hwtypes()
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-        super().__init__(query, None, None, E_vars, None)
+        super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
     # E whether represents to exclude all equivalent rules
@@ -169,7 +188,7 @@ class RuleSynth(Cegis):
                 else:
                     rp_cond, enum_time = self.ruleL(rule)
                 self.enum_times.append(enum_time)
-                self.query = self.query & ~rp_cond
+                self.synth_base = self.synth_base & ~rp_cond
 
     def ruleL(self, rule:Rule):
         L_IR = self.lhs_cs.L

@@ -65,12 +65,10 @@ class CombEncoding(PatternEncoding):
             for n, ids in _list_to_dict(oT).items():
                 self.src_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
-        assert all(len(out_lvars)==1 for out_lvars in self.op_out_lvars)
-
 
     @property
     def L(self):
-        return self.input_lvars, self.output_lvars[0], self.op_in_lvars, [lvars[0] for lvars in self.op_out_lvars]
+        return self.input_lvars, self.output_lvars, self.op_in_lvars, self.op_out_lvars
 
     @property
     def P_conn(self):
@@ -93,21 +91,20 @@ class CombEncoding(PatternEncoding):
 
         for lvar in self.rhs_lvars:
             P_in_range.append(lvar < self.tot_locs)
-        return fc.And(P_in_range)
 
-
-        #TODO flag?
         #output loc cannot be inputs
-        #for lvar in output_lvars:
-        #    P_in_range.append(lvar >= Ninputs+Nconsts)
+        for lvar in self.output_lvars:
+           P_in_range.append(lvar >= self.Ninputs + self.Nconsts)
+
+        return fc.And(P_in_range)
 
     @property
     def P_loc_unique(self):
         # Temp locs are unique
         #Could simplify to only the first lhs of each stmt
-        out_lvars = [lvars[0] for lvars in self.op_out_lvars]
+        flat_op_out_lvars = flat(self.op_out_lvars)
         P_loc_unique = []
-        for lvar_a, lvar_b in it.combinations(out_lvars, 2):
+        for lvar_a, lvar_b in it.combinations(flat_op_out_lvars, 2):
             P_loc_unique.append(lvar_a != lvar_b)
         return fc.And(P_loc_unique)
 
@@ -126,6 +123,7 @@ class CombEncoding(PatternEncoding):
         # ACYC Constraint
         #  op_out_lvars[i] > op_in_lvars[i]
         for o_lvars, i_lvars in zip(self.op_out_lvars, self.op_in_lvars):
+            #thanks to P_multi_out, only need to ensure ivars are < first ovar
             P_acyc += [o_lvars[0] > ilvar for ilvar in i_lvars]
         return fc.And(P_acyc)
 
@@ -166,7 +164,13 @@ class CombEncoding(PatternEncoding):
         used = self.lvar_t(0)
         for lvar_rhs in rhss():
             used |= (self.lvar_t(1) << lvar_rhs)
-        P_used = (used == (2**self.tot_locs)-1)
+        
+        mask = 2**(self.Ninputs + self.Nconsts)-1
+        P_used = (used & mask) == mask
+
+        for lvars in self.op_out_lvars:
+            mask = self.lvar_t(2**len(lvars)-1) << lvars[0]
+            P_used &= ((used & mask) != 0)
         return P_used
 
 
@@ -190,11 +194,23 @@ class CombEncoding(PatternEncoding):
         for op_name, op_ids in ops.items():
             if len(op_ids) ==1:
                 continue
+            #thanks to P_multi_out, only need to comparison with first ovars
             o_lvars = [self.op_out_lvars[i][0] for i in op_ids]
             for lv0, lv1 in zip(o_lvars[:-1], o_lvars[1:]):
                 P_K.append(lv0 < lv1)
 
         return fc.And(P_K)
+
+    @property
+    def P_O_order(self):
+        #enforce an ordering for outputs of the same type
+        d = {}
+        P_O_order = []
+        for T, lvar in zip(self.oT, self.output_lvars):
+            if T in d:
+                P_O_order.append(d[T] < lvar)
+            d[T] = lvar
+        return fc.And(P_O_order)
 
     @property
     def P_wfp(self):

@@ -86,12 +86,12 @@ BV = GlobalModules['bv']
     (3, 1, 1, 18),
 ])
 def test_add(pat_en_t, num_adds, C, K, num_sols):
-    N, dce, cse = 32, 0, 0
+    N, dce, cse, O_order = 32, 0, 0, 1
     obj = compile_program(add_file)
     spec = obj.get("test",f"add{num_adds+1}")[N]
     ops = [BV.add[N]] * num_adds
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K,O_order)
     sq = SpecSynth(
         spec, 
         ops, 
@@ -150,12 +150,12 @@ o0 = bv.sub[N](x, y)
     (1, 9),
 ])
 def test_same_op(pat_en_t, K, num_sols):
-    N, C, dce, cse = 4, 0, 1, 0
+    N, C, dce, cse, O_order = 4, 0, 1, 0, 1
     obj = compile_program(sameop_f)
     spec = obj.get("test", "sameop")[N]
     ops = [BV.not_[N]]*4 + [BV.sub[N]]
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K,O_order)
     sq = SpecSynth(
         spec, 
         ops, 
@@ -211,12 +211,12 @@ o = t2
     #DepthEncoding,
 ])
 def test_c_fma(pat_en_t):
-    N, C, K, dce, cse = 16, 0, 0, 0, 0
+    N, C, K, dce, cse, O_order = 16, 0, 0, 0, 0, 1
     obj = compile_program(c_fma_obj)
     spec = obj.get("test", "c_fma")[N]
     ops = [BV.abs_const[N], BV.add[N], BV.mul[N]]
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K,O_order)
     sq = SpecSynth(
         spec, 
         ops, 
@@ -268,7 +268,7 @@ import hwtypes as ht
     #DepthEncoding,
 ])
 def test_fulladder(pat_en_t):
-    N, C, K, dce, cse = 1, 1, 1, 1, 0
+    N, C, K, dce, cse, O_order = 1, 1, 1, 1, 0, 0
     obj = compile_program(fa_f)
     spec = obj.get("test", "fa")
     one, zero = ht.SMTBitVector[1](1), ht.SMTBitVector[1](0)
@@ -276,7 +276,7 @@ def test_fulladder(pat_en_t):
     print(spec.evaluate(one, zero, one))
     ops = [BV.xor[N]]*2 + [BV.and_[N]]*2 + [BV.or_[N]]
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K,O_order)
     sq = SpecSynth(
         spec, 
         ops, 
@@ -319,12 +319,12 @@ import hwtypes as ht
     #DepthEncoding,
 ])
 def test_add_ext(pat_en_t):
-    N, C, K, dce, cse = 4, 1, 1, 1, 0
+    N, C, K, dce, cse, O_order = 4, 1, 1, 1, 0, 1
     obj = compile_program(add_ext_f)
     spec = obj.get("test", "add_ext")[N]
     ops = [BV.concat[N,1]]*2 + [BV.slice[N,N-1,N]]*2 + [BV.add[N+1]]
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K,O_order)
     sq = SpecSynth(
         spec, 
         ops, 
@@ -366,12 +366,12 @@ o = i1
     # DepthEncoding,
 ])
 def test_sub_sub(pat_en_t):
-    N, C, K, dce, cse = 16, 1, 1, 1, 0
+    N, C, K, dce, cse, O_order = 16, 1, 1, 1, 0, 1
     obj = compile_program(bad)
     spec = obj.get("bad", "id2")[N]
     ops = [BV.sub[N]]*2
     ir_opts = (dce, cse)
-    narrow_opts = (C,K)
+    narrow_opts = (C,K, O_order)
     sq = SpecSynth(
         spec, 
         ops, 

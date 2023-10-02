@@ -138,7 +138,9 @@ class Pattern:
         self.ops = ops
         self.num_ops = len(ops)
         self.NI = len(iT)
+        self.NO = len(oT)
         self.op_NI = [len(op.get_type()[0]) for op in ops]
+        self.op_NO = [len(op.get_type()[1]) for op in ops]
         if is_pat:
             self.edges = P
         else:
@@ -152,14 +154,16 @@ class Pattern:
 
     def init_prog(self, P):
         I, O, IK, OK = P
-        I, O, IK, OK = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(OKi[0] for OKi in OK))
+        I, O, IK, OK = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
         ops = self.ops
         assert len(IK) == len(ops)
+        assert len(OK) == len(ops)
         assert all(len(IKi)==NI for IKi, NI in zip(IK, self.op_NI))
+        assert all(len(OKi)==NO for OKi, NO in zip(OK, self.op_NO))
         for i, op in enumerate(ops):
             iT, oT = op.get_type()
-            assert len(oT) == 1
             assert len(iT) == len(IK[i])
+            assert len(oT) == len(OK[i])
         src_to_node = {i:(-1,i) for i in range(self.NI)}
         src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
         self.edges = []
@@ -168,8 +172,12 @@ class Pattern:
                 if l < self.NI:
                     src = (-1, l)
                 else:
-                    assert l in OK
-                    src = (OK.index(l), 0)
+                    src = None
+                    for idx,o in enumerate(OK):
+                        if l in o:
+                            src = (idx,o.index(l))
+                            break
+                    assert src is not None
                 snk = (i, j)
                 self.edges.append((src, snk))
 
@@ -225,35 +233,38 @@ class Pattern:
     def enum_prog(self, edges):
         I = tuple(i for i in range(self.NI))
         IK = [[None for _ in range(NI)] for NI in self.op_NI]
-        OK = [None for _ in range(self.num_ops)]
-        O = None
+        OK = [[None for _ in range(NO)] for NO in self.op_NO]
+        O = [None for _ in range(self.NO)]
         g = nx.DiGraph()
         for (src, _), (snk, _) in edges:
             g.add_edge(src, snk)
         #Force inouts to be first
         for opi in range(self.num_ops+1):
             g.add_edge(-1, opi)
+        for opi in range(self.num_ops):
+            g.add_edge(opi, self.num_ops)
 
         for order in nx.all_topological_sorts(g):
             #OK = [o+self.NI for o in order]
-            for l, opi in enumerate(order[1:-1]):
-                OK[opi] = l + self.NI
+            l = self.NI
+            for opi in order[1:-1]:
+                for o_num in range(len(OK[opi])):
+                    OK[opi][o_num] = l
+                    l += 1
             #Set all of IK and O
             for (srci, srca), (snki, snka) in edges:
                 if srci==-1:
                     src_l = srca
                 else:
-                    src_l = OK[srci]
+                    src_l = OK[srci][srca]
                 if snki==self.num_ops:
-                    O = src_l
+                    O[snka] =  src_l
                 else:
                     IK[snki][snka] = src_l
-            if not all(l is not None for l in OK):
-                print(OK)
-                raise ValueError
-            assert all(l is not None for l in OK)
+            assert all(l is not None for l in O)
             assert all(all(l is not None for l in IKi) for IKi in IK)
-            yield (I, O, tuple(tuple(IKi) for IKi in IK), tuple(OKi for OKi in OK))
+            assert all(all(l is not None for l in OKi) for OKi in OK)
+            yield (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
 
 
     #For programs
@@ -278,7 +289,7 @@ class Pattern:
 
     def enum_comm(self, edges):
         for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
-            map = {self.num_ops:{0:0}} #[opi][ai]
+            map = {self.num_ops:{i:i for i in range(len(self.oT))}} #[opi][ai]
             for opi, (op, poss) in enumerate(zip(self.ops, op_poss)):
                 map[opi] = {f:t for f,t in zip(flat(self.ops[opi].comm_info), flat(poss))}
             es = []
@@ -345,8 +356,9 @@ class Pattern:
         I, O, IK, OK = prog
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
-        for opi in range(self.num_ops):
-            src_to_sym.update({(opi, 0):Sym(f"t{opi}_{0}")})
+        for opi,num_o in enumerate(self.op_NO):
+            for n in range(num_o):
+                src_to_sym.update({(opi, n):Sym(f"t{opi}_{n}")})
 
         snk_to_sym = {}
         for src, snk in self.edges:
@@ -362,7 +374,7 @@ class Pattern:
 
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
-            lhss = [src_to_sym[(opi, 0)]]
+            lhss = [src_to_sym[(opi, i)] for i in range(len(OK[opi]))]
             args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
@@ -393,26 +405,42 @@ class Pattern:
         raise NotImplementedError()
 
 
-#Assume 1 output
-def enum_dags(NI, pats: tp.List[Pattern]):
+def enum_dags(iT, oT, pats: tp.List[Pattern]):
     NIs = [len(p.iT) for p in pats]
+    NOs = [len(p.oT) for p in pats]
     Npat = len(NIs)
 
     #Create a set of all sources/snks sorted by type
-    srcs = [(-1, i) for i in range(NI)] + [(i,0) for i in range(Npat)]
-    snks = [(Npat, 0)]
+    srcs = [(-1, i) for i in range(len(iT))]
+    for i, NOi in enumerate(NOs):
+        srcs.extend((i, j) for j in range(NOi))
+    snks = [(Npat, i) for i in range(len(oT))]
     for i, NIi in enumerate(NIs):
         snks.extend((i, j) for j in range(NIi))
 
     #This strategy will produce invalid graphs
     #Easy filter to remove most of the bad connections
     def invalid_edge(src, snk):
-        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, len(pats)))
+        if src[0] == -1:
+            srcT = iT[src[1]]
+        else:
+            srcT = pats[src[0]].oT[src[1]]
+        if snk[0] == Npat:
+            snkT = oT[snk[1]]
+        else:
+            snkT = pats[snk[0]].iT[snk[1]]
+
+        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, Npat) or (srcT != snkT))
     def valid_dag(edges):
-        used_srcs = set(src for src,_ in edges)
-        all_used = all(src in used_srcs for src in srcs)
-        if not all_used:
+        used_pats = set(srci for (srci, _),_ in edges if srci >= 0)
+        used_Is = set(pos for (srci, pos),_ in edges if srci == -1)
+        if not len(used_pats) == Npat:
             return False
+        if not len(used_Is) == len(iT):
+            return False
+        if not set(snk for _,snk in edges) == set(snks):
+            return False
+
         bad_edge = any(invalid_edge(src, snk) for src, snk in edges)
         return not bad_edge
 
@@ -449,13 +477,13 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
     edges = []
     for pi, pat in enumerate(pats):
         i_edges = {}
-        o_srcs = []
+        o_srcs = [None for _ in range(pat.NO)]
         m_edges = []
         for (srci, srca), (snki, snka) in pat.edges:
             if snki == pat.num_ops:
                 assert (pi, srci) in pmap
                 new_srci = pmap[(pi, srci)]
-                o_srcs.append((new_srci, srca))
+                o_srcs[snka] = (new_srci, srca)
             elif srci == -1:
                 assert (pi, snki) in pmap
                 new_snki = pmap[(pi, snki)]
@@ -466,9 +494,9 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
                 new_srci = pmap[(pi, srci)]
                 new_snki = pmap[(pi, snki)]
                 m_edges.append(((new_srci, srca), (new_snki, snka)))
-        assert len(o_srcs)==1
+        assert all([src is not None for src in o_srcs])
         edges.extend(m_edges)
-        pat_edges[pi] = (i_edges, o_srcs[0])
+        pat_edges[pi] = (i_edges, o_srcs)
     for (srci, srca), (snki, snka) in dag:
         if srci==-1:
             src = (srci, srca)
@@ -476,14 +504,14 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
             for snk in i_edges[snka]:
                 edges.append((src, snk))
         elif snki == len(pats):
-            snk = (len(op_names), 0)
-            _, o_src = pat_edges[srci]
-            edges.append((o_src, snk))
+            snk = (len(op_names), snka)
+            _, o_srcs = pat_edges[srci]
+            edges.append((o_srcs[srca], snk))
         else:
-            _, src = pat_edges[srci]
+            _, srcs = pat_edges[srci]
             i_edges, _ = pat_edges[snki]
             for snk in i_edges[snka]:
-                edges.append((src, snk))
+                edges.append((srcs[srca], snk))
     return Pattern(iT, oT, ops, edges, is_pat=True)
 
 
@@ -546,17 +574,17 @@ def all_prog(pat_enum, prog_enum):
 
 def onepat(P, L):
     #Output
-    cond = [P[1]==L[1]]
+    cond = [fc.And([Pi == Li for Pi, Li in zip(P[1], L[1])])]
 
     #K ins
     cond.append(fc.And([fc.And([Pij==Lij for Pij, Lij in zip(Pi, Li)]) for Pi, Li in zip(P[2], L[2])]))
 
     #K outs
-    cond.append(fc.And([Pi==Li for Pi, Li in zip(P[3], L[3])]))
+    cond.append(fc.And([fc.And([Pij==Lij for Pij, Lij in zip(Pi, Li)]) for Pi, Li in zip(P[3], L[3])]))
     return fc.And(cond).to_hwtypes()
 
 
 def IPerm(P, map):
-    O = map[P[1]]
-    IK = [[map[IKij] for IKij in IKi] for IKi in P[2]]
+    O = tuple(map[l] for l in P[1])
+    IK = tuple(tuple(map[IKij] for IKij in IKi) for IKi in P[2])
     return P[0], O, IK, P[3]
