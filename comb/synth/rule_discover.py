@@ -226,25 +226,15 @@ class RuleDiscovery:
         return new_pat
 
     def is_new_rule(self, rule, erules):
-        new_rule = True
         for erule in erules:
             eq = erule.equal(rule)
             if eq:
                 assert rule.equal(erule)
                 print("EQUAL RULE", flush=True)
-                #print("NEW")
-                #print(rule)
-                #print("="*100)
-                #print("OLD")
-                #print(erule)
-                #print("END EQUAL RULE")
-                new_rule = False
-                #erule.update_time(rule.time)
-                #erule.add_equiv(rule)
-                break
-        return new_rule
+                return False
+        return True
 
-    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, opts=SolverOpts()):
+    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts()):
         LC, E, comp = E_opts
         assert not LC
         ruleid = 0
@@ -263,12 +253,11 @@ class RuleDiscovery:
                         if opts.log:
                             print(kstr,flush=True)
                             print_kind(lhs_ids, rhs_ids)
-                        for (iT, oT) in self.allT(lhs_ops, rhs_ops):
+                        for (iT, oT) in self.allT(lhs_ops, rhs_ops, max_outputs):
                             if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
                                 continue
                             new_rules = []
-                            NI = len(iT)
-                            k = (tuple(lhs_ids), tuple(rhs_ids), iT)
+                            k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT)
                             if opts.log:
                                 print_iot(iT, oT)
                             rs = RuleSynth(
@@ -285,7 +274,7 @@ class RuleDiscovery:
                             for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
                                 lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
                                 rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                dags = enum_dags(NI, lhs_pats)
+                                dags = enum_dags(iT, oT, lhs_pats)
                                 for dag in dags:
                                     lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                     rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
@@ -297,7 +286,7 @@ class RuleDiscovery:
                                 for crule in existing_rules:
                                     rule_cond, enum_time = rs.ruleL(crule)
                                     comp_time += enum_time
-                                    rs.query = rs.query & ~rule_cond
+                                    rs.synth_base = rs.synth_base & ~rule_cond
                             sat_time = []
                             for rule in rs.CEGISAll(E, LC, opts):
                                 sat_time.append(rule.time)
@@ -422,7 +411,7 @@ class RuleDiscovery:
                 rs.append((cost,rhs_ids))
         return [tuple(rhs_ids) for _, rhs_ids in sorted(rs, key=functools.cmp_to_key(cmp))]
 
-    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, opts=SolverOpts()):
+    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts()):
         LC, E, comp = E_opts
         assert len(costs)==len(self.rhss)
         rhs_id_order = self.gen_rhs_order(costs)
@@ -437,11 +426,10 @@ class RuleDiscovery:
                     if opts.log:
                         print(kstr,flush=True)
                     cur_cost = sum(costs[rid] for rid in rhs_ids)
-                    for (iT, oT) in self.allT(lhs_ops, rhs_ops):
+                    for (iT, oT) in self.allT(lhs_ops, rhs_ops, max_outputs):
                         if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
                             continue
                         new_rules = []
-                        NI = len(iT)
                         k = (tuple(lhs_ids), tuple(rhs_ids), iT)
 
                         #kstr += f":{NI}"
@@ -460,7 +448,7 @@ class RuleDiscovery:
                         start = timeit.default_timer()
                         for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, opts):
                             lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
-                            dags = enum_dags(NI, lhs_pats)
+                            dags = enum_dags(iT, oT, lhs_pats)
                             for dag in dags:
                                 lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                 existing_pats.append(lhs_pat)
@@ -470,7 +458,7 @@ class RuleDiscovery:
                                 for cpat in existing_pats:
                                     pat_cond, enum_time = rs.patL(cpat)
                                     comp_time += enum_time
-                                    rs.query = rs.query & ~pat_cond
+                                    rs.synth_base = rs.synth_base & ~pat_cond
                             else:
                                 erules = []
                                 for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
@@ -483,7 +471,7 @@ class RuleDiscovery:
                                         erules.append(Rule(lhs_pat, rhs_pat, 0, 0))
                                 for crule in erules:
                                     rule_cond, enum_time = rs.ruleL(crule)
-                                    rs.query = rs.query & ~rule_cond
+                                    rs.synth_base = rs.synth_base & ~rule_cond
                         sat_time = []
                         for rule in rs.CEGISAll(E, LC, opts):
                             rule.cost = cur_cost
