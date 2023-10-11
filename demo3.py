@@ -1,6 +1,5 @@
 import itertools
 import os
-
 import pytest
 
 from comb import Comb
@@ -13,10 +12,40 @@ from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 from comb.synth.utils import _list_to_counts
 
+import hwtypes as ht
+from peak import family_closure, Peak
+from comb.frontend.comb_peak import CombPeak
+from comb.frontend.ast import QSym
+BV = ht.BitVector
+
+def PeakPE(N: int):
+    @family_closure
+    def PeakPE_fc(family):
+        @family.assemble(locals(), globals())
+        class PE(Peak):
+            def __call__(self, x: BV[N], y: BV[N], c: BV[N], instr: BV[2]) -> BV[N]:
+                if instr == 3:
+                    return x + y
+                elif instr == 2:
+                    return x - y
+                elif instr == 1:
+                    return x * y
+                else:
+                    return x + c
+        return PE
+    return PeakPE_fc
+
+class CombPE(CombPeak):
+    name = QSym("peak", "PE")
+    def __init__(self):
+        super().__init__(PeakPE, 1, lambda N: ((N,N,N,2),N), ((False, False, True, True),False))
+
+PE = CombPE()
+
+
 from time import time
 from comb.frontend.stdlib import GlobalModules
-BV = GlobalModules["bv"]
-
+gmbv = GlobalModules["bv"]
 
 add_file = '''
 Comb test.add_const
@@ -64,13 +93,14 @@ o0 = test.ite[N](bvinstr1, t0, t1)
 obj = compile_program(add_file)
 N = 4
 lhs = [
-    BV.add[N],
-    BV.sub[N],
-    BV.mul[N],
+    gmbv.add[N],
+    gmbv.sub[N],
+    gmbv.mul[N],
     obj.get("test","add_const")[N]
 ]
 rhs = [
-    obj.get("test","simplePE")[N]
+    PE[N]
+    # obj.get("test","simplePE")[N]
 ]
 
 costs = [1]
