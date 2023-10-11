@@ -9,6 +9,7 @@ import typing as tp
 
 from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set
 from ..frontend.ir import CombProgram, AssignStmt
+from ..frontend.stdlib import CBVSynthConst, GlobalModules
 import itertools as it
 
 #Represnts the raw dag structure of a particular pattern
@@ -73,7 +74,9 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
             assert all(isinstance(l, list) for l in comm_info)
             assert r.ops[r_opi].comm_info == comm_info
             #Append comm_info with extra args
-            cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
+            cur_ais = set()
+            if len(comm_info) > 0:
+                cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
             assert isinstance(cur_ais, set)
             assert cur_ais == set(range(len(l_args)))
             l_poss_args = []
@@ -132,7 +135,7 @@ def filter_eq(f):
 #        pat =
 
 class Pattern:
-    def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat):
+    def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat, synth_vals = []):
         self.iT = iT
         self.oT = oT
         self.ops = ops
@@ -141,6 +144,7 @@ class Pattern:
         self.NO = len(oT)
         self.op_NI = [len(op.get_type()[0]) for op in ops]
         self.op_NO = [len(op.get_type()[1]) for op in ops]
+        self.synth_vals = synth_vals
         if is_pat:
             self.edges = P
         else:
@@ -153,8 +157,9 @@ class Pattern:
         self.root = (len(ops), 0)
 
     def init_prog(self, P):
-        I, O, IK, OK = P
-        I, O, IK, OK = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
+        I, O, IK, OK, synth_vals = P
+        I, O, IK, OK, synth_vals = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), tuple(synth_vals))
+        self.synth_vals = synth_vals
         ops = self.ops
         assert len(IK) == len(ops)
         assert len(OK) == len(ops)
@@ -278,11 +283,11 @@ class Pattern:
             yield IPerm(PL, mapL)
 
 
-    def patL(self, L):
+    def patL(self, L, synth_vars):
         allp = []
         for PL in all_prog(self.enum_CK(), self.enum_prog):
             for PL_ in self.enum_input_perm(PL):
-                allp.append(onepat(PL_, L))
+                allp.append(onepat(PL_, L, self.synth_vals, synth_vars))
         return fc.Or(allp).to_hwtypes()
 
 
@@ -332,6 +337,8 @@ class Pattern:
             return []
         if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
             return []
+        if self.synth_vals != other.synth_vals:
+            return []
         matches = matcher(other, other.root, self, self.root, opts)
         inputs = [(-1, i) for i in range(len(self.iT))]
         matches_ = []
@@ -372,10 +379,24 @@ class Pattern:
         inDecls = [InDecl(src_to_sym[(-1,i)], nT_to_type(n)) for i, n in enumerate(self.iT)]
         outDecls = [OutDecl(src_to_sym[(self.num_ops, i)], nT_to_type(n)) for i, n in enumerate(self.oT)]
 
+        BV = GlobalModules['bv']
+        opi_to_synth_val = {}
+        for opi, op in enumerate(self.ops):
+            if isinstance(op.comb, CBVSynthConst):
+                # gathering parameters to convert synth_consts to c_const
+                assert len(op.pargs) == 1
+                opi_to_synth_val[opi] = (op.pargs[0].value, self.synth_vals[len(opi_to_synth_val)])
+        
+        assert(len(opi_to_synth_val) == len(self.synth_vals))
+
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
             lhss = [src_to_sym[(opi, i)] for i in range(len(OK[opi]))]
             args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
+            if opi in opi_to_synth_val:
+                # convert synth_consts to c_const
+                N, val = opi_to_synth_val[opi]
+                op = BV.c_const[N, val]
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
         out_lhs = [src_to_sym[(self.num_ops, i)] for i in range(len(self.oT))]
@@ -572,7 +593,7 @@ def all_prog(pat_enum, prog_enum):
                 yield prog
 
 
-def onepat(P, L):
+def onepat(P, L, synth_vals, synth_vars):
     #Output
     cond = [fc.And([Pi == Li for Pi, Li in zip(P[1], L[1])])]
 
@@ -581,6 +602,9 @@ def onepat(P, L):
 
     #K outs
     cond.append(fc.And([fc.And([Pij==Lij for Pij, Lij in zip(Pi, Li)]) for Pi, Li in zip(P[3], L[3])]))
+
+    # synthesized values
+    cond.append(fc.And([vars == vals for vars,vals in zip(synth_vars, synth_vals)]))
     return fc.And(cond).to_hwtypes()
 
 

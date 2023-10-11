@@ -49,6 +49,7 @@ def test_genall(LC_test, LC, E, CMP, C, K, O_order):
     opMaxISA = None
     dce = 1
     cse = 0
+    gen_consts = False, False
     start_time = time()
     rd = RuleDiscovery(
         lhss=ir,
@@ -57,6 +58,7 @@ def test_genall(LC_test, LC, E, CMP, C, K, O_order):
         maxR=maxISA,
         opMaxL=opMaxIR,
         opMaxR=opMaxISA,
+        gen_consts=gen_consts
     )
     ir_opts = (dce, cse)
     narrow_opts = (C, K, O_order)
@@ -105,6 +107,7 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order, max_outputs):
     opMaxISA = None
     dce = 1
     cse = 0
+    gen_consts = False, False
     start_time = time()
     rd = RuleDiscovery(
         lhss=ir,
@@ -113,6 +116,7 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order, max_outputs):
         maxR=maxISA,
         opMaxL=opMaxIR,
         opMaxR=opMaxISA,
+        gen_consts=gen_consts
     )
     ir_opts = (dce, cse)
     narrow_opts = (C, K, O_order)

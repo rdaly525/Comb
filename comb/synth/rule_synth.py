@@ -2,12 +2,13 @@ import functools
 import timeit
 
 from ..frontend.ast import Comb
-from .solver_utils import Cegis, SolverOpts
+from .solver_utils import Cegis, SolverOpts, get_var
 from .pattern import Pattern, enum_dags
 from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
 from .utils import _list_to_dict, bucket_combinations, flat, nT
 from .rule import Rule
+from ..frontend.stdlib import GlobalModules
 
 import hwtypes.smt_utils as fc
 import typing as tp
@@ -107,20 +108,52 @@ class RuleSynth(Cegis):
         oT: tp.List[nT],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
+        lhs_synth_T: tp.List[nT],
+        rhs_synth_T: tp.List[nT],
         ir_opts,
         narrow_opts,
         pat_en_t: tp.Type[PatternEncoding],
     ):
         self.iT = iT
         self.oT = oT
-        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
-        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
+
+        # add constant synthesis operations to the list of ops
+        BV = GlobalModules['bv']
+        ext_lhs_op_list = list(lhs_op_list)
+        ext_rhs_op_list = list(rhs_op_list)
+
+        self.l_synth_vars = []
+        opi = len(ext_lhs_op_list)
+        for T in lhs_synth_T:
+            assert T.const
+            var = get_var(f"l_synth_const_op[{opi}]", T.n)
+            self.l_synth_vars.append(var)
+            op = BV._synth_const[T.n]
+            op.eval = functools.partial(op.eval, var)
+            ext_lhs_op_list.append(op)
+            opi += 1
+
+        self.r_synth_vars = []
+        opi = len(ext_rhs_op_list)
+        for T in rhs_synth_T:
+            assert T.const
+            var = get_var(f"r_synth_const_op[{opi}]", T.n)
+            self.r_synth_vars.append(var)
+            op = BV._synth_const[T.n]
+            op.eval = functools.partial(op.eval, var)
+            ext_rhs_op_list.append(op)
+            opi += 1
+
+        lhs_cs = pat_en_t(iT, oT, ext_lhs_op_list, prefix="l")
+        rhs_cs = pat_en_t(iT, oT, ext_rhs_op_list, prefix="r")
         assert lhs_cs.types_viable and rhs_cs.types_viable
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
         self.enum_times = []
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
+
+
 
         input_vars = [*lhs_cs.input_vars, *rhs_cs.input_vars]
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
@@ -169,7 +202,7 @@ class RuleSynth(Cegis):
         ])
         #print(query.serialize())
         #assert 0
-        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
+        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars, *self.l_synth_vars, *self.r_synth_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
@@ -177,8 +210,8 @@ class RuleSynth(Cegis):
     def CEGISAll(self, E, LC, opts: SolverOpts):
         self.enum_times = []
         for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
-            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
-            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
+            lhs_pat = self.lhs_cs.pattern_from_sol(sol, self.l_synth_vars)
+            rhs_pat = self.rhs_cs.pattern_from_sol(sol, self.r_synth_vars)
             rule = Rule(lhs_pat, rhs_pat, i, t)
             yield rule
             if E:
@@ -194,7 +227,7 @@ class RuleSynth(Cegis):
         L_IR = self.lhs_cs.L
         L_ISA = self.rhs_cs.L
         start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA)
+        rule_cond = rule.ruleL(L_IR, L_ISA, self.l_synth_vars, self.r_synth_vars)
         delta = timeit.default_timer() - start
         return rule_cond, delta
 
@@ -202,7 +235,7 @@ class RuleSynth(Cegis):
     def patL(self, pat: Pattern):
         L_IR = self.lhs_cs.L
         start = timeit.default_timer()
-        pat_cond = pat.patL(L_IR)
+        pat_cond = pat.patL(L_IR, self.l_synth_vars)
         delta = timeit.default_timer() - start
         return pat_cond, delta
 

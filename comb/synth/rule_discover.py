@@ -64,6 +64,7 @@ class RuleDiscovery:
     rhss: tp.List[Comb]
     maxL: int
     maxR: int
+    gen_consts: tp.Tuple[bool, bool]
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
     pat_en_t: tp.Type[PatternEncoding] = CombEncoding
@@ -128,6 +129,42 @@ class RuleDiscovery:
             return False
 
         return True
+
+    def all_synth_T(self, iT, oT, lhs_ops, rhs_ops):
+        # generate all possible combinations of constants that can be synthesized
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+        rop_iTs, rop_oTs = T_count(rhs_ops)
+        
+        lop_const_iTs = {k:v for k,v in lop_iTs.items() if k.const}
+        rop_const_iTs = {k:v for k,v in rop_iTs.items() if k.const}
+
+        for T in iT:
+            if not T.const:
+                continue
+            assert lop_const_iTs[T] > 0 and rop_const_iTs[T] > 0
+            lop_const_iTs[T] -= 1
+            rop_const_iTs[T] -= 1
+
+        l_gen_consts, r_gen_consts = self.gen_consts
+
+        l_synth_all = []
+        if l_gen_consts:
+            l_synth_all = flat((T,)*c for T,c in lop_const_iTs.items())
+
+        r_synth_all = []
+        if r_gen_consts:
+            r_synth_all = flat((T,)*c for T,c in rop_const_iTs.items())
+
+        for num_l in range(len(l_synth_all) + 1):
+            for l_synth_sel in multicomb(l_synth_all, num_l):
+                for num_r in range(len(r_synth_all) + 1):
+                    for r_synth_sel in multicomb(r_synth_all, num_r):
+                        yield l_synth_sel, r_synth_sel
+        
+
+    #Finds all composite rules
+
 
     # Finds all combinations of rules that exactly match the lhs and rhs
     def all_composite_msets(self, lhs_ids, rhs_ids, iT, opts:SolverOpts):
@@ -254,55 +291,58 @@ class RuleDiscovery:
                             print(kstr,flush=True)
                             print_kind(lhs_ids, rhs_ids)
                         for (iT, oT) in self.allT(lhs_ops, rhs_ops, max_outputs):
-                            if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
-                                continue
-                            new_rules = []
-                            k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT)
-                            if opts.log:
-                                print_iot(iT, oT)
-                            rs = RuleSynth(
-                                iT,
-                                oT,
-                                lhs_op_list=lhs_ops,
-                                rhs_op_list=rhs_ops,
-                                ir_opts=ir_opts,
-                                narrow_opts=narrow_opts,
-                                pat_en_t=self.pat_en_t,
-                            )
-                            existing_rules = []
-                            start = timeit.default_timer()
-                            for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
-                                lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
-                                rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                dags = enum_dags(iT, oT, lhs_pats)
-                                for dag in dags:
-                                    lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
-                                    rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
-                                    existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
-                            comp_time = timeit.default_timer() - start
-                            if len(existing_rules) > 0 and opts.log:
-                                print("CMPTIME", round(comp_time,3), flush=True)
-                            if comp:
-                                for crule in existing_rules:
-                                    rule_cond, enum_time = rs.ruleL(crule)
-                                    comp_time += enum_time
-                                    rs.synth_base = rs.synth_base & ~rule_cond
-                            sat_time = []
-                            for rule in rs.CEGISAll(E, LC, opts):
-                                sat_time.append(rule.time)
-                                assert rule.verify()
-                                if self.is_new_rule(rule, existing_rules):
-                                    rule.id = ruleid
-                                    ruleid += 1
-                                    new_rules.append(rule)
-                                    existing_rules.append(rule)
-                                    yield rule
-                            enum_time = sum(rs.enum_times)
-                            times = (sat_time, comp_time, enum_time)
-                            if sum(sat_time) > 0.0001:
-                                self.rdb.add_rules(k, new_rules, times)
-                            else:
-                                assert len(new_rules) == 0
+                            for (lhs_synth_T, rhs_synth_T) in self.all_synth_T(iT, oT, lhs_ops, rhs_ops):
+                                if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
+                                    continue
+                                new_rules = []
+                                k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT, tuple(lhs_synth_T), tuple(rhs_synth_T))
+                                if opts.log:
+                                    print_iot(iT, oT)
+                                rs = RuleSynth(
+                                    iT,
+                                    oT,
+                                    lhs_op_list=lhs_ops,
+                                    rhs_op_list=rhs_ops,
+                                    lhs_synth_T=lhs_synth_T,
+                                    rhs_synth_T=rhs_synth_T,
+                                    ir_opts=ir_opts,
+                                    narrow_opts=narrow_opts,
+                                    pat_en_t=self.pat_en_t,
+                                )
+                                existing_rules = []
+                                start = timeit.default_timer()
+                                for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
+                                    lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
+                                    rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
+                                    dags = enum_dags(iT, oT, lhs_pats)
+                                    for dag in dags:
+                                        lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
+                                        rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
+                                        existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
+                                comp_time = timeit.default_timer() - start
+                                if len(existing_rules) > 0 and opts.log:
+                                    print("CMPTIME", round(comp_time,3), flush=True)
+                                if comp:
+                                    for crule in existing_rules:
+                                        rule_cond, enum_time = rs.ruleL(crule)
+                                        comp_time += enum_time
+                                        rs.synth_base = rs.synth_base & ~rule_cond
+                                sat_time = []
+                                for rule in rs.CEGISAll(E, LC, opts):
+                                    sat_time.append(rule.time)
+                                    assert rule.verify()
+                                    if self.is_new_rule(rule, existing_rules):
+                                        rule.id = ruleid
+                                        ruleid += 1
+                                        new_rules.append(rule)
+                                        existing_rules.append(rule)
+                                        yield rule
+                                enum_time = sum(rs.enum_times)
+                                times = (sat_time, comp_time, enum_time)
+                                if sum(sat_time) > 0.0001:
+                                    self.rdb.add_rules(k, new_rules, times)
+                                else:
+                                    assert len(new_rules) == 0
 
 
     # Finds all combinations of rules that exactly match the lhs and rhs
@@ -427,66 +467,69 @@ class RuleDiscovery:
                         print(kstr,flush=True)
                     cur_cost = sum(costs[rid] for rid in rhs_ids)
                     for (iT, oT) in self.allT(lhs_ops, rhs_ops, max_outputs):
-                        if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
-                            continue
-                        new_rules = []
-                        k = (tuple(lhs_ids), tuple(rhs_ids), iT)
+                        for (lhs_synth_T, rhs_synth_T) in self.all_synth_T(iT, oT, lhs_ops, rhs_ops):
+                            if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops, lhs_synth_T, rhs_synth_T):
+                                continue
+                            new_rules = []
+                            k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT, tuple(lhs_synth_T), tuple(rhs_synth_T))
 
-                        #kstr += f":{NI}"
-                        if opts.log:
-                            print_iot(iT, oT)
-                        rs = RuleSynth(
-                            iT,
-                            oT,
-                            lhs_op_list=lhs_ops,
-                            rhs_op_list=rhs_ops,
-                            ir_opts=ir_opts,
-                            narrow_opts=narrow_opts,
-                            pat_en_t=self.pat_en_t,
-                        )
-                        existing_pats = []
-                        start = timeit.default_timer()
-                        for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, opts):
-                            lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
-                            dags = enum_dags(iT, oT, lhs_pats)
-                            for dag in dags:
-                                lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
-                                existing_pats.append(lhs_pat)
-                        comp_time = timeit.default_timer() - start
-                        if comp:
-                            if LC:
-                                for cpat in existing_pats:
-                                    pat_cond, enum_time = rs.patL(cpat)
-                                    comp_time += enum_time
-                                    rs.synth_base = rs.synth_base & ~pat_cond
+                            #kstr += f":{NI}"
+                            if opts.log:
+                                print_iot(iT, oT)
+                            rs = RuleSynth(
+                                iT,
+                                oT,
+                                lhs_op_list=lhs_ops,
+                                rhs_op_list=rhs_ops,
+                                lhs_synth_T=lhs_synth_T,
+                                rhs_synth_T=rhs_synth_T,
+                                ir_opts=ir_opts,
+                                narrow_opts=narrow_opts,
+                                pat_en_t=self.pat_en_t,
+                            )
+                            existing_pats = []
+                            start = timeit.default_timer()
+                            for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, opts):
+                                lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
+                                dags = enum_dags(iT, oT, lhs_pats)
+                                for dag in dags:
+                                    lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
+                                    existing_pats.append(lhs_pat)
+                            comp_time = timeit.default_timer() - start
+                            if comp:
+                                if LC:
+                                    for cpat in existing_pats:
+                                        pat_cond, enum_time = rs.patL(cpat)
+                                        comp_time += enum_time
+                                        rs.synth_base = rs.synth_base & ~pat_cond
+                                else:
+                                    erules = []
+                                    for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
+                                        lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
+                                        rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
+                                        dags = enum_dags(NI, lhs_pats)
+                                        for dag in dags:
+                                            lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
+                                            rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
+                                            erules.append(Rule(lhs_pat, rhs_pat, 0, 0))
+                                    for crule in erules:
+                                        rule_cond, enum_time = rs.ruleL(crule)
+                                        rs.synth_base = rs.synth_base & ~rule_cond
+                            sat_time = []
+                            for rule in rs.CEGISAll(E, LC, opts):
+                                rule.cost = cur_cost
+                                sat_time.append(rule.time)
+                                assert rule.verify()
+                                if self.is_new_pat(rule.lhs, existing_pats):
+                                    new_rules.append(rule)
+                                    existing_pats.append(rule.lhs)
+                                    yield rule
+                            enum_time = sum(rs.enum_times)
+                            times = (sat_time, comp_time, enum_time)
+                            if len(new_rules)>0 or sum(sat_time) > 0.0001:
+                                self.rdb.add_rules(k, new_rules, times)
                             else:
-                                erules = []
-                                for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
-                                    lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
-                                    rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                    dags = enum_dags(NI, lhs_pats)
-                                    for dag in dags:
-                                        lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
-                                        rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
-                                        erules.append(Rule(lhs_pat, rhs_pat, 0, 0))
-                                for crule in erules:
-                                    rule_cond, enum_time = rs.ruleL(crule)
-                                    rs.synth_base = rs.synth_base & ~rule_cond
-                        sat_time = []
-                        for rule in rs.CEGISAll(E, LC, opts):
-                            rule.cost = cur_cost
-                            sat_time.append(rule.time)
-                            assert rule.verify()
-                            if self.is_new_pat(rule.lhs, existing_pats):
-                                new_rules.append(rule)
-                                existing_pats.append(rule.lhs)
-                                yield rule
-                        enum_time = sum(rs.enum_times)
-                        times = (sat_time, comp_time, enum_time)
-                        if len(new_rules)>0 or sum(sat_time) > 0.0001:
-                            self.rdb.add_rules(k, new_rules, times)
-                        else:
-                            assert len(new_rules) == 0
+                                assert len(new_rules) == 0
 
 
 
