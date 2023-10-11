@@ -73,15 +73,15 @@ class Rule:
             yield IPerm(PL, mapL), IPerm(PR, mapR)
 
 
-    def ruleL(self, L_IR, L_ISA):
+    def ruleL(self, L_IR, L_ISA, synth_IR, synth_ISA):
         #enums patterns
         l_enum = all_prog(self.lhs.enum_CK(), self.lhs.enum_prog)
         r_enum = all_prog(self.rhs.enum_CK(), self.rhs.enum_prog)
         allr = []
         for rule in it.product(l_enum, r_enum):
             for PL, PR in self.enum_input_perm(*rule):
-                l = onepat(PL, L_IR)
-                r = onepat(PR, L_ISA)
+                l = onepat(PL, L_IR, self.lhs.synth_vals, synth_IR)
+                r = onepat(PR, L_ISA, self.rhs.synth_vals, synth_ISA)
                 allr.append(l & r)
         return fc.Or(allr).to_hwtypes()
 

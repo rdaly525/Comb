@@ -354,7 +354,7 @@ class CombEncoding(PatternEncoding):
     #    #assert sum([int(sol==_sol) for _sol in sols]) == 1, str([int(sol==_sol) for _sol in sols])
     #    #return sols
 
-    def pattern_from_sol(self, sol):
+    def pattern_from_sol(self, sol, synth_vars = []):
         num_inputs = len(self.iT)
         input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars = self.lvars
         if len(hard_const_lvars) > 0:
@@ -363,12 +363,13 @@ class CombEncoding(PatternEncoding):
         op_out_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_out_lvars]
         op_in_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_in_lvars]
         output_lvals = [_to_int(sol[lvar.value]) for lvar in output_lvars]
+        synth_vals = [_to_int(sol[var.value]) for var in synth_vars]
 
         lval_to_src = {i:(-1, i) for i in range(num_inputs)}
         for opi, lvals in enumerate(op_out_lvals):
             lval_to_src.update({lval:(opi, i) for i, lval in enumerate(lvals)})
 
-        P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals)
+        P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals, synth_vals)
         p = Pattern(self.iT, self.oT, self.op_list, P, is_pat=False)
         return p
 
