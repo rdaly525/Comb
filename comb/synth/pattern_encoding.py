@@ -67,14 +67,12 @@ class PatternEncoding:
             P_iropt.append(self.P_cse)
         return fc.And(P_iropt)
 
-    def P_narrow(self, C, K, O_order):
+    def P_narrow(self, C, K):
         P_narrow = []
         if C:
             P_narrow.append(self.P_comm)
         if K:
             P_narrow.append(self.P_K)
-        if O_order:
-            P_narrow.append(self.P_O_order)
         return fc.And(P_narrow)
 
 
