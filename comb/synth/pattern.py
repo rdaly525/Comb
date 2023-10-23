@@ -135,7 +135,7 @@ def filter_eq(f):
 #        pat =
 
 class Pattern:
-    def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat, synth_vals = []):
+    def __init__(self, iT, oT, ops: tp.List[Comb], edges, synth_vals):
         self.iT = iT
         self.oT = oT
         self.ops = ops
@@ -145,10 +145,7 @@ class Pattern:
         self.op_NI = [len(op.get_type()[0]) for op in ops]
         self.op_NO = [len(op.get_type()[1]) for op in ops]
         self.synth_vals = synth_vals
-        if is_pat:
-            self.edges = P
-        else:
-            self.init_prog(P)
+        self.edges = edges
 
         self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None for _ in oT]]
         for src, (snki, snka) in self.edges:
@@ -156,25 +153,30 @@ class Pattern:
         assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
         self.root = (len(ops), 0)
 
-    def init_prog(self, P):
+    @classmethod
+    def init_prog(cls, iT, oT, ops: tp.List[Comb], P):
         I, O, IK, OK, synth_vals = P
         I, O, IK, OK, synth_vals = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), tuple(synth_vals))
-        self.synth_vals = synth_vals
-        ops = self.ops
+        NI = len(iT)
+        NO = len(oT)
+        op_NI = [len(op.get_type()[0]) for op in ops]
+        op_NO = [len(op.get_type()[1]) for op in ops]
+        num_ops = len(ops)
+
         assert len(IK) == len(ops)
         assert len(OK) == len(ops)
-        assert all(len(IKi)==NI for IKi, NI in zip(IK, self.op_NI))
-        assert all(len(OKi)==NO for OKi, NO in zip(OK, self.op_NO))
+        assert all(len(IKi)==NI for IKi, NI in zip(IK, op_NI))
+        assert all(len(OKi)==NO for OKi, NO in zip(OK, op_NO))
         for i, op in enumerate(ops):
-            iT, oT = op.get_type()
-            assert len(iT) == len(IK[i])
-            assert len(oT) == len(OK[i])
-        src_to_node = {i:(-1,i) for i in range(self.NI)}
-        src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
-        self.edges = []
+            op_iT, op_oT = op.get_type()
+            assert len(op_iT) == len(IK[i])
+            assert len(op_oT) == len(OK[i])
+        src_to_node = {i:(-1,i) for i in range(NI)}
+        src_to_node.update({i+NI:(i,0) for i in range(num_ops)})
+        edges = []
         for i, IKi in enumerate((*IK, O)):
             for j, l in enumerate(IKi):
-                if l < self.NI:
+                if l < NI:
                     src = (-1, l)
                 else:
                     src = None
@@ -184,7 +186,9 @@ class Pattern:
                             break
                     assert src is not None
                 snk = (i, j)
-                self.edges.append((src, snk))
+                edges.append((src, snk))
+
+        return cls(iT, oT, ops, edges, synth_vals)
 
     @cached_property
     def op_names(self):
@@ -282,15 +286,12 @@ class Pattern:
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
             yield IPerm(PL, mapL)
 
-
     def patL(self, L, synth_vars):
         allp = []
         for PL in all_prog(self.enum_CK(), self.enum_prog):
             for PL_ in self.enum_input_perm(PL):
                 allp.append(onepat(PL_, L, self.synth_vals, synth_vars))
         return fc.Or(allp).to_hwtypes()
-
-
 
     def enum_comm(self, edges):
         for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
@@ -357,7 +358,6 @@ class Pattern:
     def __hash__(self):
         return hash(str(self))
 
-    #TODO verify this works
     def to_comb(self, ns="C", name="C") -> CombProgram:
         prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
         I, O, IK, OK = prog
@@ -484,9 +484,11 @@ def is_dag(edges):
 def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
     op_names = [op.qualified_name for op in ops]
     #Find one allocation of pat ops to ops
+    synth_vals = []
     op_map = [None for _ in op_names]
     pmap = {}
     for pi, pat in enumerate(pats):
+        synth_vals += pat.synth_vals
         for opi, pat_op in enumerate(pat.op_names):
             for i, op in enumerate(op_names):
                 if (op_map[i] is None) and op==pat_op:
@@ -533,7 +535,7 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
             i_edges, _ = pat_edges[snki]
             for snk in i_edges[snka]:
                 edges.append((srcs[srca], snk))
-    return Pattern(iT, oT, ops, edges, is_pat=True)
+    return Pattern(iT, oT, ops, edges, synth_vals)
 
 
 

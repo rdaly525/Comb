@@ -76,31 +76,6 @@ def enum_rule_partitions(op_list, rule_op_cnts):
         yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
 
 
-def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int, int]):
-    #Interior edges
-    interior_edges = []
-    for (li, lai), (ri, rai) in p.interior_edges:
-        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
-        r_csid = pid_to_csid[ri]
-        r_lvars = cs.op_in_lvars[r_csid]
-        r_lvar = r_lvars[rai]
-        interior_edges.append(l_lvar==r_lvar)
-    #Exterior edges
-    in_lvars = {}
-    for (li, lai), (ri, rai) in p.in_edges:
-        assert li == -1
-        assert ri != p.num_ops
-        r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
-        in_lvars[lai] = r_lvar
-    out_lvars = {}
-    for (li, lai), (ri, rai) in p.out_edges:
-        assert ri == p.num_ops
-        assert li != -1
-        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
-        out_lvars[lai] = l_lvar
-    return fc.And(interior_edges), in_lvars, out_lvars
-
-
 class RuleSynth(Cegis):
     def __init__(
         self,
@@ -108,8 +83,6 @@ class RuleSynth(Cegis):
         oT: tp.List[nT],
         lhs_op_list: tp.List[Comb],
         rhs_op_list: tp.List[Comb],
-        lhs_synth_T: tp.List[nT],
-        rhs_synth_T: tp.List[nT],
         ir_opts,
         narrow_opts,
         pat_en_t: tp.Type[PatternEncoding],
@@ -117,42 +90,15 @@ class RuleSynth(Cegis):
         self.iT = iT
         self.oT = oT
 
-        # add constant synthesis operations to the list of ops
-        BV = GlobalModules['bv']
-        ext_lhs_op_list = list(lhs_op_list)
-        ext_rhs_op_list = list(rhs_op_list)
 
-        self.l_synth_vars = []
-        opi = len(ext_lhs_op_list)
-        for T in lhs_synth_T:
-            assert T.const
-            var = get_var(f"l_synth_const_op[{opi}]", T.n)
-            self.l_synth_vars.append(var)
-            op = BV._synth_const[T.n]
-            op.eval = functools.partial(op.eval, var)
-            ext_lhs_op_list.append(op)
-            opi += 1
-
-        self.r_synth_vars = []
-        opi = len(ext_rhs_op_list)
-        for T in rhs_synth_T:
-            assert T.const
-            var = get_var(f"r_synth_const_op[{opi}]", T.n)
-            self.r_synth_vars.append(var)
-            op = BV._synth_const[T.n]
-            op.eval = functools.partial(op.eval, var)
-            ext_rhs_op_list.append(op)
-            opi += 1
-
-        lhs_cs = pat_en_t(iT, oT, ext_lhs_op_list, prefix="l")
-        rhs_cs = pat_en_t(iT, oT, ext_rhs_op_list, prefix="r")
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
         assert lhs_cs.types_viable and rhs_cs.types_viable
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
         self.enum_times = []
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
-
 
 
         input_vars = [*lhs_cs.input_vars, *rhs_cs.input_vars]
@@ -166,9 +112,7 @@ class RuleSynth(Cegis):
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
             rhs_cs.P_iropt(*ir_opts),
-            #we dont want to constrain the output order of the rhs, since that could
-            #make certain rules we want unsynthesizable
-            rhs_cs.P_narrow(*narrow_opts[:-1], 0),
+            rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
         ])
 
@@ -185,7 +129,7 @@ class RuleSynth(Cegis):
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
             rhs_cs.P_iropt(*ir_opts),
-            rhs_cs.P_narrow(*narrow_opts[:-1], 0), #see above comment
+            rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
             fc.Implies(
                 fc.And([
@@ -200,9 +144,7 @@ class RuleSynth(Cegis):
                 )
             )
         ])
-        #print(query.serialize())
-        #assert 0
-        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars, *self.l_synth_vars, *self.r_synth_vars]
+        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars, *self.lhs_cs.synth_vars, *self.rhs_cs.synth_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
@@ -210,53 +152,22 @@ class RuleSynth(Cegis):
     def CEGISAll(self, E, LC, opts: SolverOpts):
         self.enum_times = []
         for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
-            lhs_pat = self.lhs_cs.pattern_from_sol(sol, self.l_synth_vars)
-            rhs_pat = self.rhs_cs.pattern_from_sol(sol, self.r_synth_vars)
+            lhs_pat = self.lhs_cs.pattern_from_sol(sol)
+            rhs_pat = self.rhs_cs.pattern_from_sol(sol)
             rule = Rule(lhs_pat, rhs_pat, i, t)
             yield rule
+
+            assert E #or else we will just synthesize the same rules over and over
             if E:
-                #Exclude full rule.
                 if LC:
-                    rp_cond, enum_time = self.patL(rule.lhs)
+                    rp_cond = self.lhs_cs.match_one_pattern(rule.lhs).to_hwtypes()
                 else:
-                    rp_cond, enum_time = self.ruleL(rule)
-                self.enum_times.append(enum_time)
+                    rp_cond = fc.And([self.lhs_cs.match_one_pattern(rule.lhs), 
+                                      self.rhs_cs.match_one_pattern(rule.rhs)]).to_hwtypes()
                 self.synth_base = self.synth_base & ~rp_cond
 
-    def ruleL(self, rule:Rule):
-        L_IR = self.lhs_cs.L
-        L_ISA = self.rhs_cs.L
-        start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA, self.l_synth_vars, self.r_synth_vars)
-        delta = timeit.default_timer() - start
-        return rule_cond, delta
-
-    #Only for IR pattern
     def patL(self, pat: Pattern):
-        L_IR = self.lhs_cs.L
-        start = timeit.default_timer()
-        pat_cond = pat.patL(L_IR, self.l_synth_vars)
-        delta = timeit.default_timer() - start
-        return pat_cond, delta
-
-    #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
-    #def _match_pattern(self, p: Pattern, ri_op_ids):
-    #    for pid_to_csid in enum_pattern_partitions(p, ri_op_ids):
-    #        yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
-
-    #This enumerates all equiv patterns (from passed in pat) then matches on that
-    #DEPRECATED
-    def match_pattern(self, pat: Pattern, r_op_ids:tp.Mapping[str,tp.Iterable[int]]):
-        ops = sorted(r_op_ids.keys())
-        for p in pat.enum_all_equal():
-            maps = [{pid:csid for pid,csid in zip(p.op_dict[op],r_op_ids[op])} for op in ops]
-            pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
-            yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
-
-
-
-
-
+        return self.lhs_cs.match_one_pattern(pat).to_hwtypes()
 
     #Note this is really only a LHS pat cover
     #DEPRECATED

@@ -17,6 +17,7 @@ class Rule:
         #self.comm_info = get_comm_info(lhs_pat.to_comb(), opts)
         self.eq_rules = []
         self.NI = len(lhs_pat.iT)
+        self.NO = len(lhs_pat.oT)
 
     def serialize(self, ns, i):
         lhs = self.lhs.to_comb(ns, f"L{i}").serialize()
