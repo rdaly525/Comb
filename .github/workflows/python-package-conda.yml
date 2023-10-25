@@ -22,7 +22,9 @@ jobs:
       run: |
         #conda env update --file environment.yml --name base
         pip install -e .
+        git clone git@github.com:cdonovick/peak.git
+        cd peak; pip install -e .; cd ..;
+        pip install pytest
     - name: Test with pytest
       run: |
-        conda install pytest
         pytest tests/.
