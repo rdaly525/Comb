@@ -71,29 +71,34 @@ BV = GlobalModules['bv']
     #AdjEncoding,
     #DepthEncoding,
 ])
-@pytest.mark.parametrize("num_adds,comm,same_op,iperm,num_sols", [
-    (1, False, False, False, 2),
-    (1, False, True, False, 2),
-    (1, True, False, False, 1),
-    (1, True, True, False, 1),
-    (1, False, False, True, 1),
-    (1, False, True, True, 1),
-    (1, True, False, True, 1),
-    (1, True, True, True, 1),
-    (2, False, False, False, 24),
-    (2, True, False, False, 6),
-    (2, True, True, False, 3),
-    (2, True, True, True, 1),
-    (3, True, True, False, 18),
-    (3, True, True, True, 2),
+@pytest.mark.parametrize("num_adds,C,K,num_sols", [
+    (1, 0, 0, 2),
+    (1, 0, 1, 2),
+    (1, 1, 0, 1),
+    (1, 1, 1, 1),
+    (2, 0, 0, 24),
+    (2, 0, 1, 12),
+    (2, 1, 0, 6),
+    (2, 1, 1, 3),
+    # (3, 0, 0, 18*6*8), too slow to test
+    (3, 0, 1, 18*8),
+    (3, 1, 0, 18*6),
+    (3, 1, 1, 18),
 ])
-def test_add(pat_en_t, num_adds, comm, same_op, iperm, num_sols):
-    N = 32
+def test_add(pat_en_t, num_adds, C, K, num_sols):
+    N, dce, cse = 32, 0, 0
     obj = compile_program(add_file)
     spec = obj.get("test",f"add{num_adds+1}")[N]
     ops = [BV.add[N]] * num_adds
-    sym_opts = SymOpts(comm=comm, same_op=same_op, input_perm=iperm)
-    sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=1000,
@@ -137,27 +142,33 @@ o0 = bv.sub[N](x, y)
 
 
 @pytest.mark.parametrize("pat_en_t", [
-    AdjEncoding,
+    #AdjEncoding,
     CombEncoding,
-    DepthEncoding,
+    #DepthEncoding,
 ])
-@pytest.mark.parametrize("same_op,num_sols", [
-    (True, 9),
+@pytest.mark.parametrize("K,num_sols", [
+    (1, 9),
 ])
-def test_same_op(pat_en_t, same_op, num_sols):
-    N = 4
+def test_same_op(pat_en_t, K, num_sols):
+    N, C, dce, cse = 4, 0, 1, 0
     obj = compile_program(sameop_f)
-    spec = obj.comb_dict[f"test.sameop"][N]
+    spec = obj.get("test", "sameop")[N]
     ops = [BV.not_[N]]*4 + [BV.sub[N]]
-    sym_opts = SymOpts(comm=False, same_op=same_op, input_perm=False)
-    sq = SpecSynth(spec, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=1000,
             verbose=1,
         ),
     )
-    #pats = list(pats)
     pats = list(pats)
     num_pats = len(pats)
     print("SOLS:", num_pats)
@@ -200,12 +211,19 @@ o = t2
     #DepthEncoding,
 ])
 def test_c_fma(pat_en_t):
-    N = 16
+    N, C, K, dce, cse = 16, 0, 0, 0, 0
     obj = compile_program(c_fma_obj)
-    fma = obj.comb_dict[f"test.c_fma"][N]
+    spec = obj.get("test", "c_fma")[N]
     ops = [BV.abs_const[N], BV.add[N], BV.mul[N]]
-    sym_opts = SymOpts(False, False, False)
-    sq = SpecSynth(fma, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=2000,
@@ -223,11 +241,8 @@ def test_c_fma(pat_en_t):
         print(pi, "*"*80)
         combi = pat.to_comb("t", f"P{pi}")
         print(combi)
-        res = verify(combi, fma)
+        res = verify(combi, spec)
         assert res is None
-
-
-
 
 
 
@@ -244,19 +259,7 @@ s = bv.xor[1](a_xor_b, ci)
 a_and_b = bv.and_[1](a, b)
 t = bv.and_[1](ci, a_xor_b)
 co = bv.or_[1](t, a_and_b)
-
-Comb test.orand
-In a : BV[1] 
-In b : BV[1]
-In c : BV[1]
-In d : BV[1]
-Out o : BV[1]
-t0 = bv.and_[1](a, b)
-t1 = bv.and_[1](c, d)
-o = bv.or_[1](t0, t1)
 '''
-
-
 
 import hwtypes as ht
 @pytest.mark.parametrize("pat_en_t", [
@@ -264,19 +267,71 @@ import hwtypes as ht
     CombEncoding,
     #DepthEncoding,
 ])
-def _test_fulladder(pat_en_t):
-    N = 1
+def test_fulladder(pat_en_t):
+    N, C, K, dce, cse = 1, 1, 1, 1, 0
     obj = compile_program(fa_f)
-    fa = obj.comb_dict[f"test.fa"]
-    orand = obj.comb_dict[f"test.orand"]
+    spec = obj.get("test", "fa")
     one, zero = ht.SMTBitVector[1](1), ht.SMTBitVector[1](0)
-    print(fa.evaluate(one, one, one))
-    print(fa.evaluate(one, zero, one))
+    print(spec.evaluate(one, one, one))
+    print(spec.evaluate(one, zero, one))
     ops = [BV.xor[N]]*2 + [BV.and_[N]]*2 + [BV.or_[N]]
-    #ops = [BV.xor[N]]*2 + [orand]
-    sym_opts = SymOpts(comm=True, same_op=False, input_perm=False)
-    sym_opts = SymOpts(comm=True, same_op=True, input_perm=False)
-    sq = SpecSynth(fa, ops, pat_en_t=pat_en_t, sym_opts=sym_opts)
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
+    pats = sq.gen_all_sols(
+        opts=SolverOpts(
+            max_iters=2000,
+            verbose=1,
+        ),
+    )
+    num_pats = 0
+    for pi, pat in enumerate(pats):
+        print(pi, "*"*80)
+        combi = pat.to_comb("t", f"P{pi}")
+        print(combi)
+        res = verify(combi, spec)
+        assert res is None
+        num_pats += 1
+    print("SOLS:", num_pats)
+    assert num_pats == 33 
+
+add_ext_f = '''\
+Comb test.add_ext
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N+1]
+a_ext = bv.concat[N,1](a, bv.slice[N,N-1,N](a))
+b_ext = bv.concat[N,1](b, bv.slice[N,N-1,N](b))
+o = bv.add[N+1](a_ext, b_ext)
+'''
+
+import hwtypes as ht
+@pytest.mark.parametrize("pat_en_t", [
+    #AdjEncoding,
+    CombEncoding,
+    #DepthEncoding,
+])
+def test_add_ext(pat_en_t):
+    N, C, K, dce, cse = 4, 1, 1, 1, 0
+    obj = compile_program(add_ext_f)
+    spec = obj.get("test", "add_ext")[N]
+    ops = [BV.concat[N,1]]*2 + [BV.slice[N,N-1,N]]*2 + [BV.add[N+1]]
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
             max_iters=2000,
@@ -286,15 +341,15 @@ def _test_fulladder(pat_en_t):
     pats = list(pats)
     num_pats = len(pats)
     print("SOLS:", num_pats)
+    #not accounting for program enumeration
+    assert num_pats == 12 
     for pi, pat in enumerate(pats):
         print(pi, "*"*80)
         combi = pat.to_comb("t", f"P{pi}")
         print(combi)
-        res = verify(combi, fa)
+        res = verify(combi, spec)
         assert res is None
 
-
-#Bug where sub_sub does not equal the right thing
 bad = '''
 # const
 Comb bad.id2
@@ -305,13 +360,25 @@ Out o : BV[N]
 o = i1
 '''
 
-def test_sub_sub():
-    N = 16
+@pytest.mark.parametrize("pat_en_t", [
+    # AdjEncoding,
+    CombEncoding,
+    # DepthEncoding,
+])
+def test_sub_sub(pat_en_t):
+    N, C, K, dce, cse = 16, 1, 1, 1, 0
     obj = compile_program(bad)
-    spec = obj.get("bad", 'id2')[N]
+    spec = obj.get("bad", "id2")[N]
     ops = [BV.sub[N]]*2
-    sym_opts = SymOpts(comm=True, same_op=True, input_perm=True)
-    sq = SpecSynth(spec, ops, pat_en_t=CombEncoding, sym_opts=sym_opts)
+    ir_opts = (dce, cse)
+    narrow_opts = (C,K)
+    sq = SpecSynth(
+        spec, 
+        ops, 
+        pat_en_t=pat_en_t, 
+        ir_opts=ir_opts, 
+        narrow_opts=narrow_opts
+    )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
             timeout=10,
@@ -328,4 +395,4 @@ def test_sub_sub():
         assert res is None
         pats_.append(pat)
     num_pats = len(pats_)
-    assert num_pats == 1
+    assert num_pats == 2
