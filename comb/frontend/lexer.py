@@ -54,6 +54,7 @@ tokens = (
     'QDVAL',
     'QBVAL',
     'PLUS',
+    'MINUS',
     'MUL',
 )
 
@@ -70,6 +71,7 @@ t_QHVAL = '\'h[a-f0-9]+'
 t_QDVAL = '\'d[0-9]+'
 t_QBVAL = '\'b[01]+'
 t_PLUS = '\+'
+t_MINUS = '-'
 t_MUL = '\*'
 
 _reserved = dict(
@@ -123,7 +125,7 @@ lexer = lex.lex()
 
 #YACC
 precedence = (
-    ('left', 'PLUS'),
+    ('left', 'PLUS', 'MINUS'),
     ('left', 'MUL'),
 )
 
@@ -197,6 +199,10 @@ def p_expr_4(p):
 def p_expr_5(p):
     'expr : LPAREN expr RPAREN'
     p[0] = p[2]
+
+def p_expr_6(p):
+    'expr : expr MINUS expr'
+    p[0] = ASTCallExpr(QSym("i", "sub"), [], [p[1], p[3]])
 
 def p_exprs_0(p):
     'exprs : expr'

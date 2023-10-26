@@ -135,9 +135,6 @@ class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat):
         self.iT = iT
         self.oT = oT
-        assert len(oT) == 1
-        self.T = oT[0]
-        assert all(self.T == T for T in self.iT)
         self.ops = ops
         self.num_ops = len(ops)
         self.NI = len(iT)
@@ -147,7 +144,7 @@ class Pattern:
         else:
             self.init_prog(P)
 
-        self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None]]
+        self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None for _ in oT]]
         for src, (snki, snka) in self.edges:
             self.children[snki][snka] = src
         assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
@@ -155,7 +152,7 @@ class Pattern:
 
     def init_prog(self, P):
         I, O, IK, OK = P
-        I, O, IK, OK = (tuple(I), O[0], tuple(tuple(IKi) for IKi in IK), tuple(OKi[0] for OKi in OK))
+        I, O, IK, OK = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(OKi[0] for OKi in OK))
         ops = self.ops
         assert len(IK) == len(ops)
         assert all(len(IKi)==NI for IKi, NI in zip(IK, self.op_NI))
@@ -163,13 +160,10 @@ class Pattern:
             iT, oT = op.get_type()
             assert len(oT) == 1
             assert len(iT) == len(IK[i])
-            iT = [type_to_nT(t) for t in iT]
-            assert all(t==iT[0] for t in iT)
         src_to_node = {i:(-1,i) for i in range(self.NI)}
         src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
-        #snk_to_node = {}
         self.edges = []
-        for i, IKi in enumerate((*IK, (O,))):
+        for i, IKi in enumerate((*IK, O)):
             for j, l in enumerate(IKi):
                 if l < self.NI:
                     src = (-1, l)
@@ -177,7 +171,6 @@ class Pattern:
                     assert l in OK
                     src = (OK.index(l), 0)
                 snk = (i, j)
-                assert src is not None
                 self.edges.append((src, snk))
 
     @cached_property
@@ -252,7 +245,6 @@ class Pattern:
                 else:
                     src_l = OK[srci]
                 if snki==self.num_ops:
-                    assert snka == 0
                     O = src_l
                 else:
                     IK[snki][snka] = src_l
@@ -342,8 +334,7 @@ class Pattern:
 
     def __str__(self):
         ret = ",".join([f"{i}:{op}" for i, op in enumerate(self.op_names)]) + "\n  "
-        #return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
-        return ret + "\n  " + str(self.prog)
+        return ret + "\n  ".join(f"{l} -> {r}" for l,r in self.edges)
 
     def __hash__(self):
         return hash(str(self))
@@ -352,7 +343,6 @@ class Pattern:
     def to_comb(self, ns="C", name="C") -> CombProgram:
         prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
         I, O, IK, OK = prog
-        T = self.T
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
         for opi in range(self.num_ops):

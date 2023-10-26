@@ -128,9 +128,7 @@ class PatternEncoding:
     @cached_property
     def types_viable(self):
         iTs = _list_to_counts(self.iT)
-        assert len(iTs.keys())==1
         oTs = _list_to_counts(self.oT)
-        assert len(oTs.keys())==1
         op_iTs = [types_to_nT_cnts(op.get_type()[0]) for op in self.op_list]
         op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
         snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))

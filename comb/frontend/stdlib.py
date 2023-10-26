@@ -20,7 +20,7 @@ class IntAdd(IntBinaryOp):
         return CallExpr(self, pargs, args)
 
 class IntSub(IntBinaryOp):
-    name = QSym("i","add")
+    name = QSym("i","sub")
     def eval(self, *args, pargs):
         assert len(pargs) == 0
         assert len(args) == 2
@@ -237,7 +237,7 @@ def slice_peak(o, l, h):
     def slice_fc(family):
         @family.assemble(locals(), globals())
         class Slice(Peak):
-            def __call__(self, x: BV[o]) -> BV[o+l-h]:
+            def __call__(self, x: BV[o]) -> BV[h-l]:
                 return x[l:h]
         return Slice
     return slice_fc
@@ -245,7 +245,7 @@ def slice_peak(o, l, h):
 class BVSlice(CombPeak):
     name = QSym("bv", "slice")
     def __init__(self):
-        super().__init__(slice_peak, 3, lambda o, l, h: (o, o - (h-l)))
+        super().__init__(slice_peak, 3, lambda o, l, h : (o, h-l))
 
 class BVNFlag(CombPrimitive):
     name = QSym('bv', 'nflag')
