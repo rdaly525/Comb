@@ -10,7 +10,7 @@ from comb.synth.pattern_encoding import PatternEncoding
 from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all, get_var
-from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts, _m_subset
+from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts, _m_subseteq
 
 import hwtypes.smt_utils as fc
 import hwtypes as ht
@@ -113,8 +113,8 @@ class RuleDiscovery:
                 print("RCNT", {ri:1},flush=True)
                 yield [(rule, 1)]
                 continue
-            l_subseteq = _m_subset(rule.lhs.op_cnt, lhs_op_cnt)
-            r_subseteq = _m_subset(rule.rhs.op_cnt, rhs_op_cnt)
+            l_subseteq = _m_subseteq(rule.lhs.op_cnt, lhs_op_cnt)
+            r_subseteq = _m_subseteq(rule.rhs.op_cnt, rhs_op_cnt)
             if l_subseteq and r_subseteq:
                 poss_rules[ri] = rule
                 #ri_N[ri] = (I_max(rule.lhs.ops), I_max(rule.rhs.ops))
@@ -296,7 +296,7 @@ class RuleDiscovery:
                 print(f"R1", {ri:1}, end=", ")
                 yield [(rule.lhs, 1)]
                 continue
-            l_subseteq = _m_subset(rule.lhs.op_cnt, lhs_op_cnt)
+            l_subseteq = _m_subseteq(rule.lhs.op_cnt, lhs_op_cnt)
             if l_subseteq:
                 poss_pats[ri] = (rule.lhs, rule.cost)
                 #ri_N[ri] = (I_max(rule.lhs.ops), I_max(rule.rhs.ops))
