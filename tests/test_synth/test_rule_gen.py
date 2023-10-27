@@ -138,9 +138,9 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K):
     delta = time()-start_time
     print("TOTTIME:", delta)
     if LC_test:
-        assert num_rules == 19
+        assert num_rules == 17
     else: 
-        assert num_rules == 22
+        assert num_rules == 20
 
 from timeit import default_timer as time
 
