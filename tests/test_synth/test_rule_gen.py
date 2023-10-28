@@ -89,16 +89,16 @@ ir = [c[N] for c in obj.get_from_ns("ir")]
 isa = [c[N] for c in obj.get_from_ns("isa")]
 print([c.name for c in isa])
 costs = [1,1,2,2]
-@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K,O_order", [
-    (1,1,1,1,1,1,1),
-    (0,0,1,1,1,1,1),
+@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K,O_order,max_outputs", [
+    (1,1,1,1,1,1,1,1),
+    (0,0,1,1,1,1,1,1),
+    (1,1,1,1,1,1,1,None),
 ])
-def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order):
+def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order, max_outputs):
     costs = [1,1,2,2]
     if not LC_test:
         assert not LC
     print("F:", LC_test, LC, E, CMP, C, K, O_order)
-    max_outputs = 1
     maxIR = 3
     maxISA = 3
     opMaxIR = None
@@ -138,7 +138,11 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order):
     delta = time()-start_time
     print("TOTTIME:", delta)
     if LC_test:
-        assert num_rules == 17
+        if max_outputs is None:
+            assert num_rules == 80
+        else:
+            assert max_outputs == 1
+            assert num_rules == 17
     else: 
         assert num_rules == 20
 
