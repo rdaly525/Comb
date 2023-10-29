@@ -163,7 +163,7 @@ class RuleSynth(Cegis):
                     rp_cond, enum_time = self.patL(rule.lhs)
                     self.synth_base = self.synth_base & ~rp_cond
                 else:
-                    rp_cond, enum_time = self.ruleL(rule.lhs)
+                    rp_cond, enum_time = self.ruleL(rule)
                     self.synth_base = self.synth_base & ~rp_cond
                 self.enum_times.append(enum_time)
 
