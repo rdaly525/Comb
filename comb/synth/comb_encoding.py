@@ -54,7 +54,7 @@ class CombEncoding(PatternEncoding):
         self.synth_vars = synth_vars
 
         #get list of lvars (existentially quantified in final query)
-        self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars)
+        self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars) + synth_vars
         self.lvars = (self.input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
         self.rhs_lvars = flat(op_in_lvars) + output_lvars
         self.Ninputs = Ninputs

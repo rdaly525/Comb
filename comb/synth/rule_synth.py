@@ -144,7 +144,7 @@ class RuleSynth(Cegis):
                 )
             )
         ])
-        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars, *self.lhs_cs.synth_vars, *self.rhs_cs.synth_vars]
+        E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
 
@@ -160,18 +160,31 @@ class RuleSynth(Cegis):
             assert E #or else we will just synthesize the same rules over and over
             if E:
                 if LC:
-                    rp_cond = self.patL(rule.lhs)
+                    rp_cond, enum_time = self.patL(rule.lhs)
+                    self.synth_base = self.synth_base & ~rp_cond
                 else:
-                    rp_cond = self.ruleL(rule)
-                self.synth_base = self.synth_base & ~rp_cond
+                    rp_cond, enum_time = self.ruleL(rule.lhs)
+                    self.synth_base = self.synth_base & ~rp_cond
+                self.enum_times.append(enum_time)
 
     def ruleL(self, rule: Rule):
-        lhs_match = self.lhs_cs.match_one_pattern(rule.lhs).to_hwtypes()
-        rhs_match = self.rhs_cs.match_one_pattern(rule.rhs).to_hwtypes()
-        return fc.And([lhs_match, rhs_match]).to_hwtypes()
+        start = timeit.default_timer()
+        cond = []
+        for pl in rule.lhs.enum_CK():
+            for pr in rule.rhs.enum_CK():
+                lhs_match = self.lhs_cs.match_one_pattern(pl).to_hwtypes()
+                rhs_match = self.rhs_cs.match_one_pattern(pr).to_hwtypes()
+                cond.append(fc.And([lhs_match, rhs_match]))
+        delta = timeit.default_timer() - start
+        return fc.Or(cond).to_hwtypes(), delta
 
     def patL(self, pat: Pattern):
-        return self.lhs_cs.match_one_pattern(pat).to_hwtypes()
+        start = timeit.default_timer()
+        cond = []
+        for p in pat.enum_CK():
+            cond.append(self.lhs_cs.match_one_pattern(pat))
+        delta = timeit.default_timer() - start
+        return fc.Or(cond).to_hwtypes(), delta
 
     #Note this is really only a LHS pat cover
     #DEPRECATED

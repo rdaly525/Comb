@@ -338,7 +338,8 @@ class RuleDiscovery:
                                     print("CMPTIME", round(comp_time,3), flush=True)
                                 if comp:
                                     for crule in existing_rules:
-                                        rule_cond = rs.ruleL(crule)
+                                        rule_cond, enum_time = rs.ruleL(crule)
+                                        comp_time += enum_time
                                         rs.synth_base = rs.synth_base & ~rule_cond
                                 sat_time = []
                                 for rule in rs.CEGISAll(E, LC, opts):
@@ -512,7 +513,8 @@ class RuleDiscovery:
                             comp_time = timeit.default_timer() - start
                             if comp:
                                 for cpat in existing_pats:
-                                    pat_cond = rs.patL(cpat)
+                                    pat_cond, enum_time = rs.patL(cpat)
+                                    comp_time += enum_time
                                     rs.synth_base = rs.synth_base & ~pat_cond
                             sat_time = []
                             for rule in rs.CEGISAll(E, LC, opts):
