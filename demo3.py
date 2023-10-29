@@ -118,8 +118,8 @@ opMaxISA = None
 dce = 1
 cse = 1
 start_time = time()
-LC, E, CMP = 0, 1, 1
-LC_test = 0
+LC, E, CMP = 1, 1, 1
+LC_test = 1
 gen_consts = False, True
 
 rd = RuleDiscovery(
