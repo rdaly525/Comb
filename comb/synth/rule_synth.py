@@ -169,22 +169,15 @@ class RuleSynth(Cegis):
 
     def ruleL(self, rule: Rule):
         start = timeit.default_timer()
-        cond = []
-        for pl in rule.lhs.enum_CK():
-            for pr in rule.rhs.enum_CK():
-                lhs_match = self.lhs_cs.match_one_pattern(pl).to_hwtypes()
-                rhs_match = self.rhs_cs.match_one_pattern(pr).to_hwtypes()
-                cond.append(fc.And([lhs_match, rhs_match]))
+        cond = rule.ruleL(self.lhs_cs, self.rhs_cs)
         delta = timeit.default_timer() - start
-        return fc.Or(cond).to_hwtypes(), delta
+        return cond, delta
 
     def patL(self, pat: Pattern):
         start = timeit.default_timer()
-        cond = []
-        for p in pat.enum_CK():
-            cond.append(self.lhs_cs.match_one_pattern(pat))
+        cond = pat.patL(self.lhs_cs)
         delta = timeit.default_timer() - start
-        return fc.Or(cond).to_hwtypes(), delta
+        return cond, delta
 
     #Note this is really only a LHS pat cover
     #DEPRECATED

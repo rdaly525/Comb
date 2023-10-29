@@ -238,8 +238,11 @@ class Pattern:
                 yield es_c
 
 
+    def enum_single_prog(self, *args, **pargs):
+        return list(it.islice(self.enum_prog(*args, **pargs),1))[0]
 
-    def enum_prog(self, edges):
+
+    def enum_prog(self, edges, make_pat = False):
         I = tuple(i for i in range(self.NI))
         IK = [[None for _ in range(NI)] for NI in self.op_NI]
         OK = [[None for _ in range(NO)] for NO in self.op_NO]
@@ -273,7 +276,11 @@ class Pattern:
             assert all(l is not None for l in O)
             assert all(all(l is not None for l in IKi) for IKi in IK)
             assert all(all(l is not None for l in OKi) for OKi in OK)
-            yield (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
+            P = (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), self.synth_vals)
+            if make_pat:
+                yield Pattern.init_prog(self.iT, self.oT, self.ops, P)
+            else:
+                yield P
 
 
     #For programs
@@ -286,11 +293,11 @@ class Pattern:
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
             yield IPerm(PL, mapL)
 
-    def patL(self, L, synth_vars):
+    def patL(self, pat_enc):
         allp = []
-        for PL in all_prog(self.enum_CK(), self.enum_prog):
-            for PL_ in self.enum_input_perm(PL):
-                allp.append(onepat(PL_, L, self.synth_vals, synth_vars))
+        for enum in self.enum_CK():
+            prog = self.enum_single_prog(enum, make_pat = True)
+            allp.append(pat_enc.match_one_pattern(prog))
         return fc.Or(allp).to_hwtypes()
 
     def enum_comm(self, edges):
@@ -359,8 +366,8 @@ class Pattern:
         return hash(str(self))
 
     def to_comb(self, ns="C", name="C") -> CombProgram:
-        prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
-        I, O, IK, OK = prog
+        prog = self.enum_single_prog(self.edges)
+        I, O, IK, OK, _ = prog
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
         for opi,num_o in enumerate(self.op_NO):
