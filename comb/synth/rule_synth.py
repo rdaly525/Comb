@@ -160,11 +160,15 @@ class RuleSynth(Cegis):
             assert E #or else we will just synthesize the same rules over and over
             if E:
                 if LC:
-                    rp_cond = self.lhs_cs.match_one_pattern(rule.lhs).to_hwtypes()
+                    rp_cond = self.patL(rule.lhs)
                 else:
-                    rp_cond = fc.And([self.lhs_cs.match_one_pattern(rule.lhs), 
-                                      self.rhs_cs.match_one_pattern(rule.rhs)]).to_hwtypes()
+                    rp_cond = self.ruleL(rule)
                 self.synth_base = self.synth_base & ~rp_cond
+
+    def ruleL(self, rule: Rule):
+        lhs_match = self.lhs_cs.match_one_pattern(rule.lhs).to_hwtypes()
+        rhs_match = self.rhs_cs.match_one_pattern(rule.rhs).to_hwtypes()
+        return fc.And([lhs_match, rhs_match]).to_hwtypes()
 
     def patL(self, pat: Pattern):
         return self.lhs_cs.match_one_pattern(pat).to_hwtypes()

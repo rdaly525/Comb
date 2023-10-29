@@ -39,6 +39,8 @@ class CombPE(CombPeak):
     name = QSym("peak", "PE")
     def __init__(self):
         super().__init__(PeakPE, 1, lambda N: ((N,N,N,2),N), ((False, False, True, True),False))
+        set_comm(self)
+        
 
 PE = CombPE()
 
@@ -115,10 +117,9 @@ opMaxIR = None
 opMaxISA = None
 dce = 1
 cse = 1
-O_order = 1
 start_time = time()
-LC, E, CMP = 1, 1, 1
-LC_test = 1
+LC, E, CMP = 0, 1, 1
+LC_test = 0
 gen_consts = False, True
 
 rd = RuleDiscovery(
@@ -131,7 +132,7 @@ rd = RuleDiscovery(
     opMaxR=opMaxISA,
 )
 ir_opts = (dce, cse)
-narrow_opts = (C, K, O_order)
+narrow_opts = (C, K)
 E_opts = (LC, E, CMP)
 if LC_test:
     ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts)
