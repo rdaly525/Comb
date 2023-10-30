@@ -75,6 +75,29 @@ def enum_rule_partitions(op_list, rule_op_cnts):
     for op_ids in it.product(*product_list):
         yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
 
+def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int, int]):
+    #Interior edges
+    interior_edges = []
+    for (li, lai), (ri, rai) in p.interior_edges:
+        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
+        r_csid = pid_to_csid[ri]
+        r_lvars = cs.op_in_lvars[r_csid]
+        r_lvar = r_lvars[rai]
+        interior_edges.append(l_lvar==r_lvar)
+    #Exterior edges
+    in_lvars = {}
+    for (li, lai), (ri, rai) in p.in_edges:
+        assert li == -1
+        assert ri != p.num_ops
+        r_lvar = cs.op_in_lvars[pid_to_csid[ri]][rai]
+        in_lvars[lai] = r_lvar
+    out_lvars = {}
+    for (li, lai), (ri, rai) in p.out_edges:
+        assert ri == p.num_ops
+        assert li != -1
+        l_lvar = cs.op_out_lvars[pid_to_csid[li]][lai]
+        out_lvars[lai] = l_lvar
+    return fc.And(interior_edges), in_lvars, out_lvars
 
 class RuleSynth(Cegis):
     def __init__(

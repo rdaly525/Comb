@@ -243,7 +243,7 @@ class Pattern:
                 yield es_c,synth_vals
 
 
-    def enum_prog(self, edges, make_pat = False):
+    def enum_prog(self, edges):
         I = tuple(i for i in range(self.NI))
         IK = [[None for _ in range(NI)] for NI in self.op_NI]
         OK = [[None for _ in range(NO)] for NO in self.op_NO]
@@ -277,11 +277,7 @@ class Pattern:
             assert all(l is not None for l in O)
             assert all(all(l is not None for l in IKi) for IKi in IK)
             assert all(all(l is not None for l in OKi) for OKi in OK)
-            P = (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), self.synth_vals)
-            if make_pat:
-                yield Pattern.init_prog(self.iT, self.oT, self.ops, P)
-            else:
-                yield P
+            yield (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), self.synth_vals)
 
 
     #For programs
