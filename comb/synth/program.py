@@ -97,11 +97,9 @@ class Program:
     def enum_all_equal(self):
         #Does all the symmetries
         for es_ip in self.enum_input_perm(self.edges):
-            for es_so in self.enum_same_op(es_ip):
+            for es_so, synth_vals in self.enum_same_op(es_ip):
                 for es_c in self.enum_comm(es_so):
-                    p = Pattern(self.iT, self.oT, self.ops)
-                    for e in es_c:
-                        p.add_edge(*e)
+                    p = Pattern(self.iT, self.oT, self.ops, es_c, synth_vals)
                     yield p
 
     def enum_input_perm(self, edges):

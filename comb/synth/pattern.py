@@ -146,6 +146,11 @@ class Pattern:
         self.op_NO = [len(op.get_type()[1]) for op in ops]
         self.synth_vals = synth_vals
         self.edges = edges
+        self.synth_map = {}
+        for opi, op in enumerate(ops):
+            if isinstance(op.comb, CBVSynthConst):
+                self.synth_map[opi] = synth_vals[len(self.synth_map)]
+        assert len(self.synth_map) == len(synth_vals)
 
         self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None for _ in oT]]
         for src, (snki, snka) in self.edges:
@@ -233,13 +238,9 @@ class Pattern:
     #                        yield prog
 
     def enum_CK(self):
-         for es_so in self.enum_same_op(self.edges):
+         for es_so, synth_vals in self.enum_same_op(self.edges):
             for es_c in self.enum_comm(es_so):
-                yield es_c
-
-
-    def enum_single_prog(self, *args, **pargs):
-        return list(it.islice(self.enum_prog(*args, **pargs),1))[0]
+                yield es_c,synth_vals
 
 
     def enum_prog(self, edges, make_pat = False):
@@ -295,9 +296,9 @@ class Pattern:
 
     def patL(self, pat_enc):
         allp = []
-        for enum in self.enum_CK():
-            prog = self.enum_single_prog(enum, make_pat = True)
-            allp.append(pat_enc.match_one_pattern(prog))
+        for edges,synth_vals in self.enum_CK():
+            pat = Pattern(self.iT, self.oT, self.ops, edges, synth_vals)
+            allp.append(pat_enc.match_one_pattern(pat))
         return fc.Or(allp).to_hwtypes()
 
     def enum_comm(self, edges):
@@ -317,12 +318,13 @@ class Pattern:
         self_ids = flat(self.op_dict.values())
         for ids in it.product(*[it.permutations(self.op_dict[op]) for op in ops]):
             op_map = {**{f:t for f,t in zip(self_ids, flat(ids))},-1:-1,self.num_ops:self.num_ops}
+            new_synth_vals = [self.synth_map[op_map[opi]] for opi in sorted(self.synth_map.keys())]
             es = []
             for (src_i, src_a), (snk_i, snk_a) in edges:
                 new_src = (op_map[src_i], src_a)
                 new_snk = (op_map[snk_i], snk_a)
                 es.append((new_src, new_snk))
-            yield es
+            yield es, new_synth_vals
 
 
     def equal(self, other: 'Pattern'):
@@ -366,7 +368,7 @@ class Pattern:
         return hash(str(self))
 
     def to_comb(self, ns="C", name="C") -> CombProgram:
-        prog = self.enum_single_prog(self.edges)
+        prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
         I, O, IK, OK, _ = prog
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
@@ -387,23 +389,15 @@ class Pattern:
         outDecls = [OutDecl(src_to_sym[(self.num_ops, i)], nT_to_type(n)) for i, n in enumerate(self.oT)]
 
         BV = GlobalModules['bv']
-        opi_to_synth_val = {}
-        for opi, op in enumerate(self.ops):
-            if isinstance(op.comb, CBVSynthConst):
-                # gathering parameters to convert synth_consts to c_const
-                assert len(op.pargs) == 1
-                opi_to_synth_val[opi] = (op.pargs[0].value, self.synth_vals[len(opi_to_synth_val)])
-        
-        assert(len(opi_to_synth_val) == len(self.synth_vals))
-
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
             lhss = [src_to_sym[(opi, i)] for i in range(len(OK[opi]))]
             args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
-            if opi in opi_to_synth_val:
+            if opi in self.synth_map:
                 # convert synth_consts to c_const
-                N, val = opi_to_synth_val[opi]
-                op = BV.c_const[N, val]
+                assert len(op.pargs) == 1
+                op = BV.c_const[op.pargs[0].value, self.synth_map[opi]]
+
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
         out_lhs = [src_to_sym[(self.num_ops, i)] for i in range(len(self.oT))]

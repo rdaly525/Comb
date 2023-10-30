@@ -76,12 +76,14 @@ class Rule:
 
     def ruleL(self, l_pat_enc, r_pat_enc):
         #enums patterns
-        l_enum = [self.lhs.enum_single_prog(enum, make_pat = True) for enum in self.lhs.enum_CK()]
-        r_enum = [self.rhs.enum_single_prog(enum, make_pat = True) for enum in self.rhs.enum_CK()]
+        l_enum = self.lhs.enum_CK()
+        r_enum = self.rhs.enum_CK()
         allr = []
-        for l_prog,r_prog in it.product(l_enum, r_enum):
-            l = l_pat_enc.match_one_pattern(l_prog)
-            r = r_pat_enc.match_one_pattern(r_prog)
+        for (l_edges, l_synth_vals),(r_edges, r_synth_vals) in it.product(l_enum, r_enum):
+            l_pat = Pattern(self.lhs.iT, self.lhs.oT, self.lhs.ops, l_edges, l_synth_vals)
+            r_pat = Pattern(self.rhs.iT, self.rhs.oT, self.rhs.ops, r_edges, r_synth_vals)
+            l = l_pat_enc.match_one_pattern(l_pat)
+            r = r_pat_enc.match_one_pattern(r_pat)
             allr.append(fc.And([l,r]))
         return fc.Or(allr).to_hwtypes()
 
