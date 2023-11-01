@@ -53,13 +53,10 @@ def count(l):
             ret[n] = ret.get(n, 0) + v
     return ret
 
-def I_max(ops):
+def T_count(ops):
     iTs = count([get_cnt(op, 0) for op in ops])
     oTs = count([get_cnt(op, 1) for op in ops])
-    assert all(len(Ts) <= 1 for Ts in (oTs,iTs))
-    T = list(oTs.keys())[0]
-    #assert all(T in Ts for Ts in (lhs_oTs,lhs_iTs,rhs_oTs,rhs_iTs))
-    return iTs.get(T,0), oTs[T], T
+    return iTs, oTs
 
 @dataclass
 class RuleDiscovery:
@@ -82,18 +79,56 @@ class RuleDiscovery:
         self.lhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.lhss)}
         self.rhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.rhss)}
 
+    def allT(self, lhs_ops, rhs_ops, max_outputs = 1):
+        # generate all possible program input and output type combinations
+        assert max_outputs == 1
 
-    def allT(self, lhs_ops, rhs_ops, num_out=1):
-        lNI, lNO, lT = I_max(lhs_ops)
-        rNI, rNO, rT = I_max(rhs_ops)
-        assert lT == rT
-        l_I_max = lNI - lNO + num_out
-        r_I_max = rNI - rNO + num_out
-        i_max = min(l_I_max, r_I_max)
-        for n in reversed(range(1, i_max+1)):
-            yield ((lT,)*n, (lT,))
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+        rop_iTs, rop_oTs = T_count(rhs_ops)
 
-    #Finds all composite rules
+        max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
+        max_oTs = {T:min(lop_oTs[T], rop_oTs[T]) for T in set(lop_oTs.keys()) & set(rop_oTs.keys())}
+
+        max_inputs = sum(max_iTs.values())
+        if max_outputs is None:
+            max_outputs = sum(max_oTs.values())
+        else:
+            max_outputs = min(max_outputs, sum(max_oTs.values()))
+
+        iTs_all = flat((T,)*c for T,c in max_iTs.items())
+        oTs_all = flat((T,)*c for T,c in max_oTs.items())
+
+        for num_out in range(max_outputs, 0, -1):
+            for oTs_sel in multicomb(oTs_all, num_out):
+                for num_in in range(max_inputs, 0, -1):
+                    for iTs_sel in multicomb(iTs_all, num_in):
+                        yield (tuple(iTs_sel), tuple(oTs_sel))
+
+
+    def valid_program_components(self, iT, oT, lhs_ops, rhs_ops):
+        # return True if the program components could possibly form a valid program
+        # else return False
+
+        # TODO: could make this a more elaborate check in the future if too many
+        # hopeless programs make it past this check and slow down the synthesis
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+        rop_iTs, rop_oTs = T_count(rhs_ops)
+
+        lsrcs_no_i = set(lop_oTs.keys())
+        rsrcs_no_i = set(rop_oTs.keys())
+        lsncs_no_o = set(lop_iTs.keys())
+        rsncs_no_o = set(rop_iTs.keys())
+
+        #all non-output sncs must have a src
+        if not lsncs_no_o <= (set(iT) | lsrcs_no_i) or not rsncs_no_o <= (set(iT) | rsrcs_no_i):
+            return False
+
+        #all outputs must have a non-input src
+        if not set(oT) <= lsrcs_no_i or not set(oT) <= rsrcs_no_i:
+            return False
+
+        return True
 
     # Finds all combinations of rules that exactly match the lhs and rhs
     def all_composite_msets(self, lhs_ids, rhs_ids, iT, opts:SolverOpts):
@@ -110,7 +145,8 @@ class RuleDiscovery:
             l_eq = rule.lhs.op_cnt == lhs_op_cnt
             r_eq = rule.rhs.op_cnt == rhs_op_cnt
             if l_eq and r_eq and rule.NI >= NI:
-                print("RCNT", {ri:1},flush=True)
+                if opts.log:
+                    print("RCNT", {ri:1},flush=True)
                 yield [(rule, 1)]
                 continue
             l_subseteq = _m_subseteq(rule.lhs.op_cnt, lhs_op_cnt)
@@ -225,13 +261,15 @@ class RuleDiscovery:
                         #rhs_op_names = [op.qualified_name for op in rhs_ops]
                         kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
                         kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
-                        print(kstr,flush=True)
                         if opts.log:
+                            print(kstr,flush=True)
                             print_kind(lhs_ids, rhs_ids)
                         for (iT, oT) in self.allT(lhs_ops, rhs_ops):
+                            if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
+                                continue
                             new_rules = []
                             NI = len(iT)
-                            k = (tuple(lhs_ids), tuple(rhs_ids), NI)
+                            k = (tuple(lhs_ids), tuple(rhs_ids), iT)
                             if opts.log:
                                 print_iot(iT, oT)
                             rs = RuleSynth(
@@ -254,7 +292,7 @@ class RuleDiscovery:
                                     rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
                                     existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
                             comp_time = timeit.default_timer() - start
-                            if len(existing_rules) > 0:
+                            if len(existing_rules) > 0 and opts.log:
                                 print("CMPTIME", round(comp_time,3), flush=True)
                             if comp:
                                 for crule in existing_rules:
@@ -397,12 +435,15 @@ class RuleDiscovery:
                     rhs_ops = [self.rhss[i] for i in rhs_ids]
                     kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
                     kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
-                    print(kstr,flush=True)
+                    if opts.log:
+                        print(kstr,flush=True)
                     cur_cost = sum(costs[rid] for rid in rhs_ids)
                     for (iT, oT) in self.allT(lhs_ops, rhs_ops):
+                        if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
+                            continue
                         new_rules = []
                         NI = len(iT)
-                        k = (tuple(lhs_ids), tuple(rhs_ids), NI)
+                        k = (tuple(lhs_ids), tuple(rhs_ids), iT)
 
                         #kstr += f":{NI}"
                         if opts.log:
@@ -424,8 +465,6 @@ class RuleDiscovery:
                             for dag in dags:
                                 lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                 existing_pats.append(lhs_pat)
-                        if len(existing_pats) > 0:
-                            print()
                         comp_time = timeit.default_timer() - start
                         if comp:
                             if LC:

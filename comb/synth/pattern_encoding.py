@@ -133,6 +133,4 @@ class PatternEncoding:
         op_oTs = [types_to_nT_cnts(op.get_type()[1]) for op in self.op_list]
         snks = add_cnts(oTs, functools.reduce(lambda a, b: add_cnts(a,b), op_iTs))
         srcs = add_cnts(iTs, functools.reduce(lambda a, b: add_cnts(a,b), op_oTs))
-        if set(snks.keys()) != set(srcs.keys()):
-            return False
-        return ge0_cnts(sub_cnts(snks, srcs))
+        return set(snks.keys()) <= set(srcs.keys())
