@@ -60,7 +60,6 @@ class PatternEncoding:
         raise NotImplementedError
 
     def P_iropt(self, dce, cse):
-        assert not cse
         P_iropt = []
         if dce:
             P_iropt.append(self.P_dse)
@@ -68,12 +67,14 @@ class PatternEncoding:
             P_iropt.append(self.P_cse)
         return fc.And(P_iropt)
 
-    def P_narrow(self, C, K):
+    def P_narrow(self, C, K, O_order):
         P_narrow = []
         if C:
             P_narrow.append(self.P_comm)
         if K:
             P_narrow.append(self.P_K)
+        if O_order:
+            P_narrow.append(self.P_O_order)
         return fc.And(P_narrow)
 
 

@@ -33,16 +33,16 @@ assert isa[1].comm_info == ([0],) # Neg
 assert isa[2].comm_info == ([0, 1],) # And
 solver_opts = SolverOpts(verbose=0, solver_name='z3', timeout=5, log=False)
 
-@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K", [
-    (1,1,1,1,1,1),
+@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K,O_order", [
+    (1,1,1,1,1,1,1),
     #(1,1,0,1,1),
     #(0,1,1,1,1),
 ])
-def test_genall(LC_test, LC, E, CMP, C, K):
+def test_genall(LC_test, LC, E, CMP, C, K, O_order):
     if not LC_test:
         assert not LC
-    print("F:", LC_test, LC, E, CMP, C, K)
-
+    print("F:", LC_test, LC, E, CMP, C, K, O_order)
+    max_outputs = None
     maxIR = 2
     maxISA = 2
     opMaxIR = None
@@ -59,12 +59,12 @@ def test_genall(LC_test, LC, E, CMP, C, K):
         opMaxR=opMaxISA,
     )
     ir_opts = (dce, cse)
-    narrow_opts = (C, K)
+    narrow_opts = (C, K, O_order)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         print(rule)
@@ -89,16 +89,16 @@ ir = [c[N] for c in obj.get_from_ns("ir")]
 isa = [c[N] for c in obj.get_from_ns("isa")]
 print([c.name for c in isa])
 costs = [1,1,2,2]
-@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K", [
-    (1,1,1,1,1,1),
-    (0,0,1,1,1,1),
+@pytest.mark.parametrize("LC_test, LC,E,CMP,C,K,O_order,max_outputs", [
+    (1,1,1,1,1,1,1,1),
+    (0,0,1,1,1,1,1,1),
+    (1,1,1,1,1,1,1,None),
 ])
-def test_bit_movement(LC_test, LC, E, CMP, C, K):
+def test_bit_movement(LC_test, LC, E, CMP, C, K, O_order, max_outputs):
     costs = [1,1,2,2]
     if not LC_test:
         assert not LC
-    print("F:", LC_test, LC, E, CMP, C, K)
-
+    print("F:", LC_test, LC, E, CMP, C, K, O_order)
     maxIR = 3
     maxISA = 3
     opMaxIR = None
@@ -115,12 +115,12 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K):
         opMaxR=opMaxISA,
     )
     ir_opts = (dce, cse)
-    narrow_opts = (C, K)
+    narrow_opts = (C, K, O_order)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts)
     num_rules = 0
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
@@ -138,7 +138,11 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K):
     delta = time()-start_time
     print("TOTTIME:", delta)
     if LC_test:
-        assert num_rules == 17
+        if max_outputs is None:
+            assert num_rules == 80
+        else:
+            assert max_outputs == 1
+            assert num_rules == 17
     else: 
         assert num_rules == 20
 
