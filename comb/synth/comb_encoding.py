@@ -8,7 +8,7 @@ from hwtypes import smt_utils as fc
 import hwtypes as ht
 from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
 from ..frontend.ir import AssignStmt, CombProgram
-from ..frontend.stdlib import make_bv_const
+from ..frontend.stdlib import make_bv_const, CBVSynthConst
 from .pattern import Pattern
 from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
@@ -36,17 +36,25 @@ class CombEncoding(PatternEncoding):
         hard_const_lvars = list(range(Ninputs, Ninputs +len(hard_consts)))
         op_out_lvars = []
         op_in_lvars = []
+        synth_vars = []
         for opi, op in enumerate(self.op_list):
             op_iTs, op_oTs = op.get_type()
             op_in_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_in[{i}]", lvar_t_width) for i, T in enumerate(op_iTs)])
             op_out_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width) for i, T in enumerate(op_oTs)])
+            if isinstance(op.comb, CBVSynthConst):
+                assert len(op_oTs) == 1
+                var = get_var(f"{self.prefix}_synth_const_op[{opi}]", op_oTs[0])
+                synth_vars.append(var)
+                op.eval = functools.partial(op.eval, var)
+
         output_lvars = [get_var(f"{self.prefix}_L_out[{i}]", lvar_t_width) for i in range(len(self.output_vars))]
         self.op_in_lvars = op_in_lvars
         self.op_out_lvars = op_out_lvars
         self.output_lvars = output_lvars
+        self.synth_vars = synth_vars
 
         #get list of lvars (existentially quantified in final query)
-        self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars)
+        self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars) + synth_vars
         self.lvars = (self.input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
         self.rhs_lvars = flat(op_in_lvars) + output_lvars
         self.Ninputs = Ninputs
@@ -202,17 +210,6 @@ class CombEncoding(PatternEncoding):
         return fc.And(P_K)
 
     @property
-    def P_O_order(self):
-        #enforce an ordering for outputs of the same type
-        d = {}
-        P_O_order = []
-        for T, lvar in zip(self.oT, self.output_lvars):
-            if T in d:
-                P_O_order.append(d[T] < lvar)
-            d[T] = lvar
-        return fc.And(P_O_order)
-
-    @property
     def P_wfp(self):
         P_wfp = [
             self.P_in_range,
@@ -363,42 +360,64 @@ class CombEncoding(PatternEncoding):
         op_out_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_out_lvars]
         op_in_lvals = [[_to_int(sol[lvar.value]) for lvar in lvars] for lvars in op_in_lvars]
         output_lvals = [_to_int(sol[lvar.value]) for lvar in output_lvars]
+        synth_vals = [_to_int(sol[var.value]) for var in self.synth_vars]
 
         lval_to_src = {i:(-1, i) for i in range(num_inputs)}
         for opi, lvals in enumerate(op_out_lvals):
             lval_to_src.update({lval:(opi, i) for i, lval in enumerate(lvals)})
 
-        P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals)
-        p = Pattern(self.iT, self.oT, self.op_list, P, is_pat=False)
+        P = (input_lvars, output_lvals, op_in_lvals, op_out_lvals, synth_vals)
+        p = Pattern.init_prog(self.iT, self.oT, self.op_list, P)
         return p
 
 
-    def match_one_pattern(self, p: Pattern, pid_to_csid: tp.Mapping[int, int]):
+    def match_one_pattern(self, p: Pattern):
         #Interior edges
         interior_edges = []
         for (li, lai), (ri, rai) in p.interior_edges:
-            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
-            r_csid = pid_to_csid[ri]
-            r_lvars = self.op_in_lvars[r_csid]
-            r_lvar = r_lvars[rai]
+            l_lvar = self.op_out_lvars[li][lai]
+            r_lvar = self.op_in_lvars[ri][rai]
             interior_edges.append(l_lvar==r_lvar)
         #Exterior edges
         in_lvars = {}
         for (li, lai), (ri, rai) in p.in_edges:
             assert li == -1
             assert ri != p.num_ops
-            r_lvar = self.op_in_lvars[pid_to_csid[ri]][rai]
+            r_lvar = self.op_in_lvars[ri][rai]
             in_lvars.setdefault(lai,[]).append(r_lvar)
+        assert len(in_lvars) == len(self.input_lvars)
         out_lvars = {}
         for (li, lai), (ri, rai) in p.out_edges:
             assert ri == p.num_ops
             assert li != -1
-            l_lvar = self.op_out_lvars[pid_to_csid[li]][lai]
+            l_lvar = self.op_out_lvars[li][lai]
             assert rai not in out_lvars
             out_lvars[rai] = l_lvar
+        assert len(out_lvars) == len(self.output_lvars)
+
+        # every input group points to the same src
         in_conds = [fc.And([lv0==lv1 for lv0,lv1 in zip(lvars[:-1], lvars[1:])]) for lvars in in_lvars.values()]
-        in_lvars = {lai:lvars[0] for lai, lvars in in_lvars.items()}
-        return fc.And(in_conds + interior_edges), in_lvars, out_lvars
+
+        op_in_mask = self.lvar_t(0)
+        input_mask= self.lvar_t(0)
+        for l_lvars in in_lvars.values():
+            op_in_mask |= (self.lvar_t(1) << l_lvars[0])
+        for l_lvar in self.input_lvars:
+            input_mask |= (self.lvar_t(1) << l_lvar)
+        in_conds.append(op_in_mask == input_mask)
+
+        op_out_mask = self.lvar_t(0)
+        output_mask= self.lvar_t(0)
+        for l_lvar in out_lvars.values():
+            op_out_mask |= (self.lvar_t(1) << l_lvar)
+        for l_lvar in self.output_lvars:
+            output_mask |= (self.lvar_t(1) << l_lvar)
+        out_conds = [op_out_mask == output_mask]
+
+        assert len(self.synth_vars) == len(p.synth_vals)
+        synth_conds = [var == val for var, val in zip(self.synth_vars, p.synth_vals)]
+
+        return fc.And(in_conds + interior_edges + out_conds + synth_conds)
 
     def match_rule_dag(self, dag, r_matches):
         l_insides = [m[0] for m in r_matches]

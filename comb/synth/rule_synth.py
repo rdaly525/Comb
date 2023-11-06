@@ -2,12 +2,13 @@ import functools
 import timeit
 
 from ..frontend.ast import Comb
-from .solver_utils import Cegis, SolverOpts
+from .solver_utils import Cegis, SolverOpts, get_var
 from .pattern import Pattern, enum_dags
 from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
 from .utils import _list_to_dict, bucket_combinations, flat, nT
 from .rule import Rule
+from ..frontend.stdlib import GlobalModules
 
 import hwtypes.smt_utils as fc
 import typing as tp
@@ -74,7 +75,6 @@ def enum_rule_partitions(op_list, rule_op_cnts):
     for op_ids in it.product(*product_list):
         yield {op:ids for op, ids in zip(self_op_ids.keys(), op_ids)}
 
-
 def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int, int]):
     #Interior edges
     interior_edges = []
@@ -99,7 +99,6 @@ def match_one_pattern(p: Pattern, cs: CombEncoding, pid_to_csid: tp.Mapping[int,
         out_lvars[lai] = l_lvar
     return fc.And(interior_edges), in_lvars, out_lvars
 
-
 class RuleSynth(Cegis):
     def __init__(
         self,
@@ -113,6 +112,8 @@ class RuleSynth(Cegis):
     ):
         self.iT = iT
         self.oT = oT
+
+
         lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
         rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
         assert lhs_cs.types_viable and rhs_cs.types_viable
@@ -121,6 +122,7 @@ class RuleSynth(Cegis):
         self.enum_times = []
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
+
 
         input_vars = [*lhs_cs.input_vars, *rhs_cs.input_vars]
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
@@ -133,9 +135,7 @@ class RuleSynth(Cegis):
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
             rhs_cs.P_iropt(*ir_opts),
-            #we dont want to constrain the output order of the rhs, since that could
-            #make certain rules we want unsynthesizable
-            rhs_cs.P_narrow(*narrow_opts[:-1], 0),
+            rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
         ])
 
@@ -152,7 +152,7 @@ class RuleSynth(Cegis):
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
             rhs_cs.P_iropt(*ir_opts),
-            rhs_cs.P_narrow(*narrow_opts[:-1], 0), #see above comment
+            rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
             fc.Implies(
                 fc.And([
@@ -167,8 +167,6 @@ class RuleSynth(Cegis):
                 )
             )
         ])
-        #print(query.serialize())
-        #assert 0
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
@@ -181,49 +179,28 @@ class RuleSynth(Cegis):
             rhs_pat = self.rhs_cs.pattern_from_sol(sol)
             rule = Rule(lhs_pat, rhs_pat, i, t)
             yield rule
+
+            assert E #or else we will just synthesize the same rules over and over
             if E:
-                #Exclude full rule.
                 if LC:
                     rp_cond, enum_time = self.patL(rule.lhs)
+                    self.synth_base = self.synth_base & ~rp_cond
                 else:
                     rp_cond, enum_time = self.ruleL(rule)
+                    self.synth_base = self.synth_base & ~rp_cond
                 self.enum_times.append(enum_time)
-                self.synth_base = self.synth_base & ~rp_cond
 
-    def ruleL(self, rule:Rule):
-        L_IR = self.lhs_cs.L
-        L_ISA = self.rhs_cs.L
+    def ruleL(self, rule: Rule):
         start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA)
+        cond = rule.ruleL(self.lhs_cs, self.rhs_cs)
         delta = timeit.default_timer() - start
-        return rule_cond, delta
+        return cond, delta
 
-    #Only for IR pattern
     def patL(self, pat: Pattern):
-        L_IR = self.lhs_cs.L
         start = timeit.default_timer()
-        pat_cond = pat.patL(L_IR)
+        cond = pat.patL(self.lhs_cs)
         delta = timeit.default_timer() - start
-        return pat_cond, delta
-
-    #old one that used 'enum_patter_patrtions' to enumerate all same_op symmetries
-    #def _match_pattern(self, p: Pattern, ri_op_ids):
-    #    for pid_to_csid in enum_pattern_partitions(p, ri_op_ids):
-    #        yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
-
-    #This enumerates all equiv patterns (from passed in pat) then matches on that
-    #DEPRECATED
-    def match_pattern(self, pat: Pattern, r_op_ids:tp.Mapping[str,tp.Iterable[int]]):
-        ops = sorted(r_op_ids.keys())
-        for p in pat.enum_all_equal():
-            maps = [{pid:csid for pid,csid in zip(p.op_dict[op],r_op_ids[op])} for op in ops]
-            pid_to_csid = functools.reduce(lambda d0, d1: {**d0, **d1}, maps)
-            yield self.lhs_cs.match_one_pattern(p, pid_to_csid)
-
-
-
-
-
+        return cond, delta
 
     #Note this is really only a LHS pat cover
     #DEPRECATED

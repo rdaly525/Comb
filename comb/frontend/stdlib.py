@@ -78,6 +78,38 @@ class BVConst(CombPrimitive):
                 return [BVValue(ht.SMTBitVector[N.value](val.value))]
         return CallExpr(self, pargs, args)
 
+class CBVSynthConst(CombPrimitive):
+    name = QSym('bv', '_synth_const')
+    param_types = [IntType()]
+    num_inputs = 0
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        CBVCall = TypeCall(CBVType(), [N])
+        return [], [CBVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==1
+        return [BVValue(args[0])]
+
+class CBVConst(CombPrimitive):
+    name = QSym('bv', 'c_const')
+    param_types = [IntType(), IntType()]
+    num_inputs = 0
+    num_outputs = 1
+
+    def get_type(self, N: Expr, val: Expr):
+        CBVCall = TypeCall(CBVType(), [N])
+        return [], [CBVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==2 and len(args)==0
+        N = pargs[0]
+        val = pargs[1]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if isinstance(val, IntValue) and isinstance(val.value, int):
+                return [BVValue(ht.SMTBitVector[N.value](val.value))]
+        return CallExpr(self, pargs, args)
 
 def create_BVUnary(class_name: str, fun):
     class BVBin(CombPrimitive):
@@ -190,7 +222,7 @@ _binops = dict(
     and_=(lambda x, y: x & y, True),
     or_=(lambda x, y: x | y, True),
     xor=(lambda x, y: x ^ y, True),
-    lshr=(lambda x, y: x << y, True),
+    lshr=(lambda x, y: x << y, False),
 )
 
 _cmpops = dict(
@@ -316,6 +348,8 @@ class BitVectorModule(Module):
         super().__init__('bv')
         opdict = dict(
             const=BVConst(),
+            c_const=CBVConst(),
+            _synth_const=CBVSynthConst(),
             abs_const=AbsConst(),
             concat=BVConcat(),
             slice=BVSlice(),

@@ -9,6 +9,7 @@ import typing as tp
 
 from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set
 from ..frontend.ir import CombProgram, AssignStmt
+from ..frontend.stdlib import CBVSynthConst, GlobalModules
 import itertools as it
 
 #Represnts the raw dag structure of a particular pattern
@@ -73,7 +74,9 @@ def matcher(from_pat, from_root, to_pat, to_root, opts: SymOpts):
             assert all(isinstance(l, list) for l in comm_info)
             assert r.ops[r_opi].comm_info == comm_info
             #Append comm_info with extra args
-            cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
+            cur_ais = set()
+            if len(comm_info) > 0:
+                cur_ais = functools.reduce(lambda s0,s1: s0|s1, [set(c) for c in comm_info])
             assert isinstance(cur_ais, set)
             assert cur_ais == set(range(len(l_args)))
             l_poss_args = []
@@ -132,7 +135,7 @@ def filter_eq(f):
 #        pat =
 
 class Pattern:
-    def __init__(self, iT, oT, ops: tp.List[Comb], P, is_pat):
+    def __init__(self, iT, oT, ops: tp.List[Comb], edges, synth_vals):
         self.iT = iT
         self.oT = oT
         self.ops = ops
@@ -141,10 +144,13 @@ class Pattern:
         self.NO = len(oT)
         self.op_NI = [len(op.get_type()[0]) for op in ops]
         self.op_NO = [len(op.get_type()[1]) for op in ops]
-        if is_pat:
-            self.edges = P
-        else:
-            self.init_prog(P)
+        self.synth_vals = synth_vals
+        self.edges = edges
+        self.synth_map = {}
+        for opi, op in enumerate(ops):
+            if isinstance(op.comb, CBVSynthConst):
+                self.synth_map[opi] = synth_vals[len(self.synth_map)]
+        assert len(self.synth_map) == len(synth_vals)
 
         self.children = [[None for _ in range(NI)] for NI in self.op_NI] + [[None for _ in oT]]
         for src, (snki, snka) in self.edges:
@@ -152,24 +158,30 @@ class Pattern:
         assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
         self.root = (len(ops), 0)
 
-    def init_prog(self, P):
-        I, O, IK, OK = P
-        I, O, IK, OK = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
-        ops = self.ops
+    @classmethod
+    def init_prog(cls, iT, oT, ops: tp.List[Comb], P):
+        I, O, IK, OK, synth_vals = P
+        I, O, IK, OK, synth_vals = (tuple(I), tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), tuple(synth_vals))
+        NI = len(iT)
+        NO = len(oT)
+        op_NI = [len(op.get_type()[0]) for op in ops]
+        op_NO = [len(op.get_type()[1]) for op in ops]
+        num_ops = len(ops)
+
         assert len(IK) == len(ops)
         assert len(OK) == len(ops)
-        assert all(len(IKi)==NI for IKi, NI in zip(IK, self.op_NI))
-        assert all(len(OKi)==NO for OKi, NO in zip(OK, self.op_NO))
+        assert all(len(IKi)==NI for IKi, NI in zip(IK, op_NI))
+        assert all(len(OKi)==NO for OKi, NO in zip(OK, op_NO))
         for i, op in enumerate(ops):
-            iT, oT = op.get_type()
-            assert len(iT) == len(IK[i])
-            assert len(oT) == len(OK[i])
-        src_to_node = {i:(-1,i) for i in range(self.NI)}
-        src_to_node.update({i+self.NI:(i,0) for i in range(self.num_ops)})
-        self.edges = []
+            op_iT, op_oT = op.get_type()
+            assert len(op_iT) == len(IK[i])
+            assert len(op_oT) == len(OK[i])
+        src_to_node = {i:(-1,i) for i in range(NI)}
+        src_to_node.update({i+NI:(i,0) for i in range(num_ops)})
+        edges = []
         for i, IKi in enumerate((*IK, O)):
             for j, l in enumerate(IKi):
-                if l < self.NI:
+                if l < NI:
                     src = (-1, l)
                 else:
                     src = None
@@ -179,7 +191,9 @@ class Pattern:
                             break
                     assert src is not None
                 snk = (i, j)
-                self.edges.append((src, snk))
+                edges.append((src, snk))
+
+        return cls(iT, oT, ops, edges, synth_vals)
 
     @cached_property
     def op_names(self):
@@ -224,10 +238,9 @@ class Pattern:
     #                        yield prog
 
     def enum_CK(self):
-         for es_so in self.enum_same_op(self.edges):
+         for es_so, synth_vals in self.enum_same_op(self.edges):
             for es_c in self.enum_comm(es_so):
-                yield es_c
-
+                yield es_c,synth_vals
 
 
     def enum_prog(self, edges):
@@ -264,7 +277,7 @@ class Pattern:
             assert all(l is not None for l in O)
             assert all(all(l is not None for l in IKi) for IKi in IK)
             assert all(all(l is not None for l in OKi) for OKi in OK)
-            yield (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK))
+            yield (I, tuple(O), tuple(tuple(IKi) for IKi in IK), tuple(tuple(OKi) for OKi in OK), self.synth_vals)
 
 
     #For programs
@@ -277,15 +290,12 @@ class Pattern:
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
             yield IPerm(PL, mapL)
 
-
-    def patL(self, L):
+    def patL(self, pat_enc):
         allp = []
-        for PL in all_prog(self.enum_CK(), self.enum_prog):
-            for PL_ in self.enum_input_perm(PL):
-                allp.append(onepat(PL_, L))
+        for edges,synth_vals in self.enum_CK():
+            pat = Pattern(self.iT, self.oT, self.ops, edges, synth_vals)
+            allp.append(pat_enc.match_one_pattern(pat))
         return fc.Or(allp).to_hwtypes()
-
-
 
     def enum_comm(self, edges):
         for op_poss in it.product(*[it.product(*[it.permutations(comm) for comm in op.comm_info]) for op in self.ops]):
@@ -304,12 +314,13 @@ class Pattern:
         self_ids = flat(self.op_dict.values())
         for ids in it.product(*[it.permutations(self.op_dict[op]) for op in ops]):
             op_map = {**{f:t for f,t in zip(self_ids, flat(ids))},-1:-1,self.num_ops:self.num_ops}
+            new_synth_vals = [self.synth_map[op_map[opi]] for opi in sorted(self.synth_map.keys())]
             es = []
             for (src_i, src_a), (snk_i, snk_a) in edges:
                 new_src = (op_map[src_i], src_a)
                 new_snk = (op_map[snk_i], snk_a)
                 es.append((new_src, new_snk))
-            yield es
+            yield es, new_synth_vals
 
 
     def equal(self, other: 'Pattern'):
@@ -332,6 +343,8 @@ class Pattern:
             return []
         if (self.iT, self.oT, self.op_names) != (other.iT, other.oT, other.op_names):
             return []
+        if self.synth_vals != other.synth_vals:
+            return []
         matches = matcher(other, other.root, self, self.root, opts)
         inputs = [(-1, i) for i in range(len(self.iT))]
         matches_ = []
@@ -350,10 +363,9 @@ class Pattern:
     def __hash__(self):
         return hash(str(self))
 
-    #TODO verify this works
     def to_comb(self, ns="C", name="C") -> CombProgram:
         prog = list(it.islice(self.enum_prog(self.edges), 1))[0]
-        I, O, IK, OK = prog
+        I, O, IK, OK, _ = prog
         #Create symbol mapping
         src_to_sym = {(-1,i): Sym(f"I{i}") for i in range(len(I))}
         for opi,num_o in enumerate(self.op_NO):
@@ -372,10 +384,16 @@ class Pattern:
         inDecls = [InDecl(src_to_sym[(-1,i)], nT_to_type(n)) for i, n in enumerate(self.iT)]
         outDecls = [OutDecl(src_to_sym[(self.num_ops, i)], nT_to_type(n)) for i, n in enumerate(self.oT)]
 
+        BV = GlobalModules['bv']
         opi_to_assign = {}
         for opi, op in enumerate(self.ops):
             lhss = [src_to_sym[(opi, i)] for i in range(len(OK[opi]))]
             args = [snk_to_sym[(opi, i)] for i in range(len(IK[opi]))]
+            if opi in self.synth_map:
+                # convert synth_consts to c_const
+                assert len(op.pargs) == 1
+                op = BV.c_const[op.pargs[0].value, self.synth_map[opi]]
+
             opi_to_assign[opi] = AssignStmt(lhss, [op.call_expr([], args)])
         #Create output decl O0, O1 = t0_1, t2_2
         out_lhs = [src_to_sym[(self.num_ops, i)] for i in range(len(self.oT))]
@@ -463,9 +481,11 @@ def is_dag(edges):
 def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
     op_names = [op.qualified_name for op in ops]
     #Find one allocation of pat ops to ops
+    synth_vals = []
     op_map = [None for _ in op_names]
     pmap = {}
     for pi, pat in enumerate(pats):
+        synth_vals += pat.synth_vals
         for opi, pat_op in enumerate(pat.op_names):
             for i, op in enumerate(op_names):
                 if (op_map[i] is None) and op==pat_op:
@@ -512,7 +532,7 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
             i_edges, _ = pat_edges[snki]
             for snk in i_edges[snka]:
                 edges.append((srcs[srca], snk))
-    return Pattern(iT, oT, ops, edges, is_pat=True)
+    return Pattern(iT, oT, ops, edges, synth_vals)
 
 
 
@@ -572,7 +592,7 @@ def all_prog(pat_enum, prog_enum):
                 yield prog
 
 
-def onepat(P, L):
+def onepat(P, L, synth_vals, synth_vars):
     #Output
     cond = [fc.And([Pi == Li for Pi, Li in zip(P[1], L[1])])]
 
@@ -581,6 +601,9 @@ def onepat(P, L):
 
     #K outs
     cond.append(fc.And([fc.And([Pij==Lij for Pij, Lij in zip(Pi, Li)]) for Pi, Li in zip(P[3], L[3])]))
+
+    # synthesized values
+    cond.append(fc.And([vars == vals for vars,vals in zip(synth_vars, synth_vals)]))
     return fc.And(cond).to_hwtypes()
 
 

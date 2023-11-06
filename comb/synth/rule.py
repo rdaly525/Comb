@@ -17,6 +17,7 @@ class Rule:
         #self.comm_info = get_comm_info(lhs_pat.to_comb(), opts)
         self.eq_rules = []
         self.NI = len(lhs_pat.iT)
+        self.NO = len(lhs_pat.oT)
 
     def serialize(self, ns, i):
         lhs = self.lhs.to_comb(ns, f"L{i}").serialize()
@@ -73,16 +74,17 @@ class Rule:
             yield IPerm(PL, mapL), IPerm(PR, mapR)
 
 
-    def ruleL(self, L_IR, L_ISA):
+    def ruleL(self, l_pat_enc, r_pat_enc):
         #enums patterns
-        l_enum = all_prog(self.lhs.enum_CK(), self.lhs.enum_prog)
-        r_enum = all_prog(self.rhs.enum_CK(), self.rhs.enum_prog)
+        l_enum = self.lhs.enum_CK()
+        r_enum = self.rhs.enum_CK()
         allr = []
-        for rule in it.product(l_enum, r_enum):
-            for PL, PR in self.enum_input_perm(*rule):
-                l = onepat(PL, L_IR)
-                r = onepat(PR, L_ISA)
-                allr.append(l & r)
+        for (l_edges, l_synth_vals),(r_edges, r_synth_vals) in it.product(l_enum, r_enum):
+            l_pat = Pattern(self.lhs.iT, self.lhs.oT, self.lhs.ops, l_edges, l_synth_vals)
+            r_pat = Pattern(self.rhs.iT, self.rhs.oT, self.rhs.ops, r_edges, r_synth_vals)
+            l = l_pat_enc.match_one_pattern(l_pat)
+            r = r_pat_enc.match_one_pattern(r_pat)
+            allr.append(fc.And([l,r]))
         return fc.Or(allr).to_hwtypes()
 
 

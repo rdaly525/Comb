@@ -1,13 +1,14 @@
-from .ast import IntType, Expr, TypeCall, BVType, IntValue, BVValue
+from .ast import IntType, Expr, TypeCall, BVType, CBVType, IntValue, BVValue
 from .ir import CombPrimitive, CallExpr
 from comb.synth.utils import _make_list
 
 
 class CombPeak(CombPrimitive):
-    def __init__(self, peak_gen, num_pargs, type_gen):
+    def __init__(self, peak_gen, num_pargs, type_gen, consts = None):
         self.peak_gen = peak_gen
         self.param_types = [IntType() for _ in range(num_pargs)]
         self.type_gen = type_gen
+        self.consts = consts
 
         #cache pargs -> peak_smt
         self.cache = {}
@@ -36,8 +37,14 @@ class CombPeak(CombPrimitive):
         oTs = [(IntValue(o) if isinstance(o, int) else o) for o in oTs]
         assert all(isinstance(val, Expr) for val in iTs)
         assert all(isinstance(val, Expr) for val in oTs)
-        iTs = [TypeCall(BVType(), [val]) for val in iTs]
-        oTs = [TypeCall(BVType(), [val]) for val in oTs]
+        if self.consts is not None:
+            iconsts = _make_list(self.consts[0])
+            oconsts = _make_list(self.consts[1])
+        else:
+            iconsts = [False for _ in iTs]
+            oconsts = [False for _ in oTs]
+        iTs = [TypeCall(CBVType() if const else BVType(), [val]) for val,const in zip(iTs, iconsts)]
+        oTs = [TypeCall(CBVType() if const else BVType(), [val]) for val,const in zip(oTs, oconsts)]
         #TODO Verify that types match the generated peak_fc
         return iTs, oTs
 

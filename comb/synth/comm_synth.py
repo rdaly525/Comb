@@ -4,8 +4,6 @@ import typing as tp
 from hwtypes import smt_utils as fc
 
 from comb import Comb
-from .pattern import SymOpts, Pattern
-from .pattern_encoding import PatternEncoding
 from .solver_utils import SolverOpts, Cegis, get_var, smt_is_sat
 from .utils import _make_list, type_to_nT, _list_to_dict, _to_int
 import itertools as it

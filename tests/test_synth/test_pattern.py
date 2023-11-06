@@ -37,7 +37,7 @@ def test_pattern_eq():
             ((2, 0), (3, 0)),
         ],
     ]
-    ps = [Pattern([T,T,T], [T], ops, es, is_pat=True) for es in edges_list]
+    ps = [Pattern([T,T,T], [T], ops, es, []) for es in edges_list]
     for pa, pb in itertools.combinations(ps, 2):
         assert pa.equal(pb)
         assert pb.equal(pa)
@@ -62,7 +62,7 @@ def test_comm_edge():
             ((1, 0), (2, 0)),
         ],
     ]
-    ps = [Pattern([T,T], [T], ops, es, is_pat=True) for es in edges_list]
+    ps = [Pattern([T,T], [T], ops, es, []) for es in edges_list]
     pa = ps[0]
     print(pa.to_comb('a','a'))
     pb = ps[1]
