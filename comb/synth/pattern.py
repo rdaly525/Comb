@@ -9,8 +9,9 @@ import typing as tp
 
 from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set
 from ..frontend.ir import CombProgram, AssignStmt
-from ..frontend.stdlib import CBVSynthConst, GlobalModules
+from ..frontend.stdlib import CBVSynthConst, GlobalModules, BVDontCare, CBVDontCare
 import itertools as it
+from more_itertools import distinct_combinations as multicomb
 
 #Represnts the raw dag structure of a particular pattern
 #Inputs are encoded as -1
@@ -227,6 +228,12 @@ class Pattern:
     def op_cnt(self):
         return _list_to_counts(self.op_names)
 
+    @cached_property
+    def op_cnt_no_dont_cares(self):
+        return _list_to_counts(op.qualified_name for op in self.ops if
+                                (not isinstance(op.comb, BVDontCare) and 
+                                not isinstance(op.comb, CBVDontCare)))
+
     #def enum_all_equal(self, en_I):
     #    eq_set = set()
     #    for es_ip in self.enum_input_perm(self.edges, en_I):
@@ -290,11 +297,11 @@ class Pattern:
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
             yield IPerm(PL, mapL)
 
-    def patL(self, pat_enc):
+    def patL(self, pat_enc, op_mapping):
         allp = []
         for edges,synth_vals in self.enum_CK():
             pat = Pattern(self.iT, self.oT, self.ops, edges, synth_vals)
-            allp.append(pat_enc.match_one_pattern(pat))
+            allp.append(pat_enc.match_one_pattern(pat, op_mapping))
         return fc.Or(allp).to_hwtypes()
 
     def enum_comm(self, edges):
@@ -450,12 +457,6 @@ def enum_dags(iT, oT, pats: tp.List[Pattern]):
 
         return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, Npat) or (srcT != snkT))
     def valid_dag(edges):
-        used_pats = set(srci for (srci, _),_ in edges if srci >= 0)
-        used_Is = set(pos for (srci, pos),_ in edges if srci == -1)
-        if not len(used_pats) == Npat:
-            return False
-        if not len(used_Is) == len(iT):
-            return False
         if not set(snk for _,snk in edges) == set(snks):
             return False
 
@@ -479,60 +480,77 @@ def is_dag(edges):
 
 
 def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
-    op_names = [op.qualified_name for op in ops]
-    #Find one allocation of pat ops to ops
-    synth_vals = []
-    op_map = [None for _ in op_names]
-    pmap = {}
-    for pi, pat in enumerate(pats):
-        synth_vals += pat.synth_vals
-        for opi, pat_op in enumerate(pat.op_names):
-            for i, op in enumerate(op_names):
-                if (op_map[i] is None) and op==pat_op:
-                    op_map[i] = (pi, opi)
-                    pmap[(pi, opi)] = i
-                    break
-    assert all(m is not None for m in op_map)
-    pat_edges = {}
-    edges = []
-    for pi, pat in enumerate(pats):
-        i_edges = {}
-        o_srcs = [None for _ in range(pat.NO)]
-        m_edges = []
-        for (srci, srca), (snki, snka) in pat.edges:
-            if snki == pat.num_ops:
-                assert (pi, srci) in pmap
-                new_srci = pmap[(pi, srci)]
-                o_srcs[snka] = (new_srci, srca)
-            elif srci == -1:
-                assert (pi, snki) in pmap
-                new_snki = pmap[(pi, snki)]
-                i_edges.setdefault(srca,[]).append((new_snki, snka))
+    ops_no_dont_cares = [op for op in ops if (not isinstance(op.comb, CBVDontCare) and not isinstance(op.comb, BVDontCare))]
+    op_no_dont_cares_dict = _list_to_dict(op.qualified_name for op in ops_no_dont_cares)
+
+    pat_op_cnts = {}
+    for pat in pats:
+        for op_name, cnts in pat.op_cnt_no_dont_cares.items():
+            pat_op_cnts[op_name] = pat_op_cnts.get(op_name, 0) + cnts
+
+    for chosen_ops in it.product(*[[(op_name, selection) for selection in multicomb(op_no_dont_cares_dict[op_name], cnt)] for op_name,cnt in pat_op_cnts.items()]):
+        chosen_ops = {op_name:selection for op_name,selection in chosen_ops} 
+        pat_to_enc_map = {}
+        curr_ops = []
+        #Find one allocation of pat ops to ops
+        synth_vals = []
+        pmap = {}
+        for pi, pat in enumerate(pats):
+            synth_vals += pat.synth_vals
+            for opi, pat_op in enumerate(pat.ops):
+                if pat_op.qualified_name in chosen_ops:
+                    original_opi = chosen_ops[pat_op.qualified_name][0]
+                    chosen_ops[pat_op.qualified_name] = chosen_ops[pat_op.qualified_name][1:]
+                    curr_ops.append(ops[original_opi])
+                    pmap[(pi, opi)] = len(curr_ops) - 1
+                    pat_to_enc_map[len(curr_ops) - 1] = original_opi
+                else:
+                    assert isinstance(pat_op.comb, CBVDontCare) or isinstance(pat_op.comb, BVDontCare)
+                    curr_ops.append(pat_op)
+                    pmap[(pi,opi)] = len(curr_ops)-1
+        assert all(len(opis) == 0 for _,opis in chosen_ops.items())
+
+        pat_edges = {}
+        edges = []
+        for pi, pat in enumerate(pats):
+            i_edges = {}
+            o_srcs = [None for _ in range(pat.NO)]
+            m_edges = []
+            for (srci, srca), (snki, snka) in pat.edges:
+                if snki == pat.num_ops:
+                    assert (pi, srci) in pmap
+                    new_srci = pmap[(pi, srci)]
+                    o_srcs[snka] = (new_srci, srca)
+                elif srci == -1:
+                    assert (pi, snki) in pmap
+                    new_snki = pmap[(pi, snki)]
+                    i_edges.setdefault(srca,[]).append((new_snki, snka))
+                else:
+                    assert (pi, srci) in pmap
+                    assert (pi, snki) in pmap
+                    new_srci = pmap[(pi, srci)]
+                    new_snki = pmap[(pi, snki)]
+                    m_edges.append(((new_srci, srca), (new_snki, snka)))
+            assert all([src is not None for src in o_srcs])
+            edges.extend(m_edges)
+            pat_edges[pi] = (i_edges, o_srcs)
+        
+        for (srci, srca), (snki, snka) in dag:
+            if srci==-1:
+                src = (srci, srca)
+                i_edges, _ = pat_edges[snki]
+                for snk in i_edges[snka]:
+                    edges.append((src, snk))
+            elif snki == len(pats):
+                snk = (len(curr_ops), snka)
+                _, o_srcs = pat_edges[srci]
+                edges.append((o_srcs[srca], snk))
             else:
-                assert (pi, srci) in pmap
-                assert (pi, snki) in pmap
-                new_srci = pmap[(pi, srci)]
-                new_snki = pmap[(pi, snki)]
-                m_edges.append(((new_srci, srca), (new_snki, snka)))
-        assert all([src is not None for src in o_srcs])
-        edges.extend(m_edges)
-        pat_edges[pi] = (i_edges, o_srcs)
-    for (srci, srca), (snki, snka) in dag:
-        if srci==-1:
-            src = (srci, srca)
-            i_edges, _ = pat_edges[snki]
-            for snk in i_edges[snka]:
-                edges.append((src, snk))
-        elif snki == len(pats):
-            snk = (len(op_names), snka)
-            _, o_srcs = pat_edges[srci]
-            edges.append((o_srcs[srca], snk))
-        else:
-            _, srcs = pat_edges[srci]
-            i_edges, _ = pat_edges[snki]
-            for snk in i_edges[snka]:
-                edges.append((srcs[srca], snk))
-    return Pattern(iT, oT, ops, edges, synth_vals)
+                _, srcs = pat_edges[srci]
+                i_edges, _ = pat_edges[snki]
+                for snk in i_edges[snka]:
+                    edges.append((srcs[srca], snk))
+        yield Pattern(iT, oT, curr_ops, edges, synth_vals),pat_to_enc_map
 
 
 
