@@ -40,17 +40,17 @@ verbose = 0
 isa_name = 'cmp'
 N = 4
 maxIR = 2
-maxISA = 2
+maxISA = 3
 opMaxIR = None
 opMaxISA = None
 timeout = 12
-res_dir = f"{dir}/../results/real"
+res_dir = f"{dir}/../results/w2fix"
 LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
-    #(1,1,1,1,1),
-    #(1,1,0,1,1),
-    (0,1,1,1,1),
+    (1,1,1,1,1),
+    (1,1,0,1,1),
+    (1,0,0,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -62,7 +62,7 @@ all_params = (
     #(0,1,1,0,0),
     #(0,1,0,0,0),
     #(0,0,0,1,0),
-    (0,0,0,0,1),
+    #(0,0,0,0,1),
     #(0,0,0,0,0),
 )
 
@@ -141,5 +141,7 @@ for LC,E,CMP, C, K in params:
         extra_time = info['et']
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
+    for (m, n), num in db.mn_info.items():
+        print(f"({m}, {n}) has {num} rules")
     db.pickle_info(pfile)
     print("TOTTIME",time()-start_time)

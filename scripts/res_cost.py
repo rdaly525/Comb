@@ -22,8 +22,8 @@ with open(ir_fname, 'r') as f:
     irK['M'] = ir_obj.get_from_ns('irM')
 
 maxIR = 2
-maxISA = 1
-isa_name = 'cisc'
+maxISA = 4
+isa_name = 'cmp'
 #consts = [0,1,-1]
 if isa_name == 'ab':
     consts = []
@@ -74,7 +74,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
 
 
 #slt_file = '''
@@ -124,14 +124,15 @@ for ci, costs in enumerate(all_costs):
             print("*"*80)
         pass
     cdb.append(rd.rdb)
+    print("CI",ci)
+    for (m,n), v in rd.rdb.mn_info.items():
+        print(f"{m},{n}: {v}")
 
 dba = cdb[0]
 dbb = cdb[1]
 overlap = 0
-for (ka, _, ra) in dba.enum_rules():
-    for (kb, _, rb) in dbb.enum_rules():
-        if ka != kb:
-            continue
+for (_, _, ra) in dba.enum_rules():
+    for (_, _, rb) in dbb.enum_rules():
         if ra.equal(rb):
             assert rb.equal(ra)
             overlap += 1
@@ -139,14 +140,3 @@ for (ka, _, ra) in dba.enum_rules():
 uniquea = dba.num_rules - overlap
 uniqueb = dbb.num_rules - overlap
 print(f"UA, UB, SAME = {uniquea}, {uniqueb}, {overlap}")
-
-
-
-
-
-
-
-
-
-
-

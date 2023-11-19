@@ -34,17 +34,17 @@ verbose = 0
 isa_name = 'ab'
 N = 4
 maxIR = 2
-maxISA = 2
+maxISA = 3
 opMaxIR = None
 opMaxISA = None
 timeout = 12
-res_dir = f"{dir}/../results/real"
-LC_test = 0
+res_dir = f"{dir}/../results/w2fix"
+LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
-    (1,1,0,1,1),
-    (0,1,1,1,1),
+    #(1,1,0,1,1),
+    #(0,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -55,8 +55,8 @@ all_params = (
     #(0,0,0,0,0),
     #(0,1,1,0,0),
     #(0,1,0,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
 )
 
 params = lc_params if LC_test else all_params
@@ -70,7 +70,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
 
 
 #slt_file = '''
@@ -134,6 +134,8 @@ for LC,E,CMP, C, K in params:
         extra_time = info['et']
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
+    for (m, n), num in db.mn_info.items():
+        print(f"({m}, {n}) has {num} rules")
     db.pickle_info(pfile)
     delta = time()-start_time
     print("TOTTIME:", delta)

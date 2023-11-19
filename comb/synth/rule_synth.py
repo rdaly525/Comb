@@ -157,7 +157,7 @@ class RuleSynth(Cegis):
     # E whether represents to exclude all equivalent rules
     def CEGISAll(self, E, LC, opts: SolverOpts):
         self.enum_times = []
-        for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts)):
+        for i, (sol, t) in enumerate(self.cegis_all(exclude_prev=(not E), opts=opts, new_impl=True)):
             lhs_pat = self.lhs_cs.pattern_from_sol(sol)
             rhs_pat = self.rhs_cs.pattern_from_sol(sol)
             rule = Rule(lhs_pat, rhs_pat, i, t)
