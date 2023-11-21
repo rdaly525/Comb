@@ -2,7 +2,7 @@ import functools
 import timeit
 
 from ..frontend.ast import Comb
-from .solver_utils import Cegis, SolverOpts
+from .solver_utils import Cegis, SolverOpts, is_sat
 from .pattern import Pattern, enum_dags
 from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
@@ -12,7 +12,7 @@ from .rule import Rule
 import hwtypes.smt_utils as fc
 import typing as tp
 import itertools as it
-
+import hwtypes as ht
 #Stat2 is the following:
 # Given:
 #   N LHS instructions,
@@ -172,6 +172,16 @@ class RuleSynth(Cegis):
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
+    @property
+    def wfp(self):
+        return fc.And([
+            self.lhs_cs.P_wfp,
+            self.rhs_cs.P_wfp,
+            self.lhs_cs.P_narrow(*self.narrow_opts),
+            self.rhs_cs.P_narrow(*self.narrow_opts[:-1], 0),
+            self.lhs_cs.P_iropt(*self.ir_opts),
+            self.rhs_cs.P_iropt(*self.ir_opts),
+        ]).to_hwtypes()
 
     # E whether represents to exclude all equivalent rules
     def CEGISAll(self, E, LC, opts: SolverOpts):
@@ -190,11 +200,13 @@ class RuleSynth(Cegis):
                 self.enum_times.append(enum_time)
                 self.synth_base = self.synth_base & ~rp_cond
 
-    def ruleL(self, rule:Rule):
+    def ruleL(self, rule:Rule, opts: SolverOpts = SolverOpts()):
+        def is_wfp(x: ht.SMTBit):
+            return is_sat((self.wfp & x).value, opts)
         L_IR = self.lhs_cs.L
         L_ISA = self.rhs_cs.L
         start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA)
+        rule_cond = rule.ruleL(L_IR, L_ISA, is_wfp)
         delta = timeit.default_timer() - start
         return rule_cond, delta
 

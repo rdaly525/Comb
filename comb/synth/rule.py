@@ -5,6 +5,7 @@ from comb.synth.verify import verify
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 import pysmt.shortcuts as smt
+import typing as tp
 
 class Rule:
     def __init__(self, lhs_pat: Pattern, rhs_pat: Pattern, id: int, synth_time: float, cost=0):
@@ -74,17 +75,23 @@ class Rule:
             yield IPerm(PL, mapL), IPerm(PR, mapR)
 
 
-    def ruleL(self, L_IR, L_ISA):
+    def ruleL(self, L_IR, L_ISA, is_wfp: tp.Callable[[ht.SMTBit], bool]=lambda x: True):
         #enums patterns
         l_enum = all_prog(self.lhs.enum_CK(), self.lhs.enum_prog)
         r_enum = all_prog(self.rhs.enum_CK(), self.rhs.enum_prog)
         allr = []
+        fcnt = 0
         for rule in it.product(l_enum, r_enum):
             for PL, PR in self.enum_input_perm(*rule):
                 l = onepat(PL, L_IR)
                 r = onepat(PR, L_ISA)
-                allr.append(l & r)
-        print(f"NruleL:", len(allr), flush=True)
+                rule_cond = l & r
+                if is_wfp(rule_cond):
+                    allr.append(rule_cond)
+                else:
+                    fcnt += 1
+        print(f"ruleL: N,F = {len(allr)}, {fcnt}", flush=True)
+        assert len(allr) > 0
         #Hack to directly construct or
         ret = ht.SMTBit(0).value
         for c in allr:

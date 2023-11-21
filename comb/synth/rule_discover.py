@@ -287,7 +287,7 @@ class RuleDiscovery:
                                 print("CMPTIME", round(comp_time,3), flush=True)
                             if comp:
                                 for crule in existing_rules:
-                                    rule_cond, enum_time = rs.ruleL(crule)
+                                    rule_cond, enum_time = rs.ruleL(crule, opts=opts)
                                     comp_time += enum_time
                                     rs.synth_base = rs.synth_base & ~rule_cond
                             sat_time = []
@@ -473,7 +473,7 @@ class RuleDiscovery:
                                         rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
                                         erules.append(Rule(lhs_pat, rhs_pat, 0, 0))
                                 for crule in erules:
-                                    rule_cond, enum_time = rs.ruleL(crule)
+                                    rule_cond, enum_time = rs.ruleL(crule, opts=opts)
                                     rs.synth_base = rs.synth_base & ~rule_cond
                         sat_time = []
                         for rule in rs.CEGISAll(E, LC, opts):

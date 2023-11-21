@@ -53,6 +53,10 @@ def get_model(query, vars, solver_name, logic):
         return {v: model.get_value(v) for v in vars}
     return False
 
+def is_sat(query, opts: SolverOpts = SolverOpts()):
+    return smt.is_sat(query, solver_name=opts.solver_name, logic=opts.logic)
+
+
 @dataclass
 class Cegis:
     synth_base: ht.SMTBit
