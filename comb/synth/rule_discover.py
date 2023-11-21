@@ -430,7 +430,7 @@ class RuleDiscovery:
                         if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops):
                             continue
                         new_rules = []
-                        k = (tuple(lhs_ids), tuple(rhs_ids), iT)
+                        k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT)
 
                         #kstr += f":{NI}"
                         if opts.log:

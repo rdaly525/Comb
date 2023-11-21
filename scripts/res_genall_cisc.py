@@ -26,18 +26,18 @@ cse = 0
 consts = [0, 1]
 ir_kinds = ['C', 'AR', 'M']
 costs = [1, 1, 1, 1, 1]
-log = False
+log = True
 print_rules = True
 include_id = False
 verbose = 0
 isa_name = 'cisc'
 N = 4
-maxIR = 2
-maxISA = 1
+maxIR = 3
+maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
-res_dir = f"{dir}/../results/real"
+res_dir = f"{dir}/../results/w2fix"
 LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
@@ -69,7 +69,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
 
 
 #slt_file = '''
@@ -117,9 +117,9 @@ for LC,E,CMP, C, K in params:
     narrow_opts = (C, K, O_order)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, opts=solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs=1, opts=solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, opts=solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs=1, opts=solver_opts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         if print_rules:
