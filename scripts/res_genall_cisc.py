@@ -32,29 +32,29 @@ include_id = False
 verbose = 0
 isa_name = 'cisc'
 N = 4
-maxIR = 3
-maxISA = 2
+maxIR = 2
+maxISA = 1
 opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/real"
-LC_test = 1
+LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
     #(0,1,1,1,1),
-    (1,1,0,1,1),
+    #(1,1,0,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
     #(0,0,0,0,0),
 )
 all_params = (
-    #(0,1,1,1,1),
+    (0,1,1,1,1),
     #(0,1,1,0,0),
-    (0,1,0,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
+    #(0,1,0,0,0),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
     #(0,0,0,0,0),
 )
 
@@ -69,7 +69,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
 
 
 #slt_file = '''
@@ -113,12 +113,13 @@ for LC,E,CMP, C, K in params:
         opMaxR=opMaxISA,
     )
     ir_opts = (dce, cse)
-    narrow_opts = (C, K)
+    O_order = False
+    narrow_opts = (C, K, O_order)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, opts=solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, opts=solver_opts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         if print_rules:
@@ -134,4 +135,6 @@ for LC,E,CMP, C, K in params:
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
     db.pickle_info(pfile)
+    for (m, n), cnt in db.mn_info.items():
+        print(f"MN:{m},{n}: CNT:{cnt}")
     print("TOTTIME",time()-start_time)

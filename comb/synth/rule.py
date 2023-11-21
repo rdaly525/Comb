@@ -159,7 +159,7 @@ class RuleDatabase:
     @property
     def mn_info(self):
         mn_cnt = {}
-        for (lids, rids, NI), info in self.time_info.items():
+        for (lids, rids, NI, NO), info in self.time_info.items():
             mn = (len(lids),len(rids))
             mn_cnt[mn] = mn_cnt.get(mn, 0) + info['u']
         return mn_cnt
