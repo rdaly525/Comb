@@ -234,7 +234,7 @@ class RuleDiscovery:
                 return False
         return True
 
-    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts()):
+    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), known_timeouts=[]):
         LC, E, comp = E_opts
         assert not LC
         ruleid = 0
@@ -258,6 +258,9 @@ class RuleDiscovery:
                                 continue
                             new_rules = []
                             k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT)
+                            if k in known_timeouts:
+                                print("KNOWN TIMEOUT", k, flush=True)
+                                continue
                             if opts.log:
                                 print_iot(iT, oT)
                             rs = RuleSynth(

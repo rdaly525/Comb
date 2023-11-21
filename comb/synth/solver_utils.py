@@ -100,8 +100,8 @@ class Cegis:
                     #    print("TO")
                     return IterLimitError(), opts.timeout
 
-                if show_iter and i%10==0:
-                    print(f".{i}", end='', flush=True)
+                if show_iter:# and i%10==0:
+                    print(f"S", end='', flush=True)
                 E_res = solver.solve()
 
                 if not E_res:
@@ -115,6 +115,7 @@ class Cegis:
                     if show_e and i%100==50:
                         print_e(E_guess)
                     query_guess = verif.substitute(E_guess).simplify()
+                    print(f"V", end='', flush=True)
                     model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
                     if model is None:
                         t = (timeit.default_timer()-start)

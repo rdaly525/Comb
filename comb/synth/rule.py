@@ -3,7 +3,8 @@ import itertools as it
 
 from comb.synth.verify import verify
 import hwtypes.smt_utils as fc
-
+import hwtypes as ht
+import pysmt.shortcuts as smt
 
 class Rule:
     def __init__(self, lhs_pat: Pattern, rhs_pat: Pattern, id: int, synth_time: float, cost=0):
@@ -83,7 +84,13 @@ class Rule:
                 l = onepat(PL, L_IR)
                 r = onepat(PR, L_ISA)
                 allr.append(l & r)
-        return fc.Or(allr).to_hwtypes()
+        print(f"NruleL:", len(allr), flush=True)
+        #Hack to directly construct or
+        ret = ht.SMTBit(0).value
+        for c in allr:
+            ret = smt.Or(ret, c.value)
+        return ht.SMTBit(ret)
+        #return fc.Or(allr).to_hwtypes()
 
 
 import pickle

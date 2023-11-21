@@ -6,6 +6,7 @@ from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 from timeit import default_timer as time
 
+from comb.synth.utils import nT
 from comb.synth.verify import verify
 
 dir = os.path.dirname(os.path.realpath(__file__))
@@ -29,7 +30,7 @@ costs = [1, 1, 1, 1, 1]
 log = True
 print_rules = True
 include_id = False
-verbose = 0
+verbose = 1
 isa_name = 'cisc'
 N = 4
 maxIR = 3
@@ -38,6 +39,12 @@ opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/w2fix"
+known_timeouts = [
+    #((3,3,3), (1, 3), (nT(4, False),)*4, (nT(4, False),)),
+    #((3,3,3), (1, 3), (nT(4, False),)*3, (nT(4, False),)),
+    #((3,3,3), (1, 3), (nT(4, False),)*2, (nT(4, False),)),
+    #((3,3,3), (1, 3), (nT(4, False),)*1, (nT(4, False),)),
+]
 LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
@@ -119,12 +126,12 @@ for LC,E,CMP, C, K in params:
     if LC_test:
         ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs=1, opts=solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs=1, opts=solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs=1, opts=solver_opts, known_timeouts=known_timeouts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         if print_rules:
-            print(rule)
-            print("*"*80)
+            print(rule, flush=True)
+            print("*"*80, flush=True)
         pass
     db = rd.rdb
     for k, info in db.time_info.items():
