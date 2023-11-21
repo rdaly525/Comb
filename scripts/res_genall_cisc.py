@@ -6,6 +6,7 @@ from comb.synth.rule_discover import RuleDiscovery
 from comb.synth.solver_utils import SolverOpts
 from timeit import default_timer as time
 
+from comb.synth.utils import nT
 from comb.synth.verify import verify
 
 dir = os.path.dirname(os.path.realpath(__file__))
@@ -37,6 +38,9 @@ maxISA = 1
 opMaxIR = None
 opMaxISA = None
 timeout = 12
+known_timeouts = [
+    ((3,3,3), (1, 3), (nT(4, False),)*4, (nT(4, False),))
+]
 res_dir = f"{dir}/../results/real"
 LC_test = 0
 #LC,E,CMP,C,K
@@ -117,9 +121,9 @@ for LC,E,CMP, C, K in params:
     narrow_opts = (C, K, O_order)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, opts=solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs=1, opts=solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, opts=solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs=1, opts=solver_opts, known_timeouts=known_timeouts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         if print_rules:
