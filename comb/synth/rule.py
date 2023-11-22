@@ -1,4 +1,4 @@
-from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm
+from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm, get_pmap
 import itertools as it
 
 from comb.synth.verify import verify
@@ -75,7 +75,7 @@ class Rule:
             yield IPerm(PL, mapL), IPerm(PR, mapR)
 
 
-    def ruleL(self, L_IR, L_ISA, is_wfp: tp.Callable[[ht.SMTBit], bool]=lambda x: True):
+    def ruleL(self, L_IR, L_ISA, is_wfp: tp.Callable):
         #enums patterns
         l_enum = all_prog(self.lhs.enum_CK(), self.lhs.enum_prog)
         r_enum = all_prog(self.rhs.enum_CK(), self.rhs.enum_prog)
@@ -83,21 +83,18 @@ class Rule:
         fcnt = 0
         for rule in it.product(l_enum, r_enum):
             for PL, PR in self.enum_input_perm(*rule):
-                l = onepat(PL, L_IR)
-                r = onepat(PR, L_ISA)
-                rule_cond = l & r
-                if is_wfp(rule_cond):
+                lmap = get_pmap(PL, L_IR)
+                rmap = get_pmap(PR, L_ISA)
+                if is_wfp({**lmap, **rmap}):
+                    l = onepat(PL, L_IR)
+                    r = onepat(PR, L_ISA)
+                    rule_cond = l & r
                     allr.append(rule_cond)
                 else:
                     fcnt += 1
         print(f"ruleL: N,F = {len(allr)}, {fcnt}", flush=True)
         assert len(allr) > 0
-        #Hack to directly construct or
-        ret = ht.SMTBit(0).value
-        for c in allr:
-            ret = smt.Or(ret, c.value)
-        return ht.SMTBit(ret)
-        #return fc.Or(allr).to_hwtypes()
+        return fc.Or(allr).to_hwtypes()
 
 
 import pickle

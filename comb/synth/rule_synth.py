@@ -200,13 +200,14 @@ class RuleSynth(Cegis):
                 self.enum_times.append(enum_time)
                 self.synth_base = self.synth_base & ~rp_cond
 
-    def ruleL(self, rule:Rule, opts: SolverOpts = SolverOpts()):
-        def is_wfp(x: ht.SMTBit):
-            return is_sat((self.wfp & x).value, opts)
+    def is_wfp(self, pmap):
+        return self.wfp.value.substitute(pmap).simplify().is_true()
+
+    def ruleL(self, rule:Rule):
         L_IR = self.lhs_cs.L
         L_ISA = self.rhs_cs.L
         start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA, is_wfp)
+        rule_cond = rule.ruleL(L_IR, L_ISA, self.is_wfp)
         delta = timeit.default_timer() - start
         return rule_cond, delta
 

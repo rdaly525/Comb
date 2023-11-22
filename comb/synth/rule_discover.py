@@ -274,6 +274,7 @@ class RuleDiscovery:
                             )
                             existing_rules = []
                             start = timeit.default_timer()
+                            same_e_rule_cnt = 0
                             for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
                                 lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
                                 rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
@@ -281,13 +282,18 @@ class RuleDiscovery:
                                 for dag in dags:
                                     lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                     rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
-                                    existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
+                                    new_e_rule = Rule(lhs_pat, rhs_pat, 0, 0)
+                                    if self.is_new_rule(new_e_rule, existing_rules):
+                                        existing_rules.append(new_e_rule)
+                                    else:
+                                        same_e_rule_cnt += 1
                             comp_time = timeit.default_timer() - start
                             if len(existing_rules) > 0 and opts.log:
                                 print("CMPTIME", round(comp_time,3), flush=True)
+                                print("num_e_rules, filtered", len(existing_rules), same_e_rule_cnt, flush=True)
                             if comp:
                                 for crule in existing_rules:
-                                    rule_cond, enum_time = rs.ruleL(crule, opts=opts)
+                                    rule_cond, enum_time = rs.ruleL(crule)
                                     comp_time += enum_time
                                     rs.synth_base = rs.synth_base & ~rule_cond
                             sat_time = []
@@ -448,16 +454,23 @@ class RuleDiscovery:
                             pat_en_t=self.pat_en_t,
                         )
                         existing_pats = []
+                        same_e_pat_cnt = 0
                         start = timeit.default_timer()
                         for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, opts):
                             lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
                             dags = enum_dags(iT, oT, lhs_pats)
                             for dag in dags:
                                 lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
-                                existing_pats.append(lhs_pat)
+                                if self.is_new_pat(lhs_pat, existing_pats):
+                                    existing_pats.append(lhs_pat)
+                                else:
+                                    same_e_pat_cnt += 1
+
                         comp_time = timeit.default_timer() - start
                         if comp:
                             if LC:
+                                if opts.log and len(existing_pats) > 0:
+                                    print("num_e_pats, filtered", len(existing_pats), same_e_pat_cnt, flush=True)
                                 for cpat in existing_pats:
                                     pat_cond, enum_time = rs.patL(cpat)
                                     comp_time += enum_time
@@ -467,13 +480,13 @@ class RuleDiscovery:
                                 for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
                                     lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
                                     rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                    dags = enum_dags(NI, lhs_pats)
+                                    dags = enum_dags(iT, oT, lhs_pats)
                                     for dag in dags:
                                         lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
                                         rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
                                         erules.append(Rule(lhs_pat, rhs_pat, 0, 0))
                                 for crule in erules:
-                                    rule_cond, enum_time = rs.ruleL(crule, opts=opts)
+                                    rule_cond, enum_time = rs.ruleL(crule)
                                     rs.synth_base = rs.synth_base & ~rule_cond
                         sat_time = []
                         for rule in rs.CEGISAll(E, LC, opts):

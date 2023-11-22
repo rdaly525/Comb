@@ -6,6 +6,10 @@ Tasks:
     Fix CEGISAll to actually do incremental
     Current
 
+    Findings:
+        Many of the generated composite rules are duplicates. That is easy to filter
+        ruleL is still really slow for certain rules. I am enumerating all variations. Only a tiny percent of the variations are themselves valid.
+
     Done
         Fix test_comb/test_comb
         Fix test_comb_obj

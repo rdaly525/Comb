@@ -4,6 +4,7 @@ from functools import cached_property
 import networkx as nx
 from hwtypes import smt_utils as fc
 
+from .solver_utils import _int_to_pysmt
 from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
@@ -571,6 +572,21 @@ def all_prog(pat_enum, prog_enum):
             if add_to_set(eq, prog):
                 yield prog
 
+
+def get_pmap(P, L):
+    map = {}
+    for p, l in zip(P[1], L[1]):
+        map[l.value] = _int_to_pysmt(p, l.value.get_type())
+
+    for Ps, Ls in zip(P[2], L[2]):
+        for p, l in zip(Ps, Ls):
+            map[l.value] = _int_to_pysmt(p, l.value.get_type())
+
+    for Ps, Ls in zip(P[3], L[3]):
+        for p, l in zip(Ps, Ls):
+            map[l.value] = _int_to_pysmt(p, l.value.get_type())
+
+    return map
 
 def onepat(P, L):
     #Output

@@ -33,19 +33,14 @@ include_id = False
 verbose = 1
 isa_name = 'cisc'
 N = 4
-maxIR = 3
+maxIR = 2
 maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
 res_dir = f"{dir}/../results/w2fix"
-known_timeouts = [
-    #((3,3,3), (1, 3), (nT(4, False),)*4, (nT(4, False),)),
-    #((3,3,3), (1, 3), (nT(4, False),)*3, (nT(4, False),)),
-    #((3,3,3), (1, 3), (nT(4, False),)*2, (nT(4, False),)),
-    #((3,3,3), (1, 3), (nT(4, False),)*1, (nT(4, False),)),
-]
-LC_test = 0
+known_timeouts = []
+LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
@@ -76,7 +71,7 @@ isa_fname = f"{dir}/combs/isa_{isa_name}.comb"
 with open(isa_fname, 'r') as f:
     isa_obj = compile_program(f.read())
 isa = [c[N] for c in isa_obj.get_from_ns("isa")]
-solver_opts = SolverOpts(verbose=verbose, solver_name='btor', timeout=timeout, log=log)
+solver_opts = SolverOpts(verbose=verbose, solver_name='z3', timeout=timeout, log=log)
 
 
 #slt_file = '''
@@ -141,7 +136,7 @@ for LC,E,CMP, C, K in params:
         extra_time = info['et']
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
-    db.pickle_info(pfile)
     for (m, n), cnt in db.mn_info.items():
         print(f"MN:{m},{n}: CNT:{cnt}")
     print("TOTTIME",time()-start_time)
+    db.pickle_info(pfile)
