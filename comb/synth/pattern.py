@@ -279,11 +279,17 @@ class Pattern:
             yield IPerm(PL, mapL)
 
 
-    def patL(self, L):
+    def patL(self, L, is_wfp: tp.Callable):
         allp = []
+        fcnt = 0
         for PL in all_prog(self.enum_CK(), self.enum_prog):
             for PL_ in self.enum_input_perm(PL):
-                allp.append(onepat(PL_, L))
+                pmap = get_pmap(PL_, L)
+                if is_wfp(pmap):
+                    allp.append(onepat(PL_, L))
+                else:
+                    fcnt += 1
+        print(f"patL: N,F = {len(allp)}, {fcnt}", flush=True)
         return fc.Or(allp).to_hwtypes()
 
 

@@ -173,7 +173,7 @@ class RuleSynth(Cegis):
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
 
     @property
-    def wfp(self):
+    def well_formed_rule(self):
         return fc.And([
             self.lhs_cs.P_wfp,
             self.rhs_cs.P_wfp,
@@ -181,6 +181,15 @@ class RuleSynth(Cegis):
             self.rhs_cs.P_narrow(*self.narrow_opts[:-1], 0),
             self.lhs_cs.P_iropt(*self.ir_opts),
             self.rhs_cs.P_iropt(*self.ir_opts),
+        ]).to_hwtypes()
+
+
+    @property
+    def well_formed_lhs(self):
+        return fc.And([
+            self.lhs_cs.P_wfp,
+            self.lhs_cs.P_narrow(*self.narrow_opts),
+            self.lhs_cs.P_iropt(*self.ir_opts),
         ]).to_hwtypes()
 
     # E whether represents to exclude all equivalent rules
@@ -200,14 +209,17 @@ class RuleSynth(Cegis):
                 self.enum_times.append(enum_time)
                 self.synth_base = self.synth_base & ~rp_cond
 
-    def is_wfp(self, pmap):
-        return self.wfp.value.substitute(pmap).simplify().is_true()
+    def is_well_formed_rule(self, pmap):
+        return self.well_formed_rule.value.substitute(pmap).simplify().is_true()
+
+    def is_well_formed_lhs(self, pmap):
+        return self.well_formed_lhs.value.substitute(pmap).simplify().is_true()
 
     def ruleL(self, rule:Rule):
         L_IR = self.lhs_cs.L
         L_ISA = self.rhs_cs.L
         start = timeit.default_timer()
-        rule_cond = rule.ruleL(L_IR, L_ISA, self.is_wfp)
+        rule_cond = rule.ruleL(L_IR, L_ISA, self.is_well_formed_rule)
         delta = timeit.default_timer() - start
         return rule_cond, delta
 
@@ -215,7 +227,7 @@ class RuleSynth(Cegis):
     def patL(self, pat: Pattern):
         L_IR = self.lhs_cs.L
         start = timeit.default_timer()
-        pat_cond = pat.patL(L_IR)
+        pat_cond = pat.patL(L_IR, self.is_well_formed_lhs)
         delta = timeit.default_timer() - start
         return pat_cond, delta
 
