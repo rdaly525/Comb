@@ -225,12 +225,12 @@ class RuleDiscovery:
                 break
         return new_pat
 
-    def is_new_rule(self, rule, erules):
+    def is_new_rule(self, rule, erules, eq_str="EQUAL RULE"):
         for erule in erules:
             eq = erule.equal(rule)
             if eq:
                 assert rule.equal(erule)
-                print("EQUAL RULE", flush=True)
+                print(eq_str, flush=True)
                 return False
         return True
 
@@ -275,23 +275,24 @@ class RuleDiscovery:
                             existing_rules = []
                             start = timeit.default_timer()
                             same_e_rule_cnt = 0
-                            for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
-                                lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
-                                rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                dags = enum_dags(iT, oT, lhs_pats)
-                                for dag in dags:
-                                    lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
-                                    rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
-                                    new_e_rule = Rule(lhs_pat, rhs_pat, 0, 0)
-                                    if self.is_new_rule(new_e_rule, existing_rules):
-                                        existing_rules.append(new_e_rule)
-                                    else:
-                                        same_e_rule_cnt += 1
-                            comp_time = timeit.default_timer() - start
-                            if len(existing_rules) > 0 and opts.log:
-                                print("CMPTIME", round(comp_time,3), flush=True)
-                                print("num_e_rules, filtered", len(existing_rules), same_e_rule_cnt, flush=True)
+                            comp_time = 0
                             if comp:
+                                for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, opts):
+                                    lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
+                                    rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
+                                    dags = enum_dags(iT, oT, lhs_pats)
+                                    for dag in dags:
+                                        lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops)
+                                        rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops)
+                                        new_e_rule = Rule(lhs_pat, rhs_pat, 0, 0)
+                                        if self.is_new_rule(new_e_rule, existing_rules, eq_str="EQUAL COMP"):
+                                            existing_rules.append(new_e_rule)
+                                        else:
+                                            same_e_rule_cnt += 1
+                                if len(existing_rules) > 0 and opts.log:
+                                    print("CMPTIME", round(comp_time,3), flush=True)
+                                    print("num_e_rules, filtered", len(existing_rules), same_e_rule_cnt, flush=True)
+                                comp_time = timeit.default_timer() - start
                                 for crule in existing_rules:
                                     rule_cond, enum_time = rs.ruleL(crule)
                                     comp_time += enum_time
@@ -300,7 +301,7 @@ class RuleDiscovery:
                             for rule in rs.CEGISAll(E, LC, opts):
                                 sat_time.append(rule.time)
                                 assert rule.verify()
-                                if self.is_new_rule(rule, existing_rules):
+                                if self.is_new_rule(rule, existing_rules, eq_str="EQUAL DUP"):
                                     rule.id = ruleid
                                     ruleid += 1
                                     new_rules.append(rule)

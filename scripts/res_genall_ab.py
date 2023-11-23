@@ -27,10 +27,10 @@ cse = 0
 consts = []
 ir_kinds = ['BW', 'AR']
 costs = [1, 1]
-log = False
+log = True
 print_rules = True
 include_id = False
-verbose = 0
+verbose = 1
 isa_name = 'ab'
 N = 4
 maxIR = 2
@@ -38,13 +38,13 @@ maxISA = 2
 opMaxIR = None
 opMaxISA = None
 timeout = 12
-res_dir = f"{dir}/../results/real"
+res_dir = f"{dir}/../results/w2fix"
 LC_test = 0
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
-    (1,1,0,1,1),
-    (0,1,1,1,1),
+    #(1,1,0,1,1),
+    #(0,1,1,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
@@ -52,11 +52,11 @@ lc_params = (
 )
 all_params = (
     #(0,1,1,1,1),
-    #(0,0,0,0,0),
     #(0,1,1,0,0),
     #(0,1,0,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
+    (0,0,0,0,0),
 )
 
 params = lc_params if LC_test else all_params
@@ -114,12 +114,12 @@ for LC,E,CMP, C, K in params:
         opMaxR=opMaxISA,
     )
     ir_opts = (dce, cse)
-    narrow_opts = (C, K)
+    narrow_opts = (C, K, 0)
     E_opts = (LC, E, CMP)
     if LC_test:
-        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, solver_opts)
+        ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs=1, opts=solver_opts)
     else:
-        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, solver_opts)
+        ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs=1, opts=solver_opts)
     for ri, rule in enumerate(ga):
         print("RULE", ri, flush=True)
         if print_rules:
@@ -134,6 +134,8 @@ for LC,E,CMP, C, K in params:
         extra_time = info['et']
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
+    for (m, n), (uniq, dup) in db.mn_info.items():
+        print(f"MN:{m},{n}: {uniq} + {dup} = {uniq+dup}")
     db.pickle_info(pfile)
     delta = time()-start_time
     print("TOTTIME:", delta)

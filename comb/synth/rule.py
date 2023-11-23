@@ -172,7 +172,9 @@ class RuleDatabase:
         mn_cnt = {}
         for (lids, rids, NI, NO), info in self.time_info.items():
             mn = (len(lids),len(rids))
-            mn_cnt[mn] = mn_cnt.get(mn, 0) + info['u']
+            uniq, dup = mn_cnt.get(mn, (0,0))
+            uniq, dup = uniq + info['u'], dup + info['e']
+            mn_cnt[mn] = (uniq, dup)
         return mn_cnt
 
     def pickle_info(self, file):
