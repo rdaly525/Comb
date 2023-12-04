@@ -33,28 +33,28 @@ verbose = 0
 isa_name = 'cisc'
 N = 4
 maxIR = 3
-maxISA = 2
+maxISA = 1
 opMaxIR = None
 opMaxISA = None
 timeout = 12
-res_dir = f"{dir}/../results/real"
+res_dir = f"{dir}/../results/test"
 LC_test = 1
 #LC,E,CMP,C,K
 lc_params = (
     (1,1,1,1,1),
     #(0,1,1,1,1),
-    (1,1,0,1,1),
+    #(1,1,0,1,1),
     #(0,0,1,0,0),
     #(0,0,0,1,0),
     #(0,0,0,0,1),
     #(0,0,0,0,0),
 )
 all_params = (
-    #(0,1,1,1,1),
+    (0,1,1,1,1),
     #(0,1,1,0,0),
-    (0,1,0,0,0),
-    (0,0,0,1,0),
-    (0,0,0,0,1),
+    #(0,1,0,0,0),
+    #(0,0,0,1,0),
+    #(0,0,0,0,1),
     #(0,0,0,0,0),
 )
 
@@ -133,5 +133,7 @@ for LC,E,CMP, C, K in params:
         extra_time = info['et']
         assert extra >=0
         print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
+    for (m, n), cnt in db.mn_info.items():
+        print("MN", (m,n), cnt)
     db.pickle_info(pfile)
     print("TOTTIME",time()-start_time)
