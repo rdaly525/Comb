@@ -7,7 +7,7 @@ import networkx as nx
 from hwtypes import smt_utils as fc
 import hwtypes as ht
 from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
-from ..frontend.ir import AssignStmt, CombProgram
+from ..frontend.ir import AssignStmt, CombProgram, CombSpecialized
 from ..frontend.stdlib import make_bv_const, CBVSynthConst, CBVDontCare, BVDontCare, is_dont_care
 from .pattern import Pattern
 from .pattern_encoding import PatternEncoding
@@ -45,19 +45,19 @@ class CombEncoding(PatternEncoding):
 
         for opi, op in enumerate(self.op_list):
             op_iTs, op_oTs = op.get_type()
-            if isinstance(op.comb, CBVSynthConst):
+            if isinstance(op, CombSpecialized) and isinstance(op.comb, CBVSynthConst):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_synth_const_op[{opi}]", op_oTs[0])
                 synth_vars.append(var)
                 synth_map[opi] = var
                 op.eval = functools.partial(op.eval, var)
-            elif isinstance(op.comb, BVDontCare):
+            elif isinstance(op, CombSpecialized) and isinstance(op.comb, BVDontCare):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_dont_care_op[{opi}]", op_oTs[0])
                 dont_care_vars.append(var)
                 op.eval = functools.partial(op.eval, var)
                 dont_care_map.setdefault(op_oTs[0], []).append(var)
-            elif isinstance(op.comb, CBVDontCare):
+            elif isinstance(op, CombSpecialized) and isinstance(op.comb, CBVDontCare):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_c_dont_care_op[{opi}]", op_oTs[0])
                 dont_care_vars.append(var)
@@ -242,9 +242,9 @@ class CombEncoding(PatternEncoding):
         for op, ids in op_ids.items():
             if len(ids)<2:
                 continue
-            elif is_dont_care(self.op_list[ids[0]].comb):
+            elif isinstance(self.op_list[ids[0]], CombSpecialized) and is_dont_care(self.op_list[ids[0]].comb):
                 continue
-            elif isinstance(self.op_list[ids[0]].comb, CBVSynthConst):
+            elif isinstance(self.op_list[ids[0]], CombSpecialized) and isinstance(self.op_list[ids[0]].comb, CBVSynthConst):
                 # if simplify_gen_consts is set, we don't care about duplicate constants
                 if not self.simplify_gen_consts:
                     for i0, i1 in it.combinations(ids, 2):
@@ -477,7 +477,7 @@ class CombEncoding(PatternEncoding):
         dont_care_lvars = {}
         for (li, lai), (ri, rai) in p.interior_edges:
             r_lvar = self.op_in_lvars[op_mapping[ri]][rai]
-            if isinstance(p.ops[li].comb, CBVDontCare) or isinstance(p.ops[li].comb, BVDontCare):
+            if isinstance(p.ops[li], CombSpecialized) and is_dont_care(p.ops[li].comb):
                 dont_care_lvars.setdefault(li,[]).append(r_lvar)
             else:
                 l_lvar = self.op_out_lvars[op_mapping[li]][lai]

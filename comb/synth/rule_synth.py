@@ -178,7 +178,7 @@ class RuleSynth(Cegis):
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, forall_vars)
 
-    def CEGISALL_bin_search(self, E, LC, opts: SolverOpts):
+    def CEGISAll_bin_search(self, E, LC, opts: SolverOpts):
         #do a binary search for the number of dont care connections
         self.enum_times = []
         stable_synth_base = self.synth_base
@@ -224,7 +224,9 @@ class RuleSynth(Cegis):
                     rp_cond, enum_time = self.patL(rule.lhs, {opi:opi for opi in range(len(self.lhs_cs.op_list))})
                     stable_synth_base = stable_synth_base & ~rp_cond
                 else:
-                    rp_cond, enum_time = self.ruleL(rule)
+                    l_mapping = {opi:opi for opi in range(len(self.lhs_cs.op_list))}
+                    r_mapping = {opi:opi for opi in range(len(self.rhs_cs.op_list))}
+                    rp_cond, enum_time = self.ruleL(rule, l_mapping, r_mapping)
                     stable_synth_base = stable_synth_base & ~rp_cond
                 self.enum_times.append(enum_time)
 
@@ -243,13 +245,15 @@ class RuleSynth(Cegis):
                     rp_cond, enum_time = self.patL(rule.lhs, {opi:opi for opi in range(len(self.lhs_cs.op_list))})
                     self.synth_base = self.synth_base & ~rp_cond
                 else:
-                    rp_cond, enum_time = self.ruleL(rule)
+                    l_mapping = {opi:opi for opi in range(len(self.lhs_cs.op_list))}
+                    r_mapping = {opi:opi for opi in range(len(self.rhs_cs.op_list))}
+                    rp_cond, enum_time = self.ruleL(rule, l_mapping, r_mapping)
                     self.synth_base = self.synth_base & ~rp_cond
                 self.enum_times.append(enum_time)
 
-    def ruleL(self, rule: Rule):
+    def ruleL(self, rule: Rule, lhs_op_mapping, rhs_op_mapping):
         start = timeit.default_timer()
-        cond = rule.ruleL(self.lhs_cs, self.rhs_cs)
+        cond = rule.ruleL(self.lhs_cs, self.rhs_cs, lhs_op_mapping, rhs_op_mapping)
         delta = timeit.default_timer() - start
         return cond, delta
 

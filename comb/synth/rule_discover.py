@@ -359,8 +359,8 @@ class RuleDiscovery:
             assert T.const
             op = BV._synth_const[T.n]
             #TODO: this is a temporary fix to speed things up for PEs
-            # if T.n == 16:
-            #     op.constraints = lambda in_lvars,out_lvars,in_vars,out_vars: out_vars[0] == 0
+            if T.n == 16:
+                op.constraints = lambda in_lvars,out_lvars,in_vars,out_vars: out_vars[0] == 0
             op_list.append(op)
 
         return op_list
@@ -426,28 +426,33 @@ class RuleDiscovery:
                                         simplify_gen_consts = self.simplify_gen_consts,
                                     )
                                     existing_rules = []
+                                    existing_mappings = []
                                     start = timeit.default_timer()
                                     for mset in self.all_composite_msets(lhs_ids, rhs_ids, iT, oT, lhs_synth_ops, rhs_synth_ops, opts):
                                         lhs_pats = flat([[rule.lhs for _ in range(cnt)] for rule, cnt in mset])
                                         rhs_pats = flat([[rule.rhs for _ in range(cnt)] for rule, cnt in mset])
-                                        dags = enum_dags(iT, oT, lhs_pats)
-                                        for dag in dags:
-                                            lhs_pat = composite_pat(iT, oT, dag, lhs_pats, lhs_ops_all)
-                                            rhs_pat = composite_pat(iT, oT, dag, rhs_pats, rhs_ops_all)
-                                            existing_rules.append(Rule(lhs_pat, rhs_pat, 0, 0))
+                                        lhs_dags = enum_dags(iT, oT, lhs_pats)
+                                        rhs_dags = enum_dags(iT, oT, rhs_pats)
+                                        for lhs_dag,rhs_dag in it.product(lhs_dags, rhs_dags):
+                                            lhs_composite_pats = composite_pat(iT, oT, lhs_dag, lhs_pats, lhs_ops_all)
+                                            rhs_composite_pats = composite_pat(iT, oT, rhs_dag, rhs_pats, rhs_ops_all)
+                                            for (l_pat,l_mapping),(r_pat,r_mapping) in it.product(lhs_composite_pats, rhs_composite_pats):
+                                                existing_rules.append(Rule(l_pat, r_pat, 0, 0))
+                                                existing_mappings.append((l_mapping, r_mapping))
+
                                     comp_time = timeit.default_timer() - start
                                     if len(existing_rules) > 0 and opts.log:
                                         print("CMPTIME", round(comp_time,3), flush=True)
                                     if comp:
-                                        for crule in existing_rules:
-                                            rule_cond, enum_time = rs.ruleL(crule)
+                                        for crule,(l_map, r_map) in zip(existing_rules, existing_mappings):
+                                            rule_cond, enum_time = rs.ruleL(crule,l_map,r_map)
                                             comp_time += enum_time
                                             rs.synth_base = rs.synth_base & ~rule_cond
                                     sat_time = []
                                     if bin_search_dont_cares:
-                                        rulegen = rs.CEGISALL_bin_search
+                                        rulegen = rs.CEGISAll_bin_search
                                     else:
-                                        rulegen = rs.CEGISALL
+                                        rulegen = rs.CEGISAll
                                     
                                     for rule in rulegen(E, LC, opts):
                                         sat_time.append(rule.time)
@@ -648,9 +653,9 @@ class RuleDiscovery:
                                         rs.synth_base = rs.synth_base & ~pat_cond
                                 sat_time = []
                                 if bin_search_dont_cares:
-                                    rulegen = rs.CEGISALL_bin_search
+                                    rulegen = rs.CEGISAll_bin_search
                                 else:
-                                    rulegen = rs.CEGISALL
+                                    rulegen = rs.CEGISAll
                                 
                                 for rule in rulegen(E, LC, opts):
                                     rule.cost = cur_cost

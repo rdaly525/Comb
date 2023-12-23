@@ -1,5 +1,5 @@
 import functools
-from collections import namedtuple
+from collections import namedtuple, OrderedDict, Counter
 from functools import cached_property
 import networkx as nx
 from hwtypes import smt_utils as fc
@@ -7,9 +7,9 @@ from hwtypes import smt_utils as fc
 from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
-from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set
-from ..frontend.ir import CombProgram, AssignStmt
-from ..frontend.stdlib import CBVSynthConst, GlobalModules, BVDontCare, CBVDontCare
+from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set, dicts_agree
+from ..frontend.ir import CombProgram, AssignStmt, CombSpecialized
+from ..frontend.stdlib import CBVSynthConst, GlobalModules, is_dont_care
 import itertools as it
 from more_itertools import distinct_combinations as multicomb
 
@@ -18,6 +18,8 @@ from more_itertools import distinct_combinations as multicomb
 #Outputs are encoded as num_ops
 
 SymOpts = namedtuple('SymOpts', ('comm', 'same_op', 'input_perm'), defaults=(False,)*3)
+
+
 
 #dedupliates list of dicts
 def dedup(f):
@@ -149,7 +151,7 @@ class Pattern:
         self.edges = edges
         self.synth_map = {}
         for opi, op in enumerate(ops):
-            if isinstance(op.comb, CBVSynthConst):
+            if isinstance(op, CombSpecialized) and isinstance(op.comb, CBVSynthConst):
                 self.synth_map[opi] = synth_vals[len(self.synth_map)]
         assert len(self.synth_map) == len(synth_vals)
 
@@ -230,9 +232,7 @@ class Pattern:
 
     @cached_property
     def op_cnt_no_dont_cares(self):
-        return _list_to_counts(op.qualified_name for op in self.ops if
-                                (not isinstance(op.comb, BVDontCare) and 
-                                not isinstance(op.comb, CBVDontCare)))
+        return _list_to_counts(op.qualified_name for op in self.ops if not (isinstance(op, CombSpecialized) and is_dont_care(op.comb)))
 
     #def enum_all_equal(self, en_I):
     #    eq_set = set()
@@ -430,6 +430,8 @@ class Pattern:
         raise NotImplementedError()
 
 
+
+
 def enum_dags(iT, oT, pats: tp.List[Pattern]):
     NIs = [len(p.iT) for p in pats]
     NOs = [len(p.oT) for p in pats]
@@ -480,7 +482,7 @@ def is_dag(edges):
 
 
 def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
-    ops_no_dont_cares = [op for op in ops if (not isinstance(op.comb, CBVDontCare) and not isinstance(op.comb, BVDontCare))]
+    ops_no_dont_cares = [op for op in ops if not (isinstance(op, CombSpecialized) and is_dont_care(op.comb))]
     op_no_dont_cares_dict = _list_to_dict(op.qualified_name for op in ops_no_dont_cares)
 
     pat_op_cnts = {}
@@ -505,7 +507,7 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
                     pmap[(pi, opi)] = len(curr_ops) - 1
                     pat_to_enc_map[len(curr_ops) - 1] = original_opi
                 else:
-                    assert isinstance(pat_op.comb, CBVDontCare) or isinstance(pat_op.comb, BVDontCare)
+                    assert is_dont_care(pat_op.comb)
                     curr_ops.append(pat_op)
                     pmap[(pi,opi)] = len(curr_ops)-1
         assert all(len(opis) == 0 for _,opis in chosen_ops.items())
