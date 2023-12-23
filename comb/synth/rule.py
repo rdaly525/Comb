@@ -1,5 +1,4 @@
-from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm, PatternMatcher
-from comb.synth.instruction_sel import OptimalInstructionSel
+from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm
 import itertools as it
 from .utils import flat
 from comb.synth.solver_utils import SolverOpts
