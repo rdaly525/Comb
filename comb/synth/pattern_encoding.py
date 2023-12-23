@@ -18,6 +18,8 @@ class PatternEncoding:
         op_list: tp.List[Comb],
         const_list: tp.Tuple[int] = (),
         prefix: str = "",
+        simplify_dont_cares: bool = False,
+        simplify_gen_consts: bool = False
     ):
         self.iT = iT
         self.oT = oT
@@ -25,6 +27,8 @@ class PatternEncoding:
         self.op_list = op_list
         self.const_list = const_list
         self.prefix = prefix
+        self.simplify_dont_cares = simplify_dont_cares
+        self.simplify_gen_consts = simplify_gen_consts
 
         if len(self.const_list) > 0:
             raise NotImplementedError()

@@ -266,6 +266,7 @@ class Comb(Node):
     comm_info = []
     specialzied = False
     param_types = []
+    constraints = None
     def __init__(self, *args):
         super().__init__(*args)
         self.partial_cache = {}

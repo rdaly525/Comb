@@ -147,6 +147,9 @@ class BVDontCare(CombPrimitive):
         #TODO: need to return a free variable here
         return [BVValue(ht.SMTBitVector[pargs[0].value](0))]
 
+def is_dont_care(comb):
+    return isinstance(comb, BVDontCare) or isinstance(comb, CBVDontCare)
+
 def create_BVUnary(class_name: str, fun):
     class BVBin(CombPrimitive):
         name = QSym('bv', class_name)

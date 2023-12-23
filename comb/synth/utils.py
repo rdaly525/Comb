@@ -23,6 +23,10 @@ def _list_to_dict(vals):
         d.setdefault(v, []).append(i)
     return d
 
+def dicts_agree(x : dict, y : dict):
+    shared_keys = set(x.keys()) & set(y.keys())
+    return all(x[k] == y[k] for k in shared_keys)
+
 def bucket_combinations(vals: tp.Iterable[tp.Any], buckets: tp.List[int]):
     assert len(vals) == sum(buckets)
     if len(buckets)==0:

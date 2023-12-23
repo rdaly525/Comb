@@ -2,6 +2,7 @@ import functools
 import typing as tp
 from dataclasses import dataclass
 import hwtypes as ht
+from hwtypes import smt_utils as fc
 from pysmt import shortcuts as smt
 
 from pysmt.logics import Logic, QF_BV
@@ -59,7 +60,7 @@ class Cegis:
     synth_constrain: ht.SMTBit
     verif: ht.SMTBit
     E_vars: tp.Iterable['freevars']
-    input_vars: tp.Iterable['inputvars']
+    A_vars: tp.Iterable['forallvars']
 
     def cegis(self, prev_sol, opts: SolverOpts = SolverOpts()):
         if opts.verbose==2:
@@ -82,16 +83,15 @@ class Cegis:
         verif = self.verif.value
         #get exist vars:
         E_vars = set(var.value for var in self.E_vars)  # exist_vars
-        A_vars = synth_constrain.get_free_variables() - E_vars  # forall vars
-        input_vars = [var.value for var in self.input_vars]
-        dep_vars = A_vars - set(input_vars)
+        A_vars = set(var.value for var in self.A_vars)  # exist_vars
+        dep_vars = synth_constrain.get_free_variables() - A_vars - E_vars
 
         with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
             solver.add_assertion(self.synth_base.value)
 
             # Start with checking all A vals beings 0
-            input_vals = {v: _int_to_pysmt(0, v.get_type()) for v in input_vars}
-            solver.add_assertion(synth_constrain.substitute(input_vals).simplify())
+            A_vals = {v: _int_to_pysmt(0, v.get_type()) for v in A_vars}
+            solver.add_assertion(synth_constrain.substitute(A_vals).simplify())
             start = timeit.default_timer()
             for i in it.count(1):
                 if (timeit.default_timer()-start > opts.timeout):
@@ -112,6 +112,7 @@ class Cegis:
                     return None, t
                 else:
                     E_guess = {v: solver.get_value(v) for v in E_vars}
+
                     if show_e and i%100==50:
                         print_e(E_guess)
                     query_guess = verif.substitute(E_guess).simplify()
@@ -123,9 +124,9 @@ class Cegis:
                             print("SAT")
                         return E_guess, t
                     else:
-                        input_vals = {v: model.get_value(v) for v in input_vars}
+                        A_vals = {v: model.get_value(v) for v in A_vars}
                         dep_vals = {v: get_var(f"{v}_{i}", v.bv_width()).value for v in dep_vars}
-                        solver.add_assertion(synth_constrain.substitute(input_vals).substitute(dep_vals).simplify())
+                        solver.add_assertion(synth_constrain.substitute(A_vals).substitute(dep_vals).simplify())
 
     #enum_fun takes a single solution and enumerates all 'permutations' of that solution to add to the exclude list
     def cegis_all(self, exclude_prev: bool, opts: SolverOpts = SolverOpts()):

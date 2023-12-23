@@ -66,6 +66,8 @@ class RuleDiscovery:
     maxR: int
     gen_consts: tp.Tuple[bool, bool]
     gen_dont_cares: tp.Tuple[bool, bool]
+    simplify_gen_consts: tp.Tuple[bool, bool]
+    simplify_dont_cares: tp.Tuple[bool, bool]
     opMaxL: tp.Mapping[int, int] = None
     opMaxR: tp.Mapping[int, int] = None
     pat_en_t: tp.Type[PatternEncoding] = CombEncoding
@@ -80,6 +82,14 @@ class RuleDiscovery:
         self.rdb: RuleDatabase = RuleDatabase()
         self.lhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.lhss)}
         self.rhs_name_to_id = {comb.qualified_name:i for i, comb in enumerate(self.rhss)}
+        if self.simplify_dont_cares[0]:
+            assert self.gen_dont_cares[0]
+        if self.simplify_dont_cares[1]:
+            assert self.gen_dont_cares[1]
+        if self.simplify_gen_consts[0]:
+            assert self.gen_consts[0]
+        if self.simplify_gen_consts[1]:
+            assert self.gen_consts[1]
 
     def allT(self, lhs_ops, rhs_ops, l_dont_care_T, r_dont_care_T, max_outputs):
         # generate all possible program input and output type combinations
@@ -87,13 +97,15 @@ class RuleDiscovery:
         lop_iTs, lop_oTs = T_count(lhs_ops)
         rop_iTs, rop_oTs = T_count(rhs_ops)
 
-        for T in l_dont_care_T:
-            assert lop_iTs[T] > 0
-            lop_iTs[T] -= 1
+        if not self.simplify_dont_cares[0]:
+            for T in l_dont_care_T:
+                assert lop_iTs[T] > 0
+                lop_iTs[T] -= 1
 
-        for T in r_dont_care_T:
-            assert rop_iTs[T] > 0
-            rop_iTs[T] -= 1
+        if not self.simplify_dont_cares[1]:
+            for T in r_dont_care_T:
+                assert rop_iTs[T] > 0
+                rop_iTs[T] -= 1
 
         max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
         max_oTs = {T:min(lop_oTs[T], rop_oTs[T]) for T in set(lop_oTs.keys()) & set(rop_oTs.keys())}
@@ -127,21 +139,26 @@ class RuleDiscovery:
         for T in iT:
             if not T.const:
                 continue
-            assert lop_const_iTs[T] > 0 and rop_const_iTs[T] > 0
-            lop_const_iTs[T] -= 1
-            rop_const_iTs[T] -= 1
+            if not self.simplify_gen_consts[0]:
+                assert lop_const_iTs[T] > 0
+                lop_const_iTs[T] -= 1
+            if not self.simplify_gen_consts[1]:
+                assert rop_const_iTs[T] > 0
+                rop_const_iTs[T] -= 1
 
-        for T in l_dont_care_T:
-            if not T.const:
-                continue
-            assert lop_const_iTs[T] > 0
-            lop_const_iTs[T] -= 1
+        if not self.simplify_dont_cares[0]:
+            for T in l_dont_care_T:
+                if not T.const:
+                    continue
+                assert lop_const_iTs[T] > 0
+                lop_const_iTs[T] -= 1
 
-        for T in r_dont_care_T:
-            if not T.const:
-                continue
-            assert rop_const_iTs[T] > 0
-            rop_const_iTs[T] -= 1
+        if not self.simplify_dont_cares[1]:
+            for T in r_dont_care_T:
+                if not T.const:
+                    continue
+                assert rop_const_iTs[T] > 0
+                rop_const_iTs[T] -= 1
 
         l_gen_consts, r_gen_consts = self.gen_consts
 
@@ -153,19 +170,32 @@ class RuleDiscovery:
         if r_gen_consts:
             r_synth_all = flat((T,)*c for T,c in rop_const_iTs.items())
 
-        for num_l in range(len(l_synth_all) + 1):
-            for l_synth_sel in multicomb(l_synth_all, num_l):
-                for num_r in range(len(r_synth_all) + 1):
-                    for r_synth_sel in multicomb(r_synth_all, num_r):
-                        yield l_synth_sel, r_synth_sel
+        if self.simplify_gen_consts[0]: 
+            l_synth_sels = [l_synth_all]
+        else:
+            l_synth_sels = [l_synth_sel for num_l in range(len(l_synth_all) + 1) 
+                                        for l_synth_sel in multicomb(l_synth_all, num_l)]
+        if self.simplify_gen_consts[1]: 
+            r_synth_sels = [r_synth_all]
+        else:
+            r_synth_sels = [r_synth_sel for num_r in range(len(r_synth_all) + 1) 
+                                        for r_synth_sel in multicomb(r_synth_all, num_r)]
+        
+        return it.product(l_synth_sels, r_synth_sels)
+
 
     def all_dont_care_T(self, lhs_ops, rhs_ops):
-        # generate all possible combinations of constants that can be synthesized
+        # generate all possible combinations of dont cares that can be synthesized
 
         lop_iTs, lop_oTs = T_count(lhs_ops)
         rop_iTs, rop_oTs = T_count(rhs_ops)
 
         l_gen_dont_cares, r_gen_dont_cares = self.gen_dont_cares
+
+        if self.simplify_dont_cares[0]:
+            lop_iTs = {T:1 for T in lop_iTs.keys()}
+        if self.simplify_dont_cares[1]:
+            rop_iTs = {T:1 for T in rop_iTs.keys()}
 
         l_dont_care_all = []
         if l_gen_dont_cares:
@@ -174,12 +204,20 @@ class RuleDiscovery:
         r_dont_care_all = []
         if r_gen_dont_cares:
             r_dont_care_all = flat((T,)*c for T,c in rop_iTs.items())
+        
+        if self.simplify_dont_cares[0]: 
+            l_dont_care_sels = [l_dont_care_all]
+        else:
+            l_dont_care_sels = [l_dont_care_sel for num_l in range(len(l_dont_care_all), -1, -1) 
+                                        for l_dont_care_sel in multicomb(l_dont_care_all, num_l)]
+        if self.simplify_dont_cares[1]: 
+            r_dont_care_sels = [r_dont_care_all]
+        else:
+            r_dont_care_sels = [r_dont_care_sel for num_r in range(len(r_dont_care_all), -1, -1) 
+                                        for r_dont_care_sel in multicomb(r_dont_care_all, num_r)]
+        
+        return it.product(l_dont_care_sels, r_dont_care_sels)
 
-        for num_l in range(len(l_dont_care_all), -1, -1):
-            for l_dont_care_sel in multicomb(l_dont_care_all, num_l):
-                for num_r in range(len(r_dont_care_all), -1, -1):
-                    for r_dont_care_sel in multicomb(r_dont_care_all, num_r):
-                        yield l_dont_care_sel, r_dont_care_sel
 
     def valid_program_components(self, iT, oT, lhs_ops, rhs_ops, l_synth_T, r_synth_T, l_dont_care_T, r_dont_care_T):
         # return True if the program components could possibly form a valid program
@@ -320,6 +358,9 @@ class RuleDiscovery:
         for T in synth_T:
             assert T.const
             op = BV._synth_const[T.n]
+            #TODO: this is a temporary fix to speed things up for PEs
+            # if T.n == 16:
+            #     op.constraints = lambda in_lvars,out_lvars,in_vars,out_vars: out_vars[0] == 0
             op_list.append(op)
 
         return op_list
@@ -336,7 +377,7 @@ class RuleDiscovery:
 
         return op_list
 
-    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts()):
+    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = False):
         LC, E, comp = E_opts
         assert not LC
         ruleid = 0
@@ -381,6 +422,8 @@ class RuleDiscovery:
                                         ir_opts=ir_opts,
                                         narrow_opts=narrow_opts,
                                         pat_en_t=self.pat_en_t,
+                                        simplify_dont_cares = self.simplify_dont_cares,
+                                        simplify_gen_consts = self.simplify_gen_consts,
                                     )
                                     existing_rules = []
                                     start = timeit.default_timer()
@@ -401,7 +444,12 @@ class RuleDiscovery:
                                             comp_time += enum_time
                                             rs.synth_base = rs.synth_base & ~rule_cond
                                     sat_time = []
-                                    for rule in rs.CEGISAll(E, LC, opts):
+                                    if bin_search_dont_cares:
+                                        rulegen = rs.CEGISALL_bin_search
+                                    else:
+                                        rulegen = rs.CEGISALL
+                                    
+                                    for rule in rulegen(E, LC, opts):
                                         sat_time.append(rule.time)
                                         assert rule.verify()
                                         if self.is_new_rule(rule, existing_rules):
@@ -535,7 +583,7 @@ class RuleDiscovery:
                 rs.append((cost,rhs_ids))
         return [tuple(rhs_ids) for _, rhs_ids in sorted(rs, key=functools.cmp_to_key(cmp))]
 
-    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts()):
+    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False):
         LC, E, comp = E_opts
         assert len(costs)==len(self.rhss)
         rhs_id_order = self.gen_rhs_order(costs)
@@ -579,6 +627,8 @@ class RuleDiscovery:
                                     ir_opts=ir_opts,
                                     narrow_opts=narrow_opts,
                                     pat_en_t=self.pat_en_t,
+                                    simplify_dont_cares = self.simplify_dont_cares,
+                                    simplify_gen_consts = self.simplify_gen_consts,
                                 )
                                 existing_pats = []
                                 op_mappings = []
@@ -597,7 +647,12 @@ class RuleDiscovery:
                                         comp_time += enum_time
                                         rs.synth_base = rs.synth_base & ~pat_cond
                                 sat_time = []
-                                for rule in rs.CEGISAll(E, LC, opts):
+                                if bin_search_dont_cares:
+                                    rulegen = rs.CEGISALL_bin_search
+                                else:
+                                    rulegen = rs.CEGISALL
+                                
+                                for rule in rulegen(E, LC, opts):
                                     rule.cost = cur_cost
                                     sat_time.append(rule.time)
                                     assert rule.verify()
