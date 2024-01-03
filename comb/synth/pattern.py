@@ -1,4 +1,5 @@
 import functools
+import copy
 from collections import namedtuple, OrderedDict, Counter
 from functools import cached_property
 import networkx as nx
@@ -430,6 +431,19 @@ class Pattern:
         raise NotImplementedError()
 
 
+    def topological_sort(self):
+        g = nx.DiGraph()
+        for (src, _), (snk, _) in self.edges:
+            g.add_edge(src, snk)
+        for opi in range(self.num_ops+1):
+            g.add_edge(-1, opi)
+        for opi in range(self.num_ops):
+            g.add_edge(opi, self.num_ops)
+
+        order = list(nx.topological_sort(g))
+        assert order[0] == -1
+        assert order[-1] == self.num_ops
+        return order
 
 
 def enum_dags(iT, oT, pats: tp.List[Pattern]):
@@ -631,3 +645,195 @@ def IPerm(P, map):
     O = tuple(map[l] for l in P[1])
     IK = tuple(tuple(map[IKij] for IKij in IKi) for IKi in P[2])
     return P[0], O, IK, P[3]
+
+class PatternMatch:
+    def __init__(self):
+        # a:b where a is a forall src in from_pat (an input or dont care), corresponding to src b in to_pat 
+        # a and b are tuples
+        self.forall_map = {}
+
+        # a:b where a is an opi in from_pat, corresponding to opi b to to_pat 
+        # a and b are ints
+        self.opi_map = {}
+
+        # a:b where the sink a in from_pat connects to the src b in to_pat
+        # a and b are tuples
+        self.edge_map = {}
+
+    def to_tuple(self):
+        return (tuple(self.forall_map.items()), tuple(self.opi_map.items()), tuple(self.edge_map.items()))
+
+    def update(self, other):
+        assert isinstance(other, type(self))
+        self.forall_map.update(other.forall_map)
+        self.opi_map.update(other.opi_map)
+        self.edge_map.update(other.edge_map)
+    
+    @classmethod
+    def merge(cls, a, b):
+        assert isinstance(a, cls)
+        assert isinstance(b, cls)
+        ret = cls()
+        ret.forall_map = {**a.forall_map, **b.forall_map}
+        ret.opi_map = {**a.opi_map, **b.opi_map}
+        ret.edge_map = {**a.edge_map, **b.edge_map}
+        return ret
+
+    @classmethod
+    def matches_agree(cls, a, b):
+        assert isinstance(a, cls)
+        assert isinstance(b, cls)
+        return (dicts_agree(a.forall_map, b.forall_map) and 
+                dicts_agree(a.opi_map, b.opi_map) and 
+                dicts_agree(a.edge_map, b.edge_map))
+
+    def __hash__(self):
+        return hash(frozenset(self.forall_map.items()) | 
+                    frozenset(self.opi_map.items()) | 
+                    frozenset(self.edge_map.items()))
+
+    def __eq__(self, other):
+        return (isinstance(other, type(self)) and
+            self.forall_map == other.forall_map and
+            self.opi_map == other.opi_map and
+            self.edge_map == other.edge_map
+        )
+
+class PatternMatcher:
+    def __init__(self, from_pat: Pattern, to_pat: Pattern, opts):
+        self.from_pat = from_pat
+        self.to_pat = to_pat
+        self.opts = opts
+        self.mem = {}
+    
+
+    # Finds all matches where from_pat can be a subgraph anywhere in to_pat.
+    def match_all(self):
+        # Since from_pat is likely a subgraph of to_pat, having same_opts not
+        # being True here does not really make sense since from_pat likely has less ops
+        assert self.opts.same_op
+
+        from_op_matches = dict()
+
+        from_topo_sort = self.from_pat.topological_sort()[1:-1]
+        for from_opi in from_topo_sort:
+            for to_opi in range(self.to_pat.num_ops):
+                if (from_opi, to_opi) in self.mem:
+                    m = self.mem[(from_opi, to_opi)]
+                else:
+                    m = self.match_from_src((from_opi, 0), (to_opi, 0))
+                    self.mem[(from_opi, to_opi)] = m
+                from_op_matches.setdefault(from_opi, []).extend(m)
+        
+        from_output_ops = set()
+        for (srci, _),_ in self.from_pat.out_edges:
+            from_output_ops.add(srci)
+        
+        matches = set()
+        for partial_matches in it.product(*[from_op_matches[opi] for opi in from_output_ops]):
+            # store all solutions where the dicts agree on the same mappings
+            merged_match = PatternMatch()
+            valid_sol = True
+            for m in partial_matches:
+                if not PatternMatch.matches_agree(m, merged_match):
+                    valid_sol = False 
+                    break
+
+                merged_match.update(m)
+
+            if valid_sol:
+                assert all((opi in merged_match.opi_map or is_dont_care(self.from_pat.ops[opi].comb)) for opi in range(self.from_pat.num_ops))
+                assert all(((opi, arg) in merged_match.edge_map) for opi in range(self.from_pat.num_ops) for arg in range(self.from_pat.op_NI[opi]))
+                matches.add(merged_match)
+        
+        return [m for m in matches]
+
+
+    def match_from_src(self, from_src, to_src, curr_match = None):
+        if curr_match is None:
+            curr_match = PatternMatch()
+
+        from_opi, from_arg = from_src
+        to_opi, to_arg = to_src
+
+        # inputs and dont cares have the corresponding to_pat src added to the mapping
+        if from_opi == -1 or is_dont_care(self.from_pat.ops[from_opi].comb):
+            if from_src in curr_match.forall_map:
+                if curr_match.forall_map[from_src] == to_src:
+                    return [curr_match]
+                return []
+            else:
+                curr_match = copy.deepcopy(curr_match)
+                curr_match.forall_map[from_src] = to_src
+                return [curr_match]
+
+        if to_opi == -1:
+            # input of to_pat but not input of from_pat
+            return []
+
+        if from_opi in curr_match.opi_map:
+            if curr_match.opi_map[from_opi] != to_opi:
+                return []
+        if (from_opi, to_opi) in self.mem:
+            return [PatternMatch.merge(m,curr_match) for m in self.mem[(from_opi, to_opi)] if PatternMatch.matches_agree(m, curr_match)]
+        if self.from_pat.ops[from_opi].qualified_name != self.to_pat.ops[to_opi].qualified_name:
+            return []
+        if from_opi in self.from_pat.synth_map:
+            assert to_opi in self.to_pat.synth_map
+            if self.from_pat.synth_map[from_opi] != self.to_pat.synth_map[to_opi]:
+                return []
+        
+        curr_match = copy.deepcopy(curr_match)
+        curr_match.opi_map[from_opi] = to_opi
+        
+        comm_orderings = [self.to_pat.children[to_opi]]
+        if self.opts.comm:
+            to_srcs = self.to_pat.children[to_opi] 
+            comm_info = self.to_pat.ops[to_opi].comm_info
+            assert all(isinstance(l, list) for l in comm_info)
+            assert self.from_pat.ops[from_opi].comm_info == comm_info
+            assert set(flat(comm_info)) == set(range(len(to_srcs)))
+            comm_orderings = []
+            for poss in it.product(*[it.permutations(comm) for comm in comm_info]):
+                comm = [None for _ in to_srcs]
+                for f,t in zip(flat(comm_info), flat(poss)):
+                    comm[t] = to_srcs[f]
+                assert all(v is not None for v in comm)
+                comm_orderings.append(comm)
+
+        all_matches = []
+        for to_ordering in comm_orderings:
+            curr_matches = [curr_match]
+            for from_arg,(from_src, to_src) in enumerate(zip(self.from_pat.children[from_opi], to_ordering)):
+                temp = []
+                for m in curr_matches:
+                    m = copy.deepcopy(m)
+                    m.edge_map[(from_opi, from_arg)] = to_src
+                    temp.extend(self.match_from_src(from_src, to_src, m))
+                curr_matches = temp
+
+            #here we ensure the connections made to inputs are valid based on comm rules
+            for m in curr_matches:
+                #the expected connetions based on the connections in from_pat, translated into
+                #to_pat using the opi mappings and special cases for inputs and dont_cares
+                expected_conn = []
+                for (opi,arg) in self.from_pat.children[from_opi]:
+                    if opi == -1 or is_dont_care(self.from_pat.ops[opi].comb):
+                        expected_conn.append(m.forall_map[(opi,arg)])
+                    else:
+                        expected_conn.append((m.opi_map[opi], arg))
+                
+                #the actual connections made based on the match snk:src entries
+                actual_conn = [m.edge_map[(from_opi, i)] for i in range(self.from_pat.ops[from_opi].num_inputs)]
+
+                if self.opts.comm:
+                    # since comm is True, we ensure the comm groups match for expected and actual connections
+                    comm_info = self.to_pat.ops[to_opi].comm_info
+                    if all((Counter(actual_conn[c] for c in comm) == Counter(expected_conn[c] for c in comm)) 
+                            for comm in comm_info):
+                        all_matches.append(m)
+                else:
+                    # since no comm considered, compare expected and actual connections directly
+                    if expected_conn == actual_conn:
+                        all_matches.append(m)
+        return all_matches

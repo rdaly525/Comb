@@ -484,7 +484,6 @@ class RuleDiscovery:
                                     else:
                                         assert len(new_rules) == 0
 
-
     # Finds all combinations of rules that exactly match the lhs and rhs
     def all_lc_composite_msets(self, lhs_ids, cur_cost, iT, oT, lhs_synth_ops, opts:SolverOpts):
         NI = len(iT)
@@ -685,7 +684,6 @@ class RuleDiscovery:
                                     self.rdb.add_rules(k, new_rules, times)
                                 else:
                                     assert len(new_rules) == 0
-
 
 
 

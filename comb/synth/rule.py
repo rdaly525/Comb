@@ -1,4 +1,5 @@
 from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm
+from comb.synth.instruction_sel import OptimalInstructionSel
 import itertools as it
 from .utils import flat
 from comb.synth.solver_utils import SolverOpts
@@ -190,6 +191,21 @@ class RuleDatabase:
     def num_rules(self):
         return sum(len(rs) for rs in self.rules.values())
 
+    def find_all_composites(self):
+        rules_all = flat(self.rules.values())
+
+        solverops = SolverOpts(solver_name='z3')
+        symops = SymOpts(True, True, False)
+        composites = []
+
+        for i,rule in enumerate(rules_all):
+            if i == 60:
+                pass
+            components = rules_all[:i] + rules_all[i+1:]
+            instr_sel = OptimalInstructionSel(rule.lhs, components, symops, solverops)
+            if instr_sel.run(rule.cost):
+                composites.append(i)
+        return composites 
 
 
 
