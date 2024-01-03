@@ -272,8 +272,8 @@ class RuleDiscovery:
                     print("RCNT", {ri:1},flush=True)
                 yield [(rule, 1)]
                 continue
-            l_subseteq = _m_subseteq(rule.lhs.op_cnt, lhs_op_cnt)
-            r_subseteq = _m_subseteq(rule.rhs.op_cnt, rhs_op_cnt)
+            l_subseteq = _m_subseteq(rule.lhs.op_cnt_no_dont_cares, lhs_op_cnt)
+            r_subseteq = _m_subseteq(rule.rhs.op_cnt_no_dont_cares, rhs_op_cnt)
             if l_subseteq and r_subseteq:
                 poss_rules[ri] = rule
                 #ri_N[ri] = (I_max(rule.lhs.ops), I_max(rule.rhs.ops))
@@ -294,22 +294,20 @@ class RuleDiscovery:
             rvar = rvars[ri]
 
             #ir cnt
-            for op, cnt in rule.lhs.op_cnt.items():
+            for op, cnt in rule.lhs.op_cnt_no_dont_cares.items():
                 assert op in lhs_op_cnts
                 lhs_op_cnts[op] += rvar*cnt
             #isa cnt
-            for op, cnt in rule.rhs.op_cnt.items():
-                if op not in rhs_op_cnts:
-                    raise ValueError
+            for op, cnt in rule.rhs.op_cnt_no_dont_cares.items():
                 assert op in rhs_op_cnts
                 rhs_op_cnts[op] += rvar*cnt
 
         lconds = []
         for op, cnt in lhs_op_cnts.items():
-            lconds.append(cnt == lhs_op_cnt[op])
+            lconds.append(cnt <= lhs_op_cnt[op])
         rconds = []
         for op, cnt in rhs_op_cnts.items():
-            rconds.append(cnt == rhs_op_cnt[op])
+            rconds.append(cnt <= rhs_op_cnt[op])
         max_rvars = [rvar <= max_rvar for rvar in rvars.values()]
         f = fc.And([
             fc.And(max_rvars),
@@ -327,10 +325,26 @@ class RuleDiscovery:
             print("RCNT", r_cnt,flush=True)
             #lhs_pats = [(self.rdb.rules[ri].lhs, cnt) for ri, cnt in r_cnt.items()]
             mset = []
+            lhs_sol_ops = []
+            rhs_sol_ops = []
             for ri, cnt in r_cnt.items():
                 rule = poss_rules[ri]
                 mset.append((rule, cnt))
-            yield mset
+                for op in rule.lhs.ops:
+                    lhs_sol_ops += [op]*cnt
+                for op in rule.rhs.ops:
+                    rhs_sol_ops += [op]*cnt
+                
+            lhs_sol_op_cnts = {}
+            for op in lhs_sol_ops:
+                lhs_sol_op_cnts[op.qualified_name] = lhs_sol_op_cnts.get(op.qualified_name, 0) + 1
+            rhs_sol_op_cnts = {}
+            for op in rhs_sol_ops:
+                rhs_sol_op_cnts[op.qualified_name] = rhs_sol_op_cnts.get(op.qualified_name, 0) + 1
+
+            if ((lhs_sol_op_cnts == lhs_op_cnt or any((isinstance(op.comb,BVDontCare) or isinstance(op.comb,CBVDontCare)) for op in lhs_sol_ops)) and
+                (rhs_sol_op_cnts == rhs_op_cnt or any((isinstance(op.comb,BVDontCare) or isinstance(op.comb,CBVDontCare)) for op in rhs_sol_ops))):
+                yield mset
 
     def is_new_pat(self, pat: Pattern, epats: tp.List[Pattern]):
         new_pat = True
