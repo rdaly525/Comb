@@ -24,11 +24,11 @@ def PeakPE(N: int):
         @family.assemble(locals(), globals())
         class PE(Peak):
             def __call__(self, x: BV[N], y: BV[N], c: BV[N], instr: BV[2]) -> BV[N]:
-                if instr == 3:
+                if instr == 0:
                     return x + y
-                elif instr == 2:
-                    return x - y
                 elif instr == 1:
+                    return x - y
+                elif instr == 2:
                     return x * y
                 else:
                     return x + c
@@ -111,7 +111,7 @@ solver_opts = SolverOpts(verbose=0, solver_name='btor', timeout=5, log=False)
 
 max_outputs = None
 C,K = 1,1
-maxIR = 2
+maxIR = 3
 maxISA = 2
 opMaxIR = None
 opMaxISA = None
@@ -121,6 +121,7 @@ start_time = time()
 LC, E, CMP = 1, 1, 1
 LC_test = 1
 gen_consts = False, True
+gen_dont_cares = True, True
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -128,6 +129,7 @@ rd = RuleDiscovery(
     maxL=maxIR,
     maxR=maxISA,
     gen_consts=gen_consts,
+    gen_dont_cares=gen_dont_cares,
     opMaxL=opMaxIR,
     opMaxR=opMaxISA,
 )

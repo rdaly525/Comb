@@ -111,6 +111,45 @@ class CBVConst(CombPrimitive):
                 return [BVValue(ht.SMTBitVector[N.value](val.value))]
         return CallExpr(self, pargs, args)
 
+class CBVDontCare(CombPrimitive):
+    name = QSym('bv', 'c_dont_care')
+    param_types = [IntType()]
+    num_inputs = 0
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        CBVCall = TypeCall(CBVType(), [N])
+        return [], [CBVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 
+        if len(args) == 1:
+            return [BVValue(args[0])]
+        assert len(args) == 0
+        #TODO: need to return a free variable here
+        return [BVValue(ht.SMTBitVector[pargs[0].value](0))]
+
+class BVDontCare(CombPrimitive):
+    name = QSym('bv', 'dont_care')
+    param_types = [IntType()]
+    num_inputs = 0
+    num_outputs = 1
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 
+        if len(args) == 1:
+            return [BVValue(args[0])]
+        assert len(args) == 0
+        #TODO: need to return a free variable here
+        return [BVValue(ht.SMTBitVector[pargs[0].value](0))]
+
+def is_dont_care(comb):
+    return isinstance(comb, BVDontCare) or isinstance(comb, CBVDontCare)
+
 def create_BVUnary(class_name: str, fun):
     class BVBin(CombPrimitive):
         name = QSym('bv', class_name)
@@ -351,6 +390,8 @@ class BitVectorModule(Module):
             c_const=CBVConst(),
             _synth_const=CBVSynthConst(),
             abs_const=AbsConst(),
+            dont_care=BVDontCare(),
+            c_dont_care=CBVDontCare(),
             concat=BVConcat(),
             slice=BVSlice(),
             nflag=BVNFlag(),

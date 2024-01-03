@@ -2,7 +2,7 @@ import functools
 import timeit
 
 from ..frontend.ast import Comb
-from .solver_utils import Cegis, SolverOpts, get_var
+from .solver_utils import Cegis, SolverOpts, get_var, IterLimitError
 from .pattern import Pattern, enum_dags
 from .pattern_encoding import PatternEncoding
 from .comb_encoding import CombEncoding
@@ -109,13 +109,15 @@ class RuleSynth(Cegis):
         ir_opts,
         narrow_opts,
         pat_en_t: tp.Type[PatternEncoding],
+        simplify_dont_cares: tp.Tuple[bool, bool],
+        simplify_gen_consts: tp.Tuple[bool, bool],
     ):
         self.iT = iT
         self.oT = oT
 
 
-        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l")
-        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r")
+        lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", simplify_dont_cares=simplify_dont_cares[0], simplify_gen_consts=simplify_gen_consts[0])
+        rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", simplify_dont_cares=simplify_dont_cares[1], simplify_gen_consts=simplify_gen_consts[1])
         assert lhs_cs.types_viable and rhs_cs.types_viable
         self.lhs_cs = lhs_cs
         self.rhs_cs = rhs_cs
@@ -123,25 +125,31 @@ class RuleSynth(Cegis):
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
 
+        self.total_op_snks = sum(len(op.get_type()[0]) for op in lhs_op_list) + sum(len(op.get_type()[0]) for op in rhs_op_list)
+        self.total_dont_care_conn = lhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length()) + rhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length())
 
-        input_vars = [*lhs_cs.input_vars, *rhs_cs.input_vars]
+        forall_vars = [*lhs_cs.forall_vars, *rhs_cs.forall_vars]
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
         P_outputs = [lo==ro for lo, ro in zip(lhs_cs.output_vars, rhs_cs.output_vars)]
 
         #Final query:
         #  Exists(L1, L2) Forall(V1, V2) P1_wfp(L1) & P2_wfp(L2) & (P1_lib & P1_conn & P2_lib & P2_conn) => (I1==I2 => O1==O2)
         synth_base = fc.And([
+            lhs_cs.assumptions,
             lhs_cs.P_iropt(*ir_opts),
             lhs_cs.P_narrow(*narrow_opts),
             lhs_cs.P_wfp,
+            rhs_cs.assumptions,
             rhs_cs.P_iropt(*ir_opts),
             rhs_cs.P_narrow(*narrow_opts),
             rhs_cs.P_wfp,
         ])
-
+        
         synth_constrain = fc.And([
+            lhs_cs.constraints,
             lhs_cs.P_lib,
             lhs_cs.P_conn,
+            rhs_cs.constraints,
             rhs_cs.P_lib,
             rhs_cs.P_conn,
             fc.And(P_outputs),
@@ -168,8 +176,59 @@ class RuleSynth(Cegis):
             )
         ])
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
-        super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, input_vars)
+        super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, forall_vars)
 
+    def CEGISAll_bin_search(self, E, LC, opts: SolverOpts):
+        #do a binary search for the number of dont care connections
+        self.enum_times = []
+        stable_synth_base = self.synth_base
+        maxcnt = self.total_op_snks
+        for i in it.count(0):
+            #both mincnt and maxcnt are inclusive
+            mincnt = 0
+            #maxcnt remains from previous iteration to make search space smaller
+            best_sol, best_t = None, None
+            while True:
+                if mincnt == maxcnt and best_sol is not None:
+                    #this early exit is not necessary but can save an extra iteration
+                    break
+
+                target = (mincnt + maxcnt + 1) // 2
+                self.synth_base = stable_synth_base & (self.total_dont_care_conn >= target)
+                sol,t = self.cegis(None, opts)
+
+                if sol is not None and not isinstance(sol, IterLimitError):
+                    best_sol, best_t = sol,t
+
+                if mincnt == maxcnt:
+                    break
+
+                if sol is None or isinstance(sol, IterLimitError):
+                    #no solution, lower maxcnt
+                    maxcnt = target - 1
+                else:
+                    #solution found, raisecnt
+                    mincnt = target
+
+            if best_sol is None:
+                break
+            
+            lhs_pat = self.lhs_cs.pattern_from_sol(best_sol)
+            rhs_pat = self.rhs_cs.pattern_from_sol(best_sol)
+            rule = Rule(lhs_pat, rhs_pat, i, best_t)
+            yield rule
+
+            assert E
+            if E:
+                if LC:
+                    rp_cond, enum_time = self.patL(rule.lhs, {opi:opi for opi in range(len(self.lhs_cs.op_list))})
+                    stable_synth_base = stable_synth_base & ~rp_cond
+                else:
+                    l_mapping = {opi:opi for opi in range(len(self.lhs_cs.op_list))}
+                    r_mapping = {opi:opi for opi in range(len(self.rhs_cs.op_list))}
+                    rp_cond, enum_time = self.ruleL(rule, l_mapping, r_mapping)
+                    stable_synth_base = stable_synth_base & ~rp_cond
+                self.enum_times.append(enum_time)
 
     # E whether represents to exclude all equivalent rules
     def CEGISAll(self, E, LC, opts: SolverOpts):
@@ -183,22 +242,24 @@ class RuleSynth(Cegis):
             assert E #or else we will just synthesize the same rules over and over
             if E:
                 if LC:
-                    rp_cond, enum_time = self.patL(rule.lhs)
+                    rp_cond, enum_time = self.patL(rule.lhs, {opi:opi for opi in range(len(self.lhs_cs.op_list))})
                     self.synth_base = self.synth_base & ~rp_cond
                 else:
-                    rp_cond, enum_time = self.ruleL(rule)
+                    l_mapping = {opi:opi for opi in range(len(self.lhs_cs.op_list))}
+                    r_mapping = {opi:opi for opi in range(len(self.rhs_cs.op_list))}
+                    rp_cond, enum_time = self.ruleL(rule, l_mapping, r_mapping)
                     self.synth_base = self.synth_base & ~rp_cond
                 self.enum_times.append(enum_time)
 
-    def ruleL(self, rule: Rule):
+    def ruleL(self, rule: Rule, lhs_op_mapping, rhs_op_mapping):
         start = timeit.default_timer()
-        cond = rule.ruleL(self.lhs_cs, self.rhs_cs)
+        cond = rule.ruleL(self.lhs_cs, self.rhs_cs, lhs_op_mapping, rhs_op_mapping)
         delta = timeit.default_timer() - start
         return cond, delta
 
-    def patL(self, pat: Pattern):
+    def patL(self, pat: Pattern, op_mapping):
         start = timeit.default_timer()
-        cond = pat.patL(self.lhs_cs)
+        cond = pat.patL(self.lhs_cs, op_mapping)
         delta = timeit.default_timer() - start
         return cond, delta
 

@@ -1,5 +1,7 @@
 from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm
 import itertools as it
+from .utils import flat
+from comb.synth.solver_utils import SolverOpts
 
 from comb.synth.verify import verify
 import hwtypes.smt_utils as fc
@@ -74,7 +76,7 @@ class Rule:
             yield IPerm(PL, mapL), IPerm(PR, mapR)
 
 
-    def ruleL(self, l_pat_enc, r_pat_enc):
+    def ruleL(self, l_pat_enc, r_pat_enc, lhs_op_mapping, rhs_op_mapping):
         #enums patterns
         l_enum = self.lhs.enum_CK()
         r_enum = self.rhs.enum_CK()
@@ -82,8 +84,8 @@ class Rule:
         for (l_edges, l_synth_vals),(r_edges, r_synth_vals) in it.product(l_enum, r_enum):
             l_pat = Pattern(self.lhs.iT, self.lhs.oT, self.lhs.ops, l_edges, l_synth_vals)
             r_pat = Pattern(self.rhs.iT, self.rhs.oT, self.rhs.ops, r_edges, r_synth_vals)
-            l = l_pat_enc.match_one_pattern(l_pat)
-            r = r_pat_enc.match_one_pattern(r_pat)
+            l = l_pat_enc.match_one_pattern(l_pat, lhs_op_mapping)
+            r = r_pat_enc.match_one_pattern(r_pat, rhs_op_mapping)
             allr.append(fc.And([l,r]))
         return fc.Or(allr).to_hwtypes()
 
@@ -187,6 +189,9 @@ class RuleDatabase:
     @property
     def num_rules(self):
         return sum(len(rs) for rs in self.rules.values())
+
+
+
 
     #This only works for non-lowcost
     #def add_rule(self, rule: Rule):

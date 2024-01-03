@@ -55,6 +55,9 @@ def test_genall(LC_test, LC, E, CMP, C, K):
     dce = 1
     cse = 0
     gen_consts = False, False
+    gen_dont_cares = False, False
+    simplify_gen_consts = False, False
+    simplify_dont_cares = False, False
     start_time = time()
     rd = RuleDiscovery(
         lhss=ir,
@@ -63,7 +66,10 @@ def test_genall(LC_test, LC, E, CMP, C, K):
         maxR=maxISA,
         opMaxL=opMaxIR,
         opMaxR=opMaxISA,
-        gen_consts=gen_consts
+        gen_consts=gen_consts,
+        gen_dont_cares = gen_dont_cares,
+        simplify_gen_consts=simplify_gen_consts,
+        simplify_dont_cares=simplify_dont_cares
     )
     ir_opts = (dce, cse)
     narrow_opts = (C, K)
@@ -113,6 +119,9 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, max_ops, max_outputs):
     dce = 1
     cse = 0
     gen_consts = False, False
+    gen_dont_cares = False, False
+    simplify_gen_consts = False, False
+    simplify_dont_cares = False, False
     start_time = time()
     rd = RuleDiscovery(
         lhss=ir,
@@ -121,7 +130,10 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, max_ops, max_outputs):
         maxR=maxISA,
         opMaxL=opMaxIR,
         opMaxR=opMaxISA,
-        gen_consts=gen_consts
+        gen_consts=gen_consts,
+        gen_dont_cares = gen_dont_cares,
+        simplify_gen_consts=simplify_gen_consts,
+        simplify_dont_cares=simplify_dont_cares
     )
     ir_opts = (dce, cse)
     narrow_opts = (C, K)
@@ -148,7 +160,7 @@ def test_bit_movement(LC_test, LC, E, CMP, C, K, max_ops, max_outputs):
     print("TOTTIME:", delta)
     if LC_test:
         if max_outputs is None:
-            assert num_rules == 11
+            assert num_rules == 10
         else:
             assert max_outputs == 1
             assert num_rules == 17
@@ -218,6 +230,9 @@ def test_small_PE(LC_test, LC, maxIR, maxISA, max_outputs):
     C,K = 1,1
     E,CMP = 1,1
     gen_consts = False, True
+    gen_dont_cares = False, False
+    simplify_gen_consts = False, False
+    simplify_dont_cares = False, False
     start_time = time()
     rd = RuleDiscovery(
         lhss=lhs,
@@ -226,7 +241,10 @@ def test_small_PE(LC_test, LC, maxIR, maxISA, max_outputs):
         maxR=maxISA,
         opMaxL=opMaxIR,
         opMaxR=opMaxISA,
-        gen_consts=gen_consts
+        gen_consts=gen_consts,
+        gen_dont_cares = gen_dont_cares,
+        simplify_gen_consts=simplify_gen_consts,
+        simplify_dont_cares=simplify_dont_cares
     )
     ir_opts = (dce, cse)
     narrow_opts = (C, K)

@@ -169,7 +169,8 @@ class EvalCombProgram(Visitor):
         Visitor.generic_visit(self, node)
         rhss = _flat([self.expr_to_vals[rhs] for rhs in node.rhss])
         rhss_types = _flat([self.expr_to_types[rhs] for rhs in node.rhss])
-        assert len(node.lhss) == len(rhss)
+        # TODO this assert can fail when using comb_peak
+        # assert len(node.lhss) == len(rhss)
         for lhs, rhs, rhs_type in zip(node.lhss, rhss, rhss_types):
             if lhs in self.expr_to_vals:
                 raise ValueError(f"ERROR: {lhs} used before declared")

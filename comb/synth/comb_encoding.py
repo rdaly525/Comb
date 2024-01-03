@@ -7,8 +7,8 @@ import networkx as nx
 from hwtypes import smt_utils as fc
 import hwtypes as ht
 from ..frontend.ast import QSym, Sym, TypeCall, BVType, InDecl, OutDecl
-from ..frontend.ir import AssignStmt, CombProgram
-from ..frontend.stdlib import make_bv_const, CBVSynthConst
+from ..frontend.ir import AssignStmt, CombProgram, CombSpecialized
+from ..frontend.stdlib import make_bv_const, CBVSynthConst, CBVDontCare, BVDontCare, is_dont_care
 from .pattern import Pattern
 from .pattern_encoding import PatternEncoding
 from .solver_utils import get_var
@@ -37,24 +37,67 @@ class CombEncoding(PatternEncoding):
         op_out_lvars = []
         op_in_lvars = []
         synth_vars = []
+        synth_map = {}
+        dont_care_vars = []
+        hardcoded_lvars = len(self.input_vars) + len(hard_consts)
+        assumptions = [ht.SMTBit(1)]
+        dont_care_map = {}
+
         for opi, op in enumerate(self.op_list):
             op_iTs, op_oTs = op.get_type()
-            op_in_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_in[{i}]", lvar_t_width) for i, T in enumerate(op_iTs)])
-            op_out_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width) for i, T in enumerate(op_oTs)])
-            if isinstance(op.comb, CBVSynthConst):
+            if isinstance(op, CombSpecialized) and isinstance(op.comb, CBVSynthConst):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_synth_const_op[{opi}]", op_oTs[0])
                 synth_vars.append(var)
+                synth_map[opi] = var
+                op.eval = functools.partial(op.eval, var)
+            elif isinstance(op, CombSpecialized) and isinstance(op.comb, BVDontCare):
+                assert len(op_oTs) == 1
+                var = get_var(f"{self.prefix}_dont_care_op[{opi}]", op_oTs[0])
+                dont_care_vars.append(var)
+                op.eval = functools.partial(op.eval, var)
+            elif isinstance(op, CombSpecialized) and isinstance(op.comb, CBVDontCare):
+                assert len(op_oTs) == 1
+                var = get_var(f"{self.prefix}_c_dont_care_op[{opi}]", op_oTs[0])
+                dont_care_vars.append(var)
                 op.eval = functools.partial(op.eval, var)
 
+            if len(op_iTs) == 0:
+                out_lvars = []
+                for i, T in enumerate(op_oTs):
+                    v = get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width)
+                    out_lvars.append(v)
+                    assumptions.append(v == hardcoded_lvars)
+                    hardcoded_lvars += 1
+                    if is_dont_care(op.comb):
+                        dont_care_map.setdefault(type_to_nT(T), []).append(v)
+                op_in_lvars.append([])
+                op_out_lvars.append(out_lvars)
+            else:
+                op_in_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_in[{i}]", lvar_t_width) for i, T in enumerate(op_iTs)])
+                op_out_lvars.append([get_var(f"{self.prefix}_L_op[{opi}]_out[{i}]", lvar_t_width) for i, T in enumerate(op_oTs)])
+            
         output_lvars = [get_var(f"{self.prefix}_L_out[{i}]", lvar_t_width) for i in range(len(self.output_vars))]
         self.op_in_lvars = op_in_lvars
         self.op_out_lvars = op_out_lvars
         self.output_lvars = output_lvars
         self.synth_vars = synth_vars
+        self.synth_map = synth_map
+        self.dont_care_vars = dont_care_vars
+        self.dont_care_map = dont_care_map
+        self.assumptions = fc.And(assumptions)
+
+        # each op might have unique constraints, such as the enum constraints for PE instructions
+        constraints = [ht.SMTBit(1)]
+        for op,in_lvars,out_lvars,in_vars,out_vars in zip(self.op_list, self.op_in_lvars, self.op_out_lvars, self.op_in_vars, self.op_out_vars):
+            if op.constraints is not None:
+                constraints.append(op.constraints(in_lvars, out_lvars, in_vars, out_vars))
+
+        self.constraints = fc.And(constraints)
 
         #get list of lvars (existentially quantified in final query)
         self.E_vars = output_lvars + flat(op_out_lvars) + flat(op_in_lvars) + synth_vars
+        self.forall_vars = self.input_vars + dont_care_vars
         self.lvars = (self.input_lvars, hard_const_lvars, output_lvars, op_out_lvars, op_in_lvars)
         self.rhs_lvars = flat(op_in_lvars) + output_lvars
         self.Ninputs = Ninputs
@@ -73,6 +116,22 @@ class CombEncoding(PatternEncoding):
             for n, ids in _list_to_dict(oT).items():
                 self.src_n.setdefault(n, {}).update({(opi, id):VarPair(self.op_out_lvars[opi][id], self.op_out_vars[opi][id]) for id in ids})
 
+    def cnt_dont_care_conn(self, num_bits):
+        zero = SBV[num_bits](0)
+        one = SBV[num_bits](1)
+
+        cnt = zero
+        for T,d in self.snk_n.items():
+            for (opi,_),(snk_lvar,_) in d.items():
+                if opi == self.num_ops:
+                    continue
+                if T not in self.dont_care_map:
+                    continue
+                dont_care_src_lvars = self.dont_care_map[T]
+                match = [snk_lvar == src_lvar for src_lvar in dont_care_src_lvars]
+                match = fc.Or(match).to_hwtypes()
+                cnt = cnt + match.ite(one, zero)
+        return cnt
 
     @property
     def L(self):
@@ -107,6 +166,13 @@ class CombEncoding(PatternEncoding):
         return fc.And(P_in_range)
 
     @property
+    def P_out_unique(self):
+        P_out_unique = []
+        for lvar_a, lvar_b in it.combinations(self.output_lvars, 2):
+            P_out_unique.append(lvar_a != lvar_b)
+        return fc.And(P_out_unique)
+
+    @property
     def P_loc_unique(self):
         # Temp locs are unique
         #Could simplify to only the first lhs of each stmt
@@ -138,14 +204,33 @@ class CombEncoding(PatternEncoding):
     #Restricts snks to only allow for same type sources
     @property
     def P_well_typed(self):
-        src_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.src_n.items()}
-        snk_lvars_T = {T:[lvar for _, (lvar, var) in vard.items()] for T,vard in self.snk_n.items()}
+        src_lvars_T = {T:[(opi,lvar) for (opi,_), (lvar, _) in vard.items()] for T,vard in self.src_n.items()}
+        snk_lvars_T = {T:[(opi,lvar) for (opi,_), (lvar, _) in vard.items()] for T,vard in self.snk_n.items()}
         well_typed = []
         for T, snk_lvars in snk_lvars_T.items():
             assert T in src_lvars_T
             src_lvars = src_lvars_T[T]
-            for snk_lvar in snk_lvars:
-                well_typed.append(fc.Or([src_lvar==snk_lvar for src_lvar in src_lvars]))
+            if T.const and self.simplify_gen_consts:
+                # here we constrain each constant sink to only connect to an input or ONE constant synthesis operation
+                # assume the program has no constant outputs
+                assert all(opi < self.num_ops for opi,_ in snk_lvars)
+
+                snk_lvars = [lvar for _,lvar in snk_lvars]
+                src_lvars_inputs = [lvar for (opi, lvar) in src_lvars if opi == -1]
+                src_lvars_dont_cares = [lvar for (opi, lvar) in src_lvars if opi != -1 and is_dont_care(self.op_list[opi].comb)]
+                src_lvars_synth_consts = [lvar for (opi, lvar) in src_lvars if opi != -1 and not is_dont_care(self.op_list[opi].comb)]
+                if self.simplify_dont_cares:
+                    assert len(src_lvars_dont_cares) == 1
+
+                # each snk gets its own unique src, so the length of the snks and constant synthesis sources must be equal
+                assert len(snk_lvars) == len(src_lvars_synth_consts)
+                for snk_lvar, src_lvar_synth_const in zip(snk_lvars, src_lvars_synth_consts):
+                    valid_conn = src_lvars_inputs + src_lvars_dont_cares + [src_lvar_synth_const]
+                    well_typed.append(fc.Or([lvar==snk_lvar for lvar in valid_conn]))
+            else:
+                for _,snk_lvar in snk_lvars:
+                    well_typed.append(fc.Or([src_lvar==snk_lvar for _,src_lvar in src_lvars]))
+
         return fc.And(well_typed)
 
     #Every pairwise same op needs to have distinct inputs
@@ -156,8 +241,17 @@ class CombEncoding(PatternEncoding):
         for op, ids in op_ids.items():
             if len(ids)<2:
                 continue
-            for i0, i1 in it.combinations(ids, 2):
-                P_cse.append(fc.Or([lv0!=lv1 for lv0, lv1 in zip(self.op_in_lvars[i0], self.op_in_lvars[i1])]))
+            elif isinstance(self.op_list[ids[0]], CombSpecialized) and is_dont_care(self.op_list[ids[0]].comb):
+                continue
+            elif isinstance(self.op_list[ids[0]], CombSpecialized) and isinstance(self.op_list[ids[0]].comb, CBVSynthConst):
+                # if simplify_gen_consts is set, we don't care about duplicate constants
+                if not self.simplify_gen_consts:
+                    for i0, i1 in it.combinations(ids, 2):
+                        P_cse.append(self.synth_map[i0] != self.synth_map[i1])
+                continue
+            else:
+                for i0, i1 in it.combinations(ids, 2):
+                    P_cse.append(fc.Or([lv0!=lv1 for lv0, lv1 in zip(self.op_in_lvars[i0], self.op_in_lvars[i1])]))
         return fc.And(P_cse)
 
     @property
@@ -176,7 +270,11 @@ class CombEncoding(PatternEncoding):
         mask = 2**(self.Ninputs + self.Nconsts)-1
         P_used = (used & mask) == mask
 
-        for lvars in self.op_out_lvars:
+        for lvars, op in zip(self.op_out_lvars, self.op_list):
+            if self.simplify_dont_cares and is_dont_care(op.comb):
+                continue
+            if self.simplify_gen_consts and isinstance(op.comb, CBVSynthConst):
+                continue
             mask = self.lvar_t(2**len(lvars)-1) << lvars[0]
             P_used &= ((used & mask) != 0)
         return P_used
@@ -217,6 +315,7 @@ class CombEncoding(PatternEncoding):
             self.P_multi_out,
             self.P_well_typed,
             self.P_acyc,
+            self.P_out_unique,
         ]
         return fc.And(P_wfp)
 
@@ -371,29 +470,37 @@ class CombEncoding(PatternEncoding):
         return p
 
 
-    def match_one_pattern(self, p: Pattern):
+    def match_one_pattern(self, p: Pattern, op_mapping):
         #Interior edges
         interior_edges = []
+        dont_care_lvars = {}
         for (li, lai), (ri, rai) in p.interior_edges:
-            l_lvar = self.op_out_lvars[li][lai]
-            r_lvar = self.op_in_lvars[ri][rai]
-            interior_edges.append(l_lvar==r_lvar)
+            r_lvar = self.op_in_lvars[op_mapping[ri]][rai]
+            if isinstance(p.ops[li], CombSpecialized) and is_dont_care(p.ops[li].comb):
+                dont_care_lvars.setdefault(li,[]).append(r_lvar)
+            else:
+                l_lvar = self.op_out_lvars[op_mapping[li]][lai]
+                interior_edges.append(l_lvar==r_lvar)
         #Exterior edges
         in_lvars = {}
         for (li, lai), (ri, rai) in p.in_edges:
             assert li == -1
             assert ri != p.num_ops
-            r_lvar = self.op_in_lvars[ri][rai]
+            r_lvar = self.op_in_lvars[op_mapping[ri]][rai]
             in_lvars.setdefault(lai,[]).append(r_lvar)
-        assert len(in_lvars) == len(self.input_lvars)
         out_lvars = {}
         for (li, lai), (ri, rai) in p.out_edges:
             assert ri == p.num_ops
             assert li != -1
-            l_lvar = self.op_out_lvars[li][lai]
+            l_lvar = self.op_out_lvars[op_mapping[li]][lai]
             assert rai not in out_lvars
             out_lvars[rai] = l_lvar
         assert len(out_lvars) == len(self.output_lvars)
+
+        dont_care_conds = []
+        for lvars in dont_care_lvars.values():
+            for lv0, lv1 in zip(lvars[:-1], lvars[1:]):
+                dont_care_conds.append(lv0 == lv1)
 
         # every input group points to the same src
         in_conds = [fc.And([lv0==lv1 for lv0,lv1 in zip(lvars[:-1], lvars[1:])]) for lvars in in_lvars.values()]
@@ -404,7 +511,9 @@ class CombEncoding(PatternEncoding):
             op_in_mask |= (self.lvar_t(1) << l_lvars[0])
         for l_lvar in self.input_lvars:
             input_mask |= (self.lvar_t(1) << l_lvar)
-        in_conds.append(op_in_mask == input_mask)
+        #we cannot use an equality comparison here because some inputs
+        #may be connected to by dont cares
+        in_conds.append((op_in_mask & (~input_mask)) == 0)
 
         op_out_mask = self.lvar_t(0)
         output_mask= self.lvar_t(0)
@@ -416,8 +525,7 @@ class CombEncoding(PatternEncoding):
 
         assert len(self.synth_vars) == len(p.synth_vals)
         synth_conds = [var == val for var, val in zip(self.synth_vars, p.synth_vals)]
-
-        return fc.And(in_conds + interior_edges + out_conds + synth_conds)
+        return fc.And(in_conds + interior_edges + out_conds + synth_conds + dont_care_conds)
 
     def match_rule_dag(self, dag, r_matches):
         l_insides = [m[0] for m in r_matches]
