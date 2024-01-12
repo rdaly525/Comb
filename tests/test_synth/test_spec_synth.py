@@ -97,7 +97,9 @@ def test_add(pat_en_t, num_adds, C, K, num_sols):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -161,7 +163,9 @@ def test_same_op(pat_en_t, K, num_sols):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -222,7 +226,9 @@ def test_c_fma(pat_en_t):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -282,7 +288,9 @@ def test_fulladder(pat_en_t):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -330,7 +338,9 @@ def test_add_ext(pat_en_t):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(
@@ -377,7 +387,9 @@ def test_sub_sub(pat_en_t):
         ops, 
         pat_en_t=pat_en_t, 
         ir_opts=ir_opts, 
-        narrow_opts=narrow_opts
+        narrow_opts=narrow_opts,
+        simplify_dont_cares=False,
+        simplify_gen_consts=False
     )
     pats = sq.gen_all_sols(
         opts=SolverOpts(

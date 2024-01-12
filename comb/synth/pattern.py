@@ -298,11 +298,11 @@ class Pattern:
             mapL = {**map, **{i+NI:i+NI for i in range(NL)}}
             yield IPerm(PL, mapL)
 
-    def patL(self, pat_enc, op_mapping):
+    def patL(self, pat_enc, op_mapping, constrain_io):
         allp = []
         for edges,synth_vals in self.enum_CK():
             pat = Pattern(self.iT, self.oT, self.ops, edges, synth_vals)
-            allp.append(pat_enc.match_one_pattern(pat, op_mapping))
+            allp.append(pat_enc.match_one_pattern(pat, op_mapping, constrain_io))
         return fc.Or(allp).to_hwtypes()
 
     def enum_comm(self, edges):
@@ -551,21 +551,32 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
             edges.extend(m_edges)
             pat_edges[pi] = (i_edges, o_srcs)
         
-        for (srci, srca), (snki, snka) in dag:
-            if srci==-1:
-                src = (srci, srca)
-                i_edges, _ = pat_edges[snki]
-                for snk in i_edges[snka]:
+        if dag is None:
+            assert len(pats) == 1 and pats[0].iT == iT and pats[0].oT == oT
+            i_edges, o_srcs = pat_edges[0]
+            for i in range(len(iT)):
+                src = (-1, i)
+                for snk in i_edges[i]:
                     edges.append((src, snk))
-            elif snki == len(pats):
-                snk = (len(curr_ops), snka)
-                _, o_srcs = pat_edges[srci]
-                edges.append((o_srcs[srca], snk))
-            else:
-                _, srcs = pat_edges[srci]
-                i_edges, _ = pat_edges[snki]
-                for snk in i_edges[snka]:
-                    edges.append((srcs[srca], snk))
+            for o in range(len(oT)):
+                snk = (len(curr_ops), o)
+                edges.append((o_srcs[o], snk))
+        else:
+            for (srci, srca), (snki, snka) in dag:
+                if srci==-1:
+                    src = (srci, srca)
+                    i_edges, _ = pat_edges[snki]
+                    for snk in i_edges[snka]:
+                        edges.append((src, snk))
+                elif snki == len(pats):
+                    snk = (len(curr_ops), snka)
+                    _, o_srcs = pat_edges[srci]
+                    edges.append((o_srcs[srca], snk))
+                else:
+                    _, srcs = pat_edges[srci]
+                    i_edges, _ = pat_edges[snki]
+                    for snk in i_edges[snka]:
+                        edges.append((srcs[srca], snk))
         yield Pattern(iT, oT, curr_ops, edges, synth_vals),pat_to_enc_map
 
 

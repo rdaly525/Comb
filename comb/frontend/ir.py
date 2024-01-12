@@ -14,6 +14,7 @@ class CallExpr(_CallExpr):
     comb: Comb
     pargs : tp.Tuple[Expr]
     args : tp.Tuple[Expr]
+    index : tp.Union[int, type(None)] = None
 
     def __post_init__(self):
         assert isinstance(self.comb, Comb)
@@ -25,6 +26,9 @@ class CallExpr(_CallExpr):
         parg_str = f"[{_list_to_str(self.pargs)}]"
         if len(self.pargs)==0:
             parg_str = f""
+        index_str = ""
+        if self.index is not None:
+            index_str = f"[{self.index}]"
         return f"{self.comb.name}{parg_str}({_list_to_str(self.args)})"
 
 @dataclass

@@ -470,7 +470,7 @@ class CombEncoding(PatternEncoding):
         return p
 
 
-    def match_one_pattern(self, p: Pattern, op_mapping):
+    def match_one_pattern(self, p: Pattern, op_mapping, constrain_io):
         #Interior edges
         interior_edges = []
         dont_care_lvars = {}
@@ -513,18 +513,21 @@ class CombEncoding(PatternEncoding):
             input_mask |= (self.lvar_t(1) << l_lvar)
         #we cannot use an equality comparison here because some inputs
         #may be connected to by dont cares
-        in_conds.append((op_in_mask & (~input_mask)) == 0)
+        if constrain_io:
+            in_conds.append((op_in_mask & (~input_mask)) == 0)
 
-        op_out_mask = self.lvar_t(0)
-        output_mask= self.lvar_t(0)
-        for l_lvar in out_lvars.values():
-            op_out_mask |= (self.lvar_t(1) << l_lvar)
-        for l_lvar in self.output_lvars:
-            output_mask |= (self.lvar_t(1) << l_lvar)
-        out_conds = [op_out_mask == output_mask]
+        if constrain_io:
+            op_out_mask = self.lvar_t(0)
+            output_mask= self.lvar_t(0)
+            for l_lvar in out_lvars.values():
+                op_out_mask |= (self.lvar_t(1) << l_lvar)
+            for l_lvar in self.output_lvars:
+                output_mask |= (self.lvar_t(1) << l_lvar)
+            out_conds = [op_out_mask == output_mask]
+        else:
+            out_conds = [ht.SMTBit(1)]
 
-        assert len(self.synth_vars) == len(p.synth_vals)
-        synth_conds = [var == val for var, val in zip(self.synth_vars, p.synth_vals)]
+        synth_conds = [self.synth_map[op_mapping[opi]] == val for opi, val in p.synth_map.items()]
         return fc.And(in_conds + interior_edges + out_conds + synth_conds + dont_care_conds)
 
     def match_rule_dag(self, dag, r_matches):

@@ -61,7 +61,7 @@ class OptimalInstructionSel(InstructionSel):
             node_o[(-1,i)] = [ht.SMTBit(1)]
         
         if max_cost is not None:
-            assert max_cost > 0
+            assert max_cost >= 0
             cost_cond = cost <= max_cost
         else:
             cost_cond = ht.SMTBit(1)

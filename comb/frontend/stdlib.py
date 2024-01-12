@@ -176,6 +176,29 @@ def create_BVUnary(class_name: str, fun):
     BVBin.__name__ = "BV"+class_name.capitalize()
     return BVBin()
 
+class BVMux(CombPrimitive):
+    name = QSym('bv', "mux")
+    param_types = [IntType()]
+    num_inputs = 3
+    num_outputs = 1
+    comm_info = ([0],[1],[2])
+
+    def get_type(self, N: Expr):
+        BVCall_1 = TypeCall(BVType(), [IntValue(1)])
+        BVCall_N = TypeCall(BVType(), [N])
+        return [BVCall_1, BVCall_N, BVCall_N], [BVCall_N] 
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==3
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return [BVValue(args[0].value.ite(args[1].value, args[2].value))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
+
 #Represents an abstract constant :: CBV -> BV
 class AbsConst(CombPrimitive):
     name = QSym('bv', 'abs_const')
@@ -233,16 +256,17 @@ def create_BVComp(class_name: str, fun, comm):
         num_outputs = 1
 
         def get_type(self, N: Expr):
-            BVCall = TypeCall(BVType(), [N])
-            return [BVCall, BVCall], [BVCall]
+            BVCall_N = TypeCall(BVType(), [N])
+            BVCall_1 = TypeCall(BVType(), [IntValue(1)])
+            return [BVCall_N, BVCall_N], [BVCall_1]
 
         def eval(self, *args, pargs):
             assert len(pargs)==1 and len(args)==2
             N = pargs[0]
             if isinstance(N, IntValue) and isinstance(N.value, int):
                 if all(isinstance(arg, BVValue) for arg in args):
-                    bv0 = ht.SMTBitVector[N.value](0)
-                    bv1 = ht.SMTBitVector[N.value](1)
+                    bv0 = ht.SMTBitVector[1](0)
+                    bv1 = ht.SMTBitVector[1](1)
                     v = fun(args[0].value, args[1].value)
                     assert isinstance(v, ht.SMTBit)
                     return [BVValue(v.ite(bv1, bv0))]
@@ -261,7 +285,9 @@ _binops = dict(
     and_=(lambda x, y: x & y, True),
     or_=(lambda x, y: x | y, True),
     xor=(lambda x, y: x ^ y, True),
-    lshr=(lambda x, y: x << y, False),
+    lshr=(lambda x, y: ht.SMTBitVector.bvlshr(x,y), False),
+    ashr=(lambda x, y: ht.SMTBitVector.bvashr(x,y), False),
+    shl=(lambda x, y: x << y, False),
 )
 
 _cmpops = dict(
@@ -396,6 +422,7 @@ class BitVectorModule(Module):
             slice=BVSlice(),
             nflag=BVNFlag(),
             vflag=BVVFlag(),
+            mux=BVMux()
         )
         for name, (fun, comm) in _binops.items():
             opdict[name] = create_BVBinary(name, fun, comm)

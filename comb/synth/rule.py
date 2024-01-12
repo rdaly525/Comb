@@ -85,8 +85,8 @@ class Rule:
         for (l_edges, l_synth_vals),(r_edges, r_synth_vals) in it.product(l_enum, r_enum):
             l_pat = Pattern(self.lhs.iT, self.lhs.oT, self.lhs.ops, l_edges, l_synth_vals)
             r_pat = Pattern(self.rhs.iT, self.rhs.oT, self.rhs.ops, r_edges, r_synth_vals)
-            l = l_pat_enc.match_one_pattern(l_pat, lhs_op_mapping)
-            r = r_pat_enc.match_one_pattern(r_pat, rhs_op_mapping)
+            l = l_pat_enc.match_one_pattern(l_pat, lhs_op_mapping, contrain_io = True)
+            r = r_pat_enc.match_one_pattern(r_pat, rhs_op_mapping, constrain_io = True)
             allr.append(fc.And([l,r]))
         return fc.Or(allr).to_hwtypes()
 

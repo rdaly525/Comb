@@ -115,7 +115,6 @@ class RuleSynth(Cegis):
         self.iT = iT
         self.oT = oT
 
-
         lhs_cs = pat_en_t(iT, oT, lhs_op_list, prefix="l", simplify_dont_cares=simplify_dont_cares[0], simplify_gen_consts=simplify_gen_consts[0])
         rhs_cs = pat_en_t(iT, oT, rhs_op_list, prefix="r", simplify_dont_cares=simplify_dont_cares[1], simplify_gen_consts=simplify_gen_consts[1])
         assert lhs_cs.types_viable and rhs_cs.types_viable
@@ -257,9 +256,9 @@ class RuleSynth(Cegis):
         delta = timeit.default_timer() - start
         return cond, delta
 
-    def patL(self, pat: Pattern, op_mapping):
+    def patL(self, pat: Pattern, op_mapping, constrain_io = True):
         start = timeit.default_timer()
-        cond = pat.patL(self.lhs_cs, op_mapping)
+        cond = pat.patL(self.lhs_cs, op_mapping, constrain_io)
         delta = timeit.default_timer() - start
         return cond, delta
 
