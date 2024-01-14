@@ -28,7 +28,7 @@ from peak.family import PyFamily, SMTFamily
 from lassen.alu import ALU_t, Signed_t
 from lassen.cond import Cond_t
 from lassen.common import DATAWIDTH, Global
-from lassen.isa import Inst_fc, Op_t
+from lassen.isa import Inst_fc
 from lassen.lut import LUT_t_fc
 from lassen.mode import gen_register_mode, gen_bit_mode, Mode_t
 from lassen.sim import PE_fc
@@ -43,7 +43,6 @@ def parameterize_pe():
         Data = family.BitVector[DATAWIDTH]
         PE = PE_fc(family)
         Inst = Inst_fc(family)
-        opc = family.get_constructor(Op_t)
         instc = family.get_constructor(Inst)
         LUT_t, _ = LUT_t_fc(family)
 
@@ -80,7 +79,7 @@ def parameterize_pe():
                 bit2: Bit,
                 clk_en: Global(Bit),
             ) -> (Data, Bit):
-                inst_op = opc(alu = inst_op)
+                #inst_op = opc(alu = inst_op)
 
                 inst_bit0 = inst_bit0[0]
                 inst_bit1 = inst_bit1[0]
@@ -160,14 +159,13 @@ def CombPE_constraints(in_lvars, out_lvars, in_vars, out_vars):
     family = SMTFamily()
     Inst = Inst_fc(family)
     instc = family.get_constructor(Inst)
-    opc = family.get_constructor(Op_t)
     def convert_bit(b):
         assert isinstance(b, family.BitVector)
         if b.num_bits == 1:
             return b[0]
         return b
 
-    inst_in_vars = (opc(alu = in_vars[0]), in_vars[1]) +  tuple(convert_bit(b) for b in in_vars[2:16])
+    inst_in_vars = tuple(in_vars[0:2]) +  tuple(convert_bit(b) for b in in_vars[2:16])
     inst = instc(*inst_in_vars)
     cond.append(type(inst)._is_valid_(inst._value_))
     cond.append(fc.And([inst_in_vars[i] != Mode_t.DELAY._value_ for i in [4,6,8,10,12,14]]).to_hwtypes())
@@ -219,11 +217,11 @@ rhs = [
     combPE, 
 ]
 costs = [1]
-solver_opts = SolverOpts(verbose=0, solver_name='btor', timeout=300, log=False)
+solver_opts = SolverOpts(verbose=0, solver_name='z3', timeout=300, log=False)
 
 max_outputs = None
 C,K = 1,1
-maxIR = 1
+maxIR = 2
 maxISA = 1
 opMaxIR = None
 opMaxISA = None

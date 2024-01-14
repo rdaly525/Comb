@@ -495,7 +495,6 @@ class CombEncoding(PatternEncoding):
             l_lvar = self.op_out_lvars[op_mapping[li]][lai]
             assert rai not in out_lvars
             out_lvars[rai] = l_lvar
-        assert len(out_lvars) == len(self.output_lvars)
 
         dont_care_conds = []
         for lvars in dont_care_lvars.values():
@@ -517,6 +516,7 @@ class CombEncoding(PatternEncoding):
             in_conds.append((op_in_mask & (~input_mask)) == 0)
 
         if constrain_io:
+            assert len(out_lvars) == len(self.output_lvars)
             op_out_mask = self.lvar_t(0)
             output_mask= self.lvar_t(0)
             for l_lvar in out_lvars.values():
