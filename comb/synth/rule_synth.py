@@ -124,8 +124,12 @@ class RuleSynth(Cegis):
         self.ir_opts = ir_opts
         self.narrow_opts = narrow_opts
 
-        self.total_op_snks = sum(len(op.get_type()[0]) for op in lhs_op_list) + sum(len(op.get_type()[0]) for op in rhs_op_list)
-        self.total_dont_care_conn = lhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length()) + rhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length())
+        self.lhs_op_snks = sum(len(op.get_type()[0]) for op in lhs_op_list) 
+        self.rhs_op_snks = sum(len(op.get_type()[0]) for op in rhs_op_list) 
+        self.total_op_snks = self.lhs_op_snks + self.rhs_op_snks
+        self.lhs_dont_care_conn = lhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length())
+        self.rhs_dont_care_conn = rhs_cs.cnt_dont_care_conn(self.total_op_snks.bit_length())
+        self.total_dont_care_conn = self.lhs_dont_care_conn + self.rhs_dont_care_conn 
 
         forall_vars = [*lhs_cs.forall_vars, *rhs_cs.forall_vars]
         P_inputs = [li==ri for li, ri in zip(lhs_cs.input_vars, rhs_cs.input_vars)]
@@ -177,11 +181,22 @@ class RuleSynth(Cegis):
         E_vars = [*lhs_cs.E_vars, *rhs_cs.E_vars]
         super().__init__(synth_base.to_hwtypes(), synth_constrain.to_hwtypes(), verif.to_hwtypes(), E_vars, forall_vars)
 
-    def CEGISAll_bin_search(self, E, LC, opts: SolverOpts):
+    def CEGISAll_bin_search(self, E, LC, opts: SolverOpts, bin_search):
         #do a binary search for the number of dont care connections
         self.enum_times = []
         stable_synth_base = self.synth_base
-        maxcnt = self.total_op_snks
+        
+        assert any(bin_search)
+        if all(bin_search):
+            maxcnt = self.total_op_snks
+            dont_care_conn = self.total_dont_care_conn
+        elif bin_search[0]:
+            maxcnt = self.lhs_op_snks
+            dont_care_conn = self.lhs_dont_care_conn
+        else:
+            maxcnt = self.rhs_op_snks
+            dont_care_conn = self.rhs_dont_care_conn
+
         for i in it.count(0):
             #both mincnt and maxcnt are inclusive
             mincnt = 0
@@ -193,7 +208,7 @@ class RuleSynth(Cegis):
                     break
 
                 target = (mincnt + maxcnt + 1) // 2
-                self.synth_base = stable_synth_base & (self.total_dont_care_conn >= target)
+                self.synth_base = stable_synth_base & (dont_care_conn >= target)
                 sol,t = self.cegis(None, opts)
 
                 if sol is not None and not isinstance(sol, IterLimitError):

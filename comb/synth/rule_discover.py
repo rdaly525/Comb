@@ -123,7 +123,7 @@ class RuleDiscovery:
 
         for num_out in range(max_outputs, 0, -1):
             for oTs_sel in multicomb(oTs_all, num_out):
-                for num_in in range(max_inputs, -1, -1):
+                for num_in in range(max_inputs, 0, -1):
                     for iTs_sel in multicomb(iTs_all, num_in):
                         yield (tuple(iTs_sel), tuple(oTs_sel))
 
@@ -393,7 +393,7 @@ class RuleDiscovery:
 
         return op_list
 
-    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = False):
+    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = [False, False]):
         LC, E, comp = E_opts
         assert not LC
         ruleid = 0
@@ -471,12 +471,12 @@ class RuleDiscovery:
                                             comp_time += enum_time
                                             rs.synth_base = rs.synth_base & ~rule_cond
                                     sat_time = []
-                                    if bin_search_dont_cares:
-                                        rulegen = rs.CEGISAll_bin_search
+                                    if any(bin_search_dont_cares):
+                                        rulegen = rs.CEGISAll_bin_search(E, LC, opts, bin_search_dont_cares)
                                     else:
-                                        rulegen = rs.CEGISAll
+                                        rulegen = rs.CEGISAll(E, LC, opts)
                                     
-                                    for rule in rulegen(E, LC, opts):
+                                    for rule in rulegen:
                                         sat_time.append(rule.time)
                                         assert rule.verify()
                                         if self.is_new_rule(rule, existing_rules):
@@ -641,6 +641,7 @@ class RuleDiscovery:
                                 k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT, 
                                      tuple(lhs_synth_T), tuple(rhs_synth_T), 
                                      tuple(lhs_dont_care_T), tuple(rhs_dont_care_T))
+                                print(k)
 
                                 #kstr += f":{NI}"
                                 if opts.log:
@@ -679,12 +680,12 @@ class RuleDiscovery:
                                         comp_time += enum_time
                                         rs.synth_base = rs.synth_base & ~pat_cond
                                 sat_time = []
-                                if bin_search_dont_cares:
-                                    rulegen = rs.CEGISAll_bin_search
+                                if any(bin_search_dont_cares):
+                                    rulegen = rs.CEGISAll_bin_search(E, LC, opts, bin_search_dont_cares)
                                 else:
-                                    rulegen = rs.CEGISAll
+                                    rulegen = rs.CEGISAll(E, LC, opts)
                                 
-                                for rule in rulegen(E, LC, opts):
+                                for rule in rulegen:
                                     rule.cost = cur_cost
                                     sat_time.append(rule.time)
                                     assert rule.verify()

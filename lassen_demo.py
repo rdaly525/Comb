@@ -250,7 +250,8 @@ rd = RuleDiscovery(
 ir_opts = (dce, cse)
 narrow_opts = (C, K)
 E_opts = (LC, E, CMP)
-exclude_pats = rd.gen_ir_optimizations(E_opts, ir_opts, narrow_opts, solver_opts, True)
+bin_search = [True, False]
+exclude_pats = rd.gen_ir_optimizations(E_opts, ir_opts, narrow_opts, solver_opts, bin_search[0])
 excluded_pats = []
 for i,pat in enumerate(exclude_pats):
     print("excluded", i, flush=True)
@@ -258,9 +259,9 @@ for i,pat in enumerate(exclude_pats):
     print("*"*80)
     excluded_pats.append(pat)
 if LC_test:
-    ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, True, excluded_pats)
+    ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats)
 else:
-    ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts, True, excluded_pats)
+    ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts, bin_search, excluded_pats)
 for ri, rule in enumerate(ga):
     print("RULE", ri, flush=True)
     print(rule)
