@@ -36,6 +36,7 @@ from peak import family_closure, Peak, Const
 from peak.assembler import AssembledADT, Assembler
 from time import time
 
+solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=300, log=False)
 def parameterize_pe():
     @family_closure
     def ExpandedPE_fc(family):
@@ -152,7 +153,7 @@ class CombPE(CombPeak):
         )
 
         super().__init__(parameterize_pe, 0, type_gen, consts)
-        set_comm(self)
+        set_comm(self, solver_opts)
 
 def CombPE_constraints(in_lvars, out_lvars, in_vars, out_vars):
     cond = []
@@ -217,7 +218,6 @@ rhs = [
     combPE, 
 ]
 costs = [1]
-solver_opts = SolverOpts(verbose=0, solver_name='z3', timeout=300, log=False)
 
 max_outputs = None
 C,K = 1,1

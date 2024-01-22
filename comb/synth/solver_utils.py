@@ -6,6 +6,8 @@ from hwtypes import smt_utils as fc
 from pysmt import shortcuts as smt
 
 from pysmt.logics import Logic, QF_BV
+import smt_switch.pysmt_frontend as fe
+
 
 from comb.frontend.ast import Type, TypeCall
 from comb.synth.utils import type_to_nT, nT
@@ -49,10 +51,14 @@ def timer(opts:SolverOpts):
     return _timer
 
 def get_model(query, vars, solver_name, logic):
-    model = smt.get_model(smt.And(query), solver_name=solver_name, logic=logic)
-    if model:
-        return {v: model.get_value(v) for v in vars}
-    return False
+    with fe.Solver(name = solver_name, logic = logic) as solver:
+        solver.add_assertion(query)
+        res = solver.solve()
+        model = None
+        if res:
+            model = solver.get_model()
+            model = {v: model.get_value(v) for v in vars}
+    return model
 
 @dataclass
 class Cegis:
@@ -86,7 +92,7 @@ class Cegis:
         A_vars = set(var.value for var in self.A_vars)  # exist_vars
         dep_vars = synth_constrain.get_free_variables() - A_vars - E_vars
 
-        with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+        with fe.Solver(name = opts.solver_name, logic = opts.logic) as solver:
             solver.add_assertion(self.synth_base.value)
 
             # Start with checking all A vals beings 0
@@ -116,15 +122,14 @@ class Cegis:
                     if show_e and i%100==50:
                         print_e(E_guess)
                     query_guess = verif.substitute(E_guess).simplify()
-                    model = smt.get_model(smt.Not(query_guess), solver_name=opts.solver_name, logic=opts.logic)
-                    if model is None:
+                    A_vals = get_model(smt.Not(query_guess), A_vars, solver_name=opts.solver_name, logic=opts.logic)
+                    if A_vals is None:
                         t = (timeit.default_timer()-start)
                         print('SAT',t, flush=True)
                         if show_iter:
                             print("SAT")
                         return E_guess, t
                     else:
-                        A_vals = {v: model.get_value(v) for v in A_vars}
                         dep_vals = {v: get_var(f"{v}_{i}", v.bv_width()).value for v in dep_vars}
                         solver.add_assertion(synth_constrain.substitute(A_vals).substitute(dep_vals).simplify())
 
@@ -176,14 +181,14 @@ def get_var(name, T):
 
 
 def smt_is_sat(f, opts: SolverOpts = SolverOpts()):
-    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+    with fe.Solver(name = opts.solver_name, logic = opts.logic) as solver:
         solver.add_assertion(f)
         res = solver.solve()
         return (res is not False)
 
 def smt_solve_all(f, opts: SolverOpts = SolverOpts()):
     E_vars = f.get_free_variables()
-    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+    with fe.Solver(name = opts.solver_name, logic = opts.logic) as solver:
         solver.add_assertion(f)
         while solver.solve():
             sol = {v: solver.get_value(v) for v in E_vars}
