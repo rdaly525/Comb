@@ -50,16 +50,19 @@ class CombEncoding(PatternEncoding):
                 var = get_var(f"{self.prefix}_synth_const_op[{opi}]", op_oTs[0])
                 synth_vars.append(var)
                 synth_map[opi] = var
+                op.prev_eval = op.eval
                 op.eval = functools.partial(op.eval, var)
             elif isinstance(op, CombSpecialized) and isinstance(op.comb, BVDontCare):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_dont_care_op[{opi}]", op_oTs[0])
                 dont_care_vars.append(var)
+                op.prev_eval = op.eval
                 op.eval = functools.partial(op.eval, var)
             elif isinstance(op, CombSpecialized) and isinstance(op.comb, CBVDontCare):
                 assert len(op_oTs) == 1
                 var = get_var(f"{self.prefix}_c_dont_care_op[{opi}]", op_oTs[0])
                 dont_care_vars.append(var)
+                op.prev_eval = op.eval
                 op.eval = functools.partial(op.eval, var)
 
             if len(op_iTs) == 0:

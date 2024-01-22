@@ -221,7 +221,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 2
+maxIR = 1
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -234,6 +234,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
+num_proc = 8
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -259,7 +260,7 @@ for i,pat in enumerate(exclude_pats):
     print("*"*80)
     excluded_pats.append(pat)
 if LC_test:
-    ga = rd.gen_lowcost_rules(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats)
+    ga = rd.gen_lowcost_rules_mp(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats, num_proc)
 else:
     ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts, bin_search, excluded_pats)
 for ri, rule in enumerate(ga):
