@@ -1,8 +1,11 @@
 import functools
 import timeit
+import copy
 
 from comb import Comb
-from comb.frontend.ast import TypeCall, BVType, IntValue
+from comb.frontend.ast import TypeCall, BVType, CBVType, IntValue, QSym, BVValue
+from comb.frontend.ir import CombPrimitive, CombSpecialized
+from comb.frontend.comb_peak import CombPeak
 from ..frontend.stdlib import GlobalModules, CBVDontCare, BVDontCare
 from comb.synth.comb_encoding import CombEncoding
 from comb.synth.const_synth import ConstDiscover
@@ -10,6 +13,7 @@ from comb.synth.pattern import SymOpts, enum_dags, composite_pat, Pattern
 from comb.synth.pattern_encoding import PatternEncoding
 from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
+from comb.synth.spec_synth import SpecSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all, get_var
 from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts, _m_subseteq
 import hwtypes.smt_utils as fc
@@ -20,6 +24,8 @@ from dataclasses import dataclass
 #This is the motherload of classes
 #It is the discovery engine that leverages the symbolic instruction selection
 from more_itertools import distinct_combinations as multicomb
+import multiprocessing
+import time
 
 
 def _smart_iter(mL: int, mR: int):
@@ -57,6 +63,9 @@ def T_count(ops):
     iTs = count([get_cnt(op, 0) for op in ops])
     oTs = count([get_cnt(op, 1) for op in ops])
     return iTs, oTs
+
+def simplify_constraint(in_lvars,out_lvars,in_vars,out_vars):
+    return out_vars[0] == 0
 
 @dataclass
 class RuleDiscovery:
@@ -121,7 +130,7 @@ class RuleDiscovery:
 
         for num_out in range(max_outputs, 0, -1):
             for oTs_sel in multicomb(oTs_all, num_out):
-                for num_in in range(max_inputs, -1, -1):
+                for num_in in range(max_inputs, 0, -1):
                     for iTs_sel in multicomb(iTs_all, num_in):
                         yield (tuple(iTs_sel), tuple(oTs_sel))
 
@@ -146,14 +155,14 @@ class RuleDiscovery:
                 assert rop_const_iTs[T] > 0
                 rop_const_iTs[T] -= 1
 
-        if not self.simplify_dont_cares[0]:
+        if not self.simplify_dont_cares[0] and not self.simplify_gen_consts[0]:
             for T in l_dont_care_T:
                 if not T.const:
                     continue
                 assert lop_const_iTs[T] > 0
                 lop_const_iTs[T] -= 1
 
-        if not self.simplify_dont_cares[1]:
+        if not self.simplify_dont_cares[1] and not self.simplify_gen_consts[1]:
             for T in r_dont_care_T:
                 if not T.const:
                     continue
@@ -365,16 +374,16 @@ class RuleDiscovery:
                 print("EQUAL RULE", flush=True)
                 return False
         return True
-
+    
     def synth_T_to_op_list(self, synth_T):
         op_list = []
         BV = GlobalModules['bv']
         for T in synth_T:
             assert T.const
             op = BV._synth_const[T.n]
-            #TODO: this is a temporary fix to speed things up for PEs
+            # #TODO: this is a temporary fix to speed things up for PEs
             if T.n == 16:
-                op.constraints = lambda in_lvars,out_lvars,in_vars,out_vars: out_vars[0] == 0
+                op.constraints = simplify_constraint
             op_list.append(op)
 
         return op_list
@@ -391,7 +400,7 @@ class RuleDiscovery:
 
         return op_list
 
-    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = False):
+    def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = [False, False]):
         LC, E, comp = E_opts
         assert not LC
         ruleid = 0
@@ -439,6 +448,12 @@ class RuleDiscovery:
                                         simplify_dont_cares = self.simplify_dont_cares,
                                         simplify_gen_consts = self.simplify_gen_consts,
                                     )
+
+                                    for pat in self.all_ir_subpats(excluded_pats, lhs_ids,lhs_synth_ops):
+                                        for lhs_pat,op_mapping in composite_pat(pat.iT, pat.oT, None, [pat], lhs_ops_all):
+                                            pat_cond, enum_time = rs.patL(lhs_pat, op_mapping, constrain_io = False)
+                                            rs.synth_base = rs.synth_base & ~pat_cond
+
                                     existing_rules = []
                                     existing_mappings = []
                                     start = timeit.default_timer()
@@ -463,12 +478,12 @@ class RuleDiscovery:
                                             comp_time += enum_time
                                             rs.synth_base = rs.synth_base & ~rule_cond
                                     sat_time = []
-                                    if bin_search_dont_cares:
-                                        rulegen = rs.CEGISAll_bin_search
+                                    if any(bin_search_dont_cares):
+                                        rulegen = rs.CEGISAll_bin_search(E, LC, opts, bin_search_dont_cares)
                                     else:
-                                        rulegen = rs.CEGISAll
+                                        rulegen = rs.CEGISAll(E, LC, opts)
                                     
-                                    for rule in rulegen(E, LC, opts):
+                                    for rule in rulegen:
                                         sat_time.append(rule.time)
                                         assert rule.verify()
                                         if self.is_new_rule(rule, existing_rules):
@@ -483,7 +498,6 @@ class RuleDiscovery:
                                         self.rdb.add_rules(k, new_rules, times)
                                     else:
                                         assert len(new_rules) == 0
-
 
     # Finds all combinations of rules that exactly match the lhs and rhs
     def all_lc_composite_msets(self, lhs_ids, cur_cost, iT, oT, lhs_synth_ops, opts:SolverOpts):
@@ -602,7 +616,7 @@ class RuleDiscovery:
                 rs.append((cost,rhs_ids))
         return [tuple(rhs_ids) for _, rhs_ids in sorted(rs, key=functools.cmp_to_key(cmp))]
 
-    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False):
+    def gen_lowcost_rules(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = []):
         LC, E, comp = E_opts
         assert len(costs)==len(self.rhss)
         rhs_id_order = self.gen_rhs_order(costs)
@@ -634,6 +648,7 @@ class RuleDiscovery:
                                 k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT, 
                                      tuple(lhs_synth_T), tuple(rhs_synth_T), 
                                      tuple(lhs_dont_care_T), tuple(rhs_dont_care_T))
+                                print(k)
 
                                 #kstr += f":{NI}"
                                 if opts.log:
@@ -649,6 +664,12 @@ class RuleDiscovery:
                                     simplify_dont_cares = self.simplify_dont_cares,
                                     simplify_gen_consts = self.simplify_gen_consts,
                                 )
+
+                                for pat in self.all_ir_subpats(excluded_pats, lhs_ids,lhs_synth_ops):
+                                    for lhs_pat,op_mapping in composite_pat(pat.iT, pat.oT, None, [pat], lhs_ops_all):
+                                        pat_cond, enum_time = rs.patL(lhs_pat, op_mapping, constrain_io = False)
+                                        rs.synth_base = rs.synth_base & ~pat_cond
+
                                 existing_pats = []
                                 op_mappings = []
                                 start = timeit.default_timer()
@@ -666,12 +687,12 @@ class RuleDiscovery:
                                         comp_time += enum_time
                                         rs.synth_base = rs.synth_base & ~pat_cond
                                 sat_time = []
-                                if bin_search_dont_cares:
-                                    rulegen = rs.CEGISAll_bin_search
+                                if any(bin_search_dont_cares):
+                                    rulegen = rs.CEGISAll_bin_search(E, LC, opts, bin_search_dont_cares)
                                 else:
-                                    rulegen = rs.CEGISAll
+                                    rulegen = rs.CEGISAll(E, LC, opts)
                                 
-                                for rule in rulegen(E, LC, opts):
+                                for rule in rulegen:
                                     rule.cost = cur_cost
                                     sat_time.append(rule.time)
                                     assert rule.verify()
@@ -686,9 +707,366 @@ class RuleDiscovery:
                                 else:
                                     assert len(new_rules) == 0
 
+    def gen_lowcost_rules_target(self, lhs_ids, E_opts, ir_opts, narrow_opts, costs, max_outputs, opts, bin_search_dont_cares, excluded_pats, rules):
+        LC, E, comp = E_opts
+        lhs_ops = [self.lhss[i] for i in lhs_ids]
+        rhs_id_order = self.gen_rhs_order(costs)
+        rules_for_manager = []
+        for rhs_ids in rhs_id_order:
+            rhs_ops = [self.rhss[i] for i in rhs_ids]
+            kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
+            kstr += "("+",".join(str(i) for i in rhs_ids) + ")"
+            if opts.log:
+                print(kstr,flush=True)
+            cur_cost = sum(costs[rid] for rid in rhs_ids)
+            for (lhs_dont_care_T, rhs_dont_care_T) in self.all_dont_care_T(lhs_ops, rhs_ops):
+                for (iT, oT) in self.allT(lhs_ops, rhs_ops, lhs_dont_care_T, rhs_dont_care_T, max_outputs):
+                    for (lhs_synth_T, rhs_synth_T) in self.all_synth_T(iT, oT, lhs_ops, rhs_ops, lhs_dont_care_T, rhs_dont_care_T):
+                        if not self.valid_program_components(iT, oT, lhs_ops, rhs_ops, lhs_synth_T, rhs_synth_T, lhs_dont_care_T, rhs_dont_care_T):
+                            continue
+
+                        lhs_synth_ops = self.synth_T_to_op_list(lhs_synth_T)
+                        rhs_synth_ops = self.synth_T_to_op_list(rhs_synth_T)
+                        lhs_dont_care_ops = self.dont_care_T_to_op_list(lhs_dont_care_T)
+                        rhs_dont_care_ops = self.dont_care_T_to_op_list(rhs_dont_care_T)
+                        lhs_ops_all = lhs_ops + lhs_synth_ops + lhs_dont_care_ops
+                        rhs_ops_all = rhs_ops + rhs_synth_ops + rhs_dont_care_ops
+
+                        new_rules = []
+                        k = (tuple(lhs_ids), tuple(rhs_ids), iT, oT, 
+                                tuple(lhs_synth_T), tuple(rhs_synth_T), 
+                                tuple(lhs_dont_care_T), tuple(rhs_dont_care_T))
+
+                        #kstr += f":{NI}"
+                        if opts.log:
+                            print_iot(iT, oT)
+                        rs = RuleSynth(
+                            iT,
+                            oT,
+                            lhs_op_list=lhs_ops_all,
+                            rhs_op_list=rhs_ops_all,
+                            ir_opts=ir_opts,
+                            narrow_opts=narrow_opts,
+                            pat_en_t=self.pat_en_t,
+                            simplify_dont_cares = self.simplify_dont_cares,
+                            simplify_gen_consts = self.simplify_gen_consts,
+                        )
+
+                        for pat in self.all_ir_subpats(excluded_pats, lhs_ids,lhs_synth_ops):
+                            for lhs_pat,op_mapping in composite_pat(pat.iT, pat.oT, None, [pat], lhs_ops_all):
+                                pat_cond, enum_time = rs.patL(lhs_pat, op_mapping, constrain_io = False)
+                                rs.synth_base = rs.synth_base & ~pat_cond
+
+                        existing_pats = []
+                        op_mappings = []
+                        start = timeit.default_timer()
+                        for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, oT, lhs_synth_ops, opts):
+                            lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
+                            dags = enum_dags(iT, oT, lhs_pats)
+                            for dag in dags:
+                                for lhs_pat,op_mapping in composite_pat(iT, oT, dag, lhs_pats, lhs_ops_all):
+                                    existing_pats.append(lhs_pat)
+                                    op_mappings.append(op_mapping)
+                        comp_time = timeit.default_timer() - start
+                        if comp:
+                            for cpat,op_mapping in zip(existing_pats, op_mappings):
+                                pat_cond, enum_time = rs.patL(cpat, op_mapping)
+                                comp_time += enum_time
+                                rs.synth_base = rs.synth_base & ~pat_cond
+                        sat_time = []
+                        if any(bin_search_dont_cares):
+                            rulegen = rs.CEGISAll_bin_search(E, LC, opts, bin_search_dont_cares)
+                        else:
+                            rulegen = rs.CEGISAll(E, LC, opts)
+                        
+                        enum_time = sum(rs.enum_times)
+                        times = (sat_time, comp_time, enum_time)
+                        for rule in rulegen:
+                            rule.cost = cur_cost
+                            sat_time.append(rule.time)
+                            assert rule.verify()
+                            if self.is_new_pat(rule.lhs, existing_pats):
+                                new_rules.append(rule)
+                                existing_pats.append(rule.lhs)
+                        if len(new_rules)>0:
+                            rules_for_manager.append((k, new_rules, times))
+                            self.rdb.add_rules(k, new_rules, times)
+
+        
+        for k, new_rules, times in rules_for_manager:
+            for rule in new_rules:
+                for op in rule.lhs.ops: 
+                    if hasattr(op, "prev_eval"):
+                        op.eval = op.prev_eval
+                        delattr(op, "prev_eval")
+                for i,op in enumerate(rule.rhs.ops):
+                    if hasattr(op, "prev_eval"):
+                        op.eval = op.prev_eval
+                        delattr(op, "prev_eval")
+                    elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
+                        rule.rhs.ops[i] = rhs_ids[i]
+            rules.append((k, new_rules, times))
+
+    def join_one(self,processes):
+        while True:
+            for p,rules in processes.items():
+                if not p.is_alive():
+                    p.join()
+                    return p,rules 
+                
+            time.sleep(1)
+
+    def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1):
+        assert len(costs)==len(self.rhss)
+        for lN in range(1, self.maxL+1):
+            processes = dict()
+            lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
+            with multiprocessing.Manager() as manager:
+                for lhs_ids in multicomb(lhs_mc_ids, lN):
+                    if len(processes) == num_proc:
+                        p,new_rules = self.join_one(processes)
+                        del processes[p]
+                        for k,rules,time in new_rules:
+                            for rule in rules:
+                                for i,op in enumerate(rule.rhs.ops):
+                                    if isinstance(op, int):
+                                        rule.rhs.ops[i] = self.rhss[op]
+                                yield rule
+                            self.rdb.add_rules(k,rules,time)
+                        
+                    new_rules = manager.list([])
+                    p = multiprocessing.Process(target=self.gen_lowcost_rules_target, 
+                        args=(lhs_ids, E_opts, ir_opts, narrow_opts, costs, max_outputs, opts, bin_search_dont_cares, excluded_pats, new_rules)) 
+                    p.start()
+                    processes[p] = new_rules
+                
+                while len(processes) > 0:
+                    p,new_rules = self.join_one(processes)
+                    del processes[p]
+                    for k,rules,time in new_rules:
+                        for rule in rules:
+                            for i,op in enumerate(rule.rhs.ops):
+                                if isinstance(op, int):
+                                    rule.rhs.ops[i] = self.rhss[op]
+                            yield rule
+                        self.rdb.add_rules(k,rules,time)
+
+    def ir_T(self, lhs_ops, l_dont_care_T):
+        # generate all possible program input and output type combinations
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+
+        if not self.simplify_dont_cares[0]:
+            for T in l_dont_care_T:
+                assert lop_iTs[T] > 0
+                lop_iTs[T] -= 1
 
 
+        max_inputs = sum(lop_iTs.values())
+        iTs_all = flat((T,)*c for T,c in lop_iTs.items())
+        oTs_all = lop_oTs.keys()
 
+        for oTs_sel in oTs_all:
+            for num_in in range(max_inputs, -1, -1):
+                for iTs_sel in multicomb(iTs_all, num_in):
+                    yield (tuple(iTs_sel), (oTs_sel,))
+
+    def ir_synth_T(self, iT, oT, lhs_ops, l_dont_care_T):
+        # generate all possible combinations of constants that can be synthesized
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+        lop_const_iTs = {k:v for k,v in lop_iTs.items() if k.const}
+
+        # inputs must go somewhere, remove their counts from the 
+        # possible number of constants that can be generate
+        for T in iT:
+            if not T.const:
+                continue
+            if not self.simplify_gen_consts[0]:
+                assert lop_const_iTs[T] > 0
+                lop_const_iTs[T] -= 1
+
+        if not self.simplify_dont_cares[0] and not self.simplify_gen_consts[0]:
+            for T in l_dont_care_T:
+                if not T.const:
+                    continue
+                assert lop_const_iTs[T] > 0
+                lop_const_iTs[T] -= 1
+
+        l_synth_all = []
+        if self.gen_consts[0]:
+            l_synth_all = flat((T,)*c for T,c in lop_const_iTs.items())
+
+        if self.simplify_gen_consts[0]: 
+            l_synth_sels = [l_synth_all]
+        else:
+            l_synth_sels = [l_synth_sel for num_l in range(len(l_synth_all) + 1) 
+                                        for l_synth_sel in multicomb(l_synth_all, num_l)]
+        
+        return l_synth_sels
+
+
+    def ir_dont_care_T(self, lhs_ops):
+        # generate all possible combinations of dont cares that can be synthesized
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+
+        if self.simplify_dont_cares[0]:
+            lop_iTs = {T:1 for T in lop_iTs.keys()}
+
+        l_dont_care_all = []
+        if self.gen_dont_cares[0]:
+            l_dont_care_all = flat((T,)*c for T,c in lop_iTs.items())
+        
+        if self.simplify_dont_cares[0]: 
+            l_dont_care_sels = [l_dont_care_all]
+        else:
+            l_dont_care_sels = [l_dont_care_sel for num_l in range(len(l_dont_care_all), -1, -1) 
+                                        for l_dont_care_sel in multicomb(l_dont_care_all, num_l)]
+        return l_dont_care_sels
+
+
+    def valid_ir_components(self, iT, oT, lhs_ops, l_synth_T, l_dont_care_T):
+        # return True if the program components could possibly form a valid program
+        # else return False
+
+        # TODO: could make this a more elaborate check in the future if too many
+        # hopeless programs make it past this check and slow down the synthesis
+
+        lop_iTs, lop_oTs = T_count(lhs_ops)
+
+        lsrcs_no_i = set(lop_oTs.keys()) | set(l_synth_T) | set(l_dont_care_T)
+        lsncs_no_o = set(lop_iTs.keys())
+
+        #all non-output sncs must have a src
+        if not lsncs_no_o <= (set(iT) | lsrcs_no_i):
+            return False
+
+        #all outputs must have a non-input src
+        if not set(oT) <= lsrcs_no_i:
+            return False
+
+        return True
+
+    def ir_optimization_specs(self, iT, oT):
+        # generates comb programs that should be excluded:
+        assert len(oT) == 1
+
+        # no-ops on inputs
+        # no need to enumerate which input is used for the no op
+        if oT[0] in iT:
+            index = iT.index(oT[0])
+            class NoOp(CombPrimitive):
+                name = QSym('bv', 'no_op')
+                param_types = []
+                num_inputs = len(iT)
+                num_outputs = 1
+
+                def get_type(self):
+                    in_calls = [TypeCall(CBVType() if T.const else BVType(), [IntValue(T.n)]) for T in iT]
+                    assert not oT[0].const
+                    out_call = TypeCall(BVType(), [IntValue(oT[0].n)])
+                    return in_calls, [out_call]
+
+                def eval(self, *args, pargs):
+                    assert len(pargs)==0 and len(args)==len(iT)
+                    return [args[index]]
+
+            yield NoOp(),[]
+
+        const_op_E_var = get_var(f"ConstOpOut[{oT[0].n}]", oT[0].n)
+        class ConstOp(CombPrimitive):
+            name = QSym('bv', 'const_op')
+            param_types = []
+            num_inputs = len(iT)
+            num_outputs = 1
+
+            def get_type(self):
+                in_calls = [TypeCall(CBVType() if T.const else BVType(), [IntValue(T.n)]) for T in iT]
+                assert not oT[0].const
+                out_call = TypeCall(BVType(), [IntValue(oT[0].n)])
+                return in_calls, [out_call]
+
+            def eval(self, *args, pargs):
+                assert len(pargs)==0 and len(args)==len(iT)
+                return [BVValue(const_op_E_var)]
+        
+        yield ConstOp(),[const_op_E_var]
+        
+
+        # constant outputs
+
+    # Finds all ir patterns to exclude
+    def all_ir_subpats(self, pats, lhs_ids, lhs_synth_ops):
+        lhs_op_cnt = _list_to_counts([self.lhss[lid].qualified_name for lid in lhs_ids])
+
+        for op in lhs_synth_ops:
+            lhs_op_cnt[op.qualified_name] = lhs_op_cnt.get(op.qualified_name, 0) + 1
+        
+        for pat in pats:
+            l_subseteq = _m_subseteq(pat.op_cnt_no_dont_cares, lhs_op_cnt)
+            if l_subseteq:
+                yield pat
+
+    def gen_ir_optimizations(self, E_opts, ir_opts, narrow_opts, opts=SolverOpts(), bin_search_dont_cares = False):
+        LC, E, comp = E_opts
+        generated_pats = []
+        for lN in range(1, self.maxL+1):
+            lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
+            for lhs_ids in multicomb(lhs_mc_ids, lN):
+                lhs_ops = [self.lhss[i] for i in lhs_ids]
+                for lhs_dont_care_T in self.ir_dont_care_T(lhs_ops):
+                    for (iT, oT) in self.ir_T(lhs_ops, lhs_dont_care_T):
+                        for lhs_synth_T in self.ir_synth_T(iT, oT, lhs_ops, lhs_dont_care_T):
+                                if not self.valid_ir_components(iT, oT, lhs_ops, lhs_synth_T, lhs_dont_care_T):
+                                    continue
+                                for spec,spec_E_vars in self.ir_optimization_specs(iT, oT):
+                                    lhs_synth_ops = self.synth_T_to_op_list(lhs_synth_T)
+                                    lhs_dont_care_ops = self.dont_care_T_to_op_list(lhs_dont_care_T)
+                                    lhs_ops_all = lhs_ops + lhs_synth_ops + lhs_dont_care_ops
+
+                                    new_rules = []
+                                    k = (tuple(lhs_ids), iT, oT, 
+                                        tuple(lhs_synth_T),  
+                                        tuple(lhs_dont_care_T))
+
+                                    #kstr += f":{NI}"
+                                    if opts.log:
+                                        print_iot(iT, oT)
+                                    ss = SpecSynth(
+                                        spec=spec,
+                                        op_list=lhs_ops_all,
+                                        ir_opts=ir_opts,
+                                        narrow_opts=narrow_opts,
+                                        pat_en_t=self.pat_en_t,
+                                        simplify_dont_cares = self.simplify_dont_cares[0],
+                                        simplify_gen_consts = self.simplify_gen_consts[0],
+                                        spec_E_vars = spec_E_vars
+                                    )
+                                    existing_pats = []
+                                    op_mappings = []
+                                    start = timeit.default_timer()
+                                    for pat in self.all_ir_subpats(generated_pats, lhs_ids,lhs_synth_ops):
+                                        for lhs_pat,op_mapping in composite_pat(pat.iT, pat.oT, None, [pat], lhs_ops_all):
+                                            existing_pats.append(lhs_pat)
+                                            op_mappings.append(op_mapping)
+                                    comp_time = timeit.default_timer() - start
+                                    if comp:
+                                        for cpat,op_mapping in zip(existing_pats, op_mappings):
+                                            pat_cond, enum_time = ss.patL(cpat, op_mapping, constrain_io = False)
+                                            comp_time += enum_time
+                                            ss.synth_base = ss.synth_base & ~pat_cond
+                                    sat_time = []
+                                    if bin_search_dont_cares:
+                                        patgen = ss.CEGISAll_bin_search
+                                    else:
+                                        patgen = ss.CEGISAll
+                                    
+                                    for pat in patgen(E, LC, opts):
+                                        if self.is_new_pat(pat, existing_pats):
+                                            existing_pats.append(pat)
+                                            generated_pats.append(pat)
+                                            yield pat
 
 
 

@@ -1,4 +1,5 @@
 from comb.synth.pattern import Pattern, SymOpts, all_prog, onepat, IPerm
+from comb.synth.instruction_sel import OptimalInstructionSel
 import itertools as it
 from .utils import flat
 from comb.synth.solver_utils import SolverOpts
@@ -84,8 +85,8 @@ class Rule:
         for (l_edges, l_synth_vals),(r_edges, r_synth_vals) in it.product(l_enum, r_enum):
             l_pat = Pattern(self.lhs.iT, self.lhs.oT, self.lhs.ops, l_edges, l_synth_vals)
             r_pat = Pattern(self.rhs.iT, self.rhs.oT, self.rhs.ops, r_edges, r_synth_vals)
-            l = l_pat_enc.match_one_pattern(l_pat, lhs_op_mapping)
-            r = r_pat_enc.match_one_pattern(r_pat, rhs_op_mapping)
+            l = l_pat_enc.match_one_pattern(l_pat, lhs_op_mapping, contrain_io = True)
+            r = r_pat_enc.match_one_pattern(r_pat, rhs_op_mapping, constrain_io = True)
             allr.append(fc.And([l,r]))
         return fc.Or(allr).to_hwtypes()
 
@@ -190,6 +191,21 @@ class RuleDatabase:
     def num_rules(self):
         return sum(len(rs) for rs in self.rules.values())
 
+    def find_all_composites(self):
+        rules_all = flat(self.rules.values())
+
+        solverops = SolverOpts(solver_name='z3')
+        symops = SymOpts(True, True, False)
+        composites = []
+
+        for i,rule in enumerate(rules_all):
+            if i == 60:
+                pass
+            components = rules_all[:i] + rules_all[i+1:]
+            instr_sel = OptimalInstructionSel(rule.lhs, components, symops, solverops)
+            if instr_sel.run(rule.cost):
+                composites.append(i)
+        return composites 
 
 
 

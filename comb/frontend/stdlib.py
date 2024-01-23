@@ -150,31 +150,58 @@ class BVDontCare(CombPrimitive):
 def is_dont_care(comb):
     return isinstance(comb, BVDontCare) or isinstance(comb, CBVDontCare)
 
+class BVUnary(CombPrimitive):
+    param_types = [IntType()]
+    num_inputs = 1
+    num_outputs = 1
+    comm_info = ([0],)
+
+    def __init__(self, class_name: str, fun):
+        self.name = QSym('bv', class_name)
+        self.fun = fun
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [BVCall], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==1
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return [BVValue(self.fun(args[0].value))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
+
 def create_BVUnary(class_name: str, fun):
-    class BVBin(CombPrimitive):
-        name = QSym('bv', class_name)
-        param_types = [IntType()]
-        num_inputs = 1
-        num_outputs = 1
-        comm_info = ([0],)
+    cls = BVUnary
+    cls.__name__ = "BV"+class_name.capitalize()
+    return cls(class_name, fun)
 
-        def get_type(self, N: Expr):
-            BVCall = TypeCall(BVType(), [N])
-            return [BVCall], [BVCall]
+class BVMux(CombPrimitive):
+    name = QSym('bv', "mux")
+    param_types = [IntType()]
+    num_inputs = 3
+    num_outputs = 1
+    comm_info = ([0],[1],[2])
 
-        def eval(self, *args, pargs):
-            assert len(pargs)==1 and len(args)==1
-            N = pargs[0]
-            if isinstance(N, IntValue) and isinstance(N.value, int):
-                if all(isinstance(arg, BVValue) for arg in args):
-                    return [BVValue(fun(args[0].value))]
-            return CallExpr(self, pargs, args)
+    def get_type(self, N: Expr):
+        BVCall_1 = TypeCall(BVType(), [IntValue(1)])
+        BVCall_N = TypeCall(BVType(), [N])
+        return [BVCall_1, BVCall_N, BVCall_N], [BVCall_N] 
 
-        def partial_eval(self, N):
-            return CombSpecialized(self, [N])
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==3
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return [BVValue(args[0].value.ite(args[1].value, args[2].value))]
+        return CallExpr(self, pargs, args)
 
-    BVBin.__name__ = "BV"+class_name.capitalize()
-    return BVBin()
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
 
 #Represents an abstract constant :: CBV -> BV
 class AbsConst(CombPrimitive):
@@ -198,91 +225,145 @@ class AbsConst(CombPrimitive):
     def partial_eval(self, N):
         return CombSpecialized(self, [N])
 
+class BVBin(CombPrimitive):
+    param_types = [IntType()]
+    num_inputs = 2
+    num_outputs = 1
+
+    def __init__(self, class_name: str, fun, comm):
+        self.name = QSym('bv', class_name)
+        self.comm_info = ([0,1],) if comm else ([0], [1])
+        self.fun = fun
+
+    def get_type(self, N: Expr):
+        BVCall = TypeCall(BVType(), [N])
+        return [BVCall, BVCall], [BVCall]
+
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                return [BVValue(self.fun(args[0].value, args[1].value))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
+
 def create_BVBinary(class_name: str, fun, comm):
-    class BVBin(CombPrimitive):
-        name = QSym('bv', class_name)
-        param_types = [IntType()]
-        comm_info = ([0,1],) if comm else ([0], [1])
-        num_inputs = 2
-        num_outputs = 1
+    cls= BVBin
+    cls.__name__ = "BV"+class_name.capitalize()
+    return cls(class_name, fun, comm)
 
-        def get_type(self, N: Expr):
-            BVCall = TypeCall(BVType(), [N])
-            return [BVCall, BVCall], [BVCall]
+class BVComp(CombPrimitive):
+    param_types = [IntType()]
+    num_inputs = 2
+    num_outputs = 1
 
-        def eval(self, *args, pargs):
-            assert len(pargs)==1 and len(args)==2
-            N = pargs[0]
-            if isinstance(N, IntValue) and isinstance(N.value, int):
-                if all(isinstance(arg, BVValue) for arg in args):
-                    return [BVValue(fun(args[0].value, args[1].value))]
-            return CallExpr(self, pargs, args)
+    def __init__(self, class_name:str, fun, comm):
+        self.name = QSym('bv', class_name)
+        self.comm_info = ([0,1],) if comm else ([0], [1])
+        self.fun = fun
 
-        def partial_eval(self, N):
-            return CombSpecialized(self, [N])
+    def get_type(self, N: Expr):
+        BVCall_N = TypeCall(BVType(), [N])
+        BVCall_1 = TypeCall(BVType(), [IntValue(1)])
+        return [BVCall_N, BVCall_N], [BVCall_1]
 
-    BVBin.__name__ = "BV"+class_name.capitalize()
-    return BVBin()
+    def eval(self, *args, pargs):
+        assert len(pargs)==1 and len(args)==2
+        N = pargs[0]
+        if isinstance(N, IntValue) and isinstance(N.value, int):
+            if all(isinstance(arg, BVValue) for arg in args):
+                bv0 = ht.SMTBitVector[1](0)
+                bv1 = ht.SMTBitVector[1](1)
+                v = self.fun(args[0].value, args[1].value)
+                assert isinstance(v, ht.SMTBit)
+                return [BVValue(v.ite(bv1, bv0))]
+        return CallExpr(self, pargs, args)
+
+    def partial_eval(self, N):
+        return CombSpecialized(self, [N])
 
 def create_BVComp(class_name: str, fun, comm):
-    class BVComp(CombPrimitive):
-        name = QSym('bv', class_name)
-        param_types = [IntType()]
-        comm_info = ([0,1],) if comm else ([0], [1])
-        num_inputs = 2
-        num_outputs = 1
+    cls = BVComp
+    cls.__name__ = "BV"+class_name.capitalize()
+    return cls(class_name, fun, comm)
 
-        def get_type(self, N: Expr):
-            BVCall = TypeCall(BVType(), [N])
-            return [BVCall, BVCall], [BVCall]
-
-        def eval(self, *args, pargs):
-            assert len(pargs)==1 and len(args)==2
-            N = pargs[0]
-            if isinstance(N, IntValue) and isinstance(N.value, int):
-                if all(isinstance(arg, BVValue) for arg in args):
-                    bv0 = ht.SMTBitVector[N.value](0)
-                    bv1 = ht.SMTBitVector[N.value](1)
-                    v = fun(args[0].value, args[1].value)
-                    assert isinstance(v, ht.SMTBit)
-                    return [BVValue(v.ite(bv1, bv0))]
-            return CallExpr(self, pargs, args)
-
-        def partial_eval(self, N):
-            return CombSpecialized(self, [N])
-
-    BVComp.__name__ = "BV"+class_name.capitalize()
-    return BVComp()
-
+def add(x,y):
+    return x + y
+def sub(x,y):
+    return x - y
+def mul(x,y):
+    return x * y
+def and_(x,y):
+    return x & y
+def or_(x,y):
+    return x | y
+def xor(x,y):
+    return x ^ y
+def lshr(x,y):
+    return ht.SMTBitVector.bvlshr(x,y)
+def ashr(x,y):
+    return ht.SMTBitVector.bvashr(x,y)
+def shl(x,y):
+    return x << y
 _binops = dict(
-    add=(lambda x, y: x + y, True),
-    sub=(lambda x, y: x - y, False),
-    mul=(lambda x, y: x * y, True),
-    and_=(lambda x, y: x & y, True),
-    or_=(lambda x, y: x | y, True),
-    xor=(lambda x, y: x ^ y, True),
-    lshr=(lambda x, y: x << y, False),
+    add=(add, True),
+    sub=(sub, False),
+    mul=(mul, True),
+    and_=(and_, True),
+    or_=(or_, True),
+    xor=(xor, True),
+    lshr=(lshr, False),
+    ashr=(ashr, False),
+    shl=(shl, False),
 )
 
+def eq(x,y):
+    return x == y
+def neq(x,y):
+    return ~(x == y)
+def ult(x,y):
+    return x.bvult(y)
+def slt(x,y):
+    return x.bvslt(y)
+def ule(x,y):
+    return x.bvule(y)
+def sle(x,y):
+    return x.bvsle(y)
+def ugt(x,y):
+    return x.bvugt(y)
+def sgt(x,y):
+    return x.bvsgt(y)
+def uge(x,y):
+    return x.bvuge(y)
+def sge(x,y):
+    return x.bvsge(y)
 _cmpops = dict(
-    eq=(lambda x, y: x==y, True),
-    neq=(lambda x, y: ~(x==y), True),
-    ult=(lambda x, y: x.bvult(y), False),
-    slt=(lambda x, y: x.bvslt(y), False),
-    ule=(lambda x, y: x.bvule(y), False),
-    sle=(lambda x, y: x.bvsle(y), False),
-    ugt=(lambda x, y: x.bvugt(y), False),
-    sgt=(lambda x, y: x.bvsgt(y), False),
-    uge=(lambda x, y: x.bvuge(y), False),
-    sge=(lambda x, y: x.bvsge(y), False),
+    eq=(eq, True),
+    neq=(neq, True),
+    ult=(ult, False),
+    slt=(slt, False),
+    ule=(ule, False),
+    sle=(sle, False),
+    ugt=(ugt, False),
+    sgt=(sgt, False),
+    uge=(uge, False),
+    sge=(sge, False),
 )
 
+def identity(x):
+    return x
+def neg(x):
+    return -x
+def not_(x):
+    return ~x
 _unary_ops = dict(
-    identity=lambda x: x,
-    neg=lambda x: -x,
-    not_=lambda x: ~x,
+    identity=identity,
+    neg=neg,
+    not_=not_,
 )
-
 
 from peak import family_closure, Peak
 def concat_peak(lsbs, msbs):
@@ -396,6 +477,7 @@ class BitVectorModule(Module):
             slice=BVSlice(),
             nflag=BVNFlag(),
             vflag=BVVFlag(),
+            mux=BVMux()
         )
         for name, (fun, comm) in _binops.items():
             opdict[name] = create_BVBinary(name, fun, comm)
