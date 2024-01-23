@@ -221,7 +221,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 1
+maxIR = 2
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -234,7 +234,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
-num_proc = 8
+num_proc = 10
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -264,9 +264,9 @@ if LC_test:
 else:
     ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts, bin_search, excluded_pats)
 for ri, rule in enumerate(ga):
-    print("RULE", ri, flush=True)
+    print("RULE", ri, time()-start_time)
     print(rule)
-    print("*"*80)
+    print("*"*80, flush = True)
 db = rd.rdb
 for k, info in db.time_info.items():
     num_unique = info["u"]

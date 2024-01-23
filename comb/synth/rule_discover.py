@@ -1,5 +1,6 @@
 import functools
 import timeit
+import copy
 
 from comb import Comb
 from comb.frontend.ast import TypeCall, BVType, CBVType, IntValue, QSym, BVValue
@@ -710,6 +711,7 @@ class RuleDiscovery:
         LC, E, comp = E_opts
         lhs_ops = [self.lhss[i] for i in lhs_ids]
         rhs_id_order = self.gen_rhs_order(costs)
+        rules_for_manager = []
         for rhs_ids in rhs_id_order:
             rhs_ops = [self.rhss[i] for i in rhs_ids]
             kstr = "("+",".join(str(i) for i in lhs_ids) + ")"
@@ -784,21 +786,26 @@ class RuleDiscovery:
                             sat_time.append(rule.time)
                             assert rule.verify()
                             if self.is_new_pat(rule.lhs, existing_pats):
-                                for op in rule.lhs.ops:
-                                    if hasattr(op, "prev_eval"):
-                                        op.eval = op.prev_eval
-                                        delattr(op, "prev_eval")
-                                for i,op in enumerate(rule.rhs.ops):
-                                    if hasattr(op, "prev_eval"):
-                                        op.eval = op.prev_eval
-                                        delattr(op, "prev_eval")
-                                    elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
-                                        rule.rhs.ops[i] = rhs_ids[i]
                                 new_rules.append(rule)
                                 existing_pats.append(rule.lhs)
                         if len(new_rules)>0:
-                            rules.append((k, new_rules, times))
+                            rules_for_manager.append((k, new_rules, times))
                             self.rdb.add_rules(k, new_rules, times)
+
+        
+        for k, new_rules, times in rules_for_manager:
+            for rule in new_rules:
+                for op in rule.lhs.ops: 
+                    if hasattr(op, "prev_eval"):
+                        op.eval = op.prev_eval
+                        delattr(op, "prev_eval")
+                for i,op in enumerate(rule.rhs.ops):
+                    if hasattr(op, "prev_eval"):
+                        op.eval = op.prev_eval
+                        delattr(op, "prev_eval")
+                    elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
+                        rule.rhs.ops[i] = rhs_ids[i]
+            rules.append((k, new_rules, times))
 
     def join_one(self,processes):
         while True:
@@ -807,7 +814,7 @@ class RuleDiscovery:
                     p.join()
                     return p,rules 
                 
-            time.sleep(0.2)
+            time.sleep(1)
 
     def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1):
         assert len(costs)==len(self.rhss)
