@@ -18,6 +18,7 @@ import hwtypes as ht
 
 from comb.frontend.ast import QSym
 from comb.frontend.comb_peak import CombPeak
+from comb.frontend.ir import CombSpecialized
 from comb.frontend.stdlib import CBVSynthConst
 from comb.synth.comm_synth import set_comm
 from comb.synth.rule_discover import RuleDiscovery
@@ -35,8 +36,10 @@ from lassen.sim import PE_fc
 from peak import family_closure, Peak, Const
 from peak.assembler import AssembledADT, Assembler
 from time import time
+import os
+import pickle
 
-solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=300, log=False)
+solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=1000, log=False)
 def parameterize_pe():
     @family_closure
     def ExpandedPE_fc(family):
@@ -221,7 +224,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 2
+maxIR = 3
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -234,7 +237,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
-num_proc = 10
+num_proc = 20
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -252,13 +255,33 @@ ir_opts = (dce, cse)
 narrow_opts = (C, K)
 E_opts = (LC, E, CMP)
 bin_search = [True, False]
-exclude_pats = rd.gen_ir_optimizations(E_opts, ir_opts, narrow_opts, solver_opts, bin_search[0])
+
+#load excluded pats or generate them
+ir_exclude_filename = f"lassen/exclude_{maxIR}.pkl"
+if os.path.exists(ir_exclude_filename):
+    print(f"Found excluded pats file {ir_exclude_filename}")
+    with open(ir_exclude_filename, 'rb') as f:
+        exclude_pats = pickle.load(f)
+else:
+    print("Generating excluded pats")
+    exclude_pats = rd.gen_ir_optimizations(E_opts, ir_opts, narrow_opts, solver_opts, bin_search[0])
+
 excluded_pats = []
 for i,pat in enumerate(exclude_pats):
     print("excluded", i, flush=True)
     print(pat.to_comb())
     print("*"*80)
     excluded_pats.append(pat)
+if not os.path.exists(ir_exclude_filename):
+    print(f"Saving excluded pats to {ir_exclude_filename}")
+    for pat in excluded_pats:
+        for op in pat.ops:
+            if hasattr(op, "prev_eval"):
+                op.eval = op.prev_eval
+                delattr(op, "prev_eval")
+    with open(ir_exclude_filename, 'wb') as f:
+        pickle.dump(excluded_pats, f)
+
 if LC_test:
     ga = rd.gen_lowcost_rules_mp(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats, num_proc)
 else:
@@ -268,6 +291,29 @@ for ri, rule in enumerate(ga):
     print(rule)
     print("*"*80, flush = True)
 db = rd.rdb
+
+rule_database_filename = f"lassen/rules_{maxIR}_{maxISA}.pkl"
+if not os.path.exists(rule_database_filename):
+    print(f"Saving rules to {rule_database_filename}")
+    all_rules = []
+    for k,rules in db.rules.items():
+        t = db.time[k]
+        for rule in rules:
+            for op in rule.lhs.ops:
+                if hasattr(op, "prev_eval"):
+                    op.eval = op.prev_eval
+                    delattr(op, "prev_eval")
+            for i,op in enumerate(rule.rhs.ops):
+                if hasattr(op, "prev_eval"):
+                    op.eval = op.prev_eval
+                    delattr(op, "prev_eval")
+                elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
+                    rule.rhs.ops[i] = 0
+        all_rules.append((k, rules, t))
+
+    with open(rule_database_filename, 'wb') as f:
+        pickle.dump(all_rules, f)
+
 for k, info in db.time_info.items():
     num_unique = info["u"]
     extra = info['e']

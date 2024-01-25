@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from more_itertools import distinct_combinations as multicomb
 import multiprocessing
 import time
+import pickle
+import os
 
 
 def _smart_iter(mL: int, mR: int):
@@ -818,7 +820,21 @@ class RuleDiscovery:
 
     def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1):
         assert len(costs)==len(self.rhss)
-        for lN in range(1, self.maxL+1):
+        found_rules = [os.path.exists(f"lassen/rules_{l}_{self.maxR}.pkl") for l in range(1, self.maxL + 1)]
+        start_l = 1
+        if any(found_rules):
+            start_l = max((index + 2) for index,found in enumerate(found_rules) if found)
+            print("Found existing rules file lassen/rules_{start_l-1}_{self.maxR}.pkl")
+            with open(f"lassen/rules_{start_l-1}_{self.maxR}.pkl", 'rb') as f:
+                all_rules = pickle.load(f)
+            for k,rules,time in all_rules:
+                for rule in rules:
+                    for i,op in enumerate(rule.rhs.ops):
+                        if isinstance(op, int):
+                            rule.rhs.ops[i] = self.rhss[op]
+                self.rdb.add_rules(k,rules,time)
+
+        for lN in range(start_l, self.maxL+1):
             processes = dict()
             lhs_mc_ids = flat([[i for _ in range(self.opMaxL[i])] for i in range(len(self.lhss))])
             with multiprocessing.Manager() as manager:
