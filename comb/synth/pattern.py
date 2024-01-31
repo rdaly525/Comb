@@ -4,6 +4,7 @@ from collections import namedtuple, OrderedDict, Counter
 from functools import cached_property
 import networkx as nx
 from hwtypes import smt_utils as fc
+from DagVisitor import Visitor
 
 from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
