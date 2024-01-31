@@ -138,6 +138,27 @@ def filter_eq(f):
 #        if not isinstance(other, Pattern)
 #        pat =
 
+class CoreIRToPattern(Visitor):
+    def __init__(self, dag, node_mapping):
+        self.node_mapping
+        self.iT = []
+        self.oT = []
+        self.ops = []
+        self.edges = []
+        self.synth_vals = []
+
+    def generic_visit(self, node):
+        Visitor.generic_visit(self, node)
+    
+    def visit_select(self, node):
+        print("In select")
+        print(node)
+
+    def visit_constant(self, node):
+        print("In constant")
+        print(node)
+
+
 class Pattern:
     def __init__(self, iT, oT, ops: tp.List[Comb], edges, synth_vals):
         self.iT = iT
@@ -161,6 +182,12 @@ class Pattern:
             self.children[snki][snka] = src
         assert all(all(ch is not None for ch in op_ch) for op_ch in self.children)
         self.root = (len(ops), 0)
+
+    @classmethod
+    def from_coreir_dag(cls, dag, node_mapping):
+        visitor = CoreIRToPattern(dag, node_mapping)
+        visitor.run()
+        return cls(visitor.iT, visitor.oT, visitor.ops, visitor.edges, visitor.synth_vals)
 
     @classmethod
     def init_prog(cls, iT, oT, ops: tp.List[Comb], P):
