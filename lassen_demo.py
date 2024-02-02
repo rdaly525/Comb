@@ -178,25 +178,22 @@ def CombPE_constraints(in_lvars, out_lvars, in_vars, out_vars):
 combPE = CombPE()[()]
 combPE.constraints = CombPE_constraints
 
-add_file = '''
-Comb test.add_const
-Param N: Int
-In i0 : BV[N]
-In i1 : CBV[N]
-Out o0 : BV[N]
-t = bv.abs_const[N](i1)
-o0 = bv.add[N](i0, t)
-'''
-obj = compile_program(add_file)
-
 from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules["bv"]
 
 lhs = [
+    BV.abs_const[DATAWIDTH],
+    BV.abs_const[1],
+
     BV.not_[DATAWIDTH],
     BV.and_[DATAWIDTH],
     BV.or_[DATAWIDTH],
     BV.xor[DATAWIDTH],
+    BV.not_[1],
+    BV.and_[1],
+    BV.or_[1],
+    BV.xor[1],
+
     BV.lshr[DATAWIDTH],
     BV.ashr[DATAWIDTH],
     BV.shl[DATAWIDTH],
@@ -214,7 +211,6 @@ lhs = [
     BV.ugt[DATAWIDTH],
     BV.ule[DATAWIDTH],
     BV.uge[DATAWIDTH],
-
     BV.mux[DATAWIDTH]
 ]
 rhs = [
@@ -224,7 +220,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 3
+maxIR = 2
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -237,7 +233,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
-num_proc = 20
+num_proc = 14
 
 rd = RuleDiscovery(
     lhss=lhs,

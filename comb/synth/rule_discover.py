@@ -67,7 +67,7 @@ def T_count(ops):
     return iTs, oTs
 
 def simplify_constraint(in_lvars,out_lvars,in_vars,out_vars):
-    return out_vars[0] == 0
+    return (out_vars[0] == 0) | (out_vars[0] == 1) | (out_vars[0] == 2**15) | (out_vars[0] == 2**16-1)
 
 @dataclass
 class RuleDiscovery:
@@ -832,6 +832,7 @@ class RuleDiscovery:
                     for i,op in enumerate(rule.rhs.ops):
                         if isinstance(op, int):
                             rule.rhs.ops[i] = self.rhss[op]
+                    yield rule
                 self.rdb.add_rules(k,rules,time)
 
         for lN in range(start_l, self.maxL+1):
