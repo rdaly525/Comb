@@ -5,7 +5,8 @@ import hwtypes.smt_utils as fc
 from comb.synth.solver_utils import SolverOpts, get_var
 from pysmt import shortcuts as smt
 from comb.frontend.ir import CombSpecialized
-from comb.frontend.stdlib import CBVConst
+from comb.frontend.stdlib import CBVConst, BVConst
+import smt_switch.pysmt_frontend as fe
 
 class InstructionSel:
     def run(self, max_cost = None):
@@ -64,7 +65,7 @@ class OptimalInstructionSel(InstructionSel):
 
         #constants are available
         for i,op in enumerate(self.pat.ops):
-            if isinstance(op, CombSpecialized) and isinstance(op.comb, CBVConst):
+            if isinstance(op, CombSpecialized) and isinstance(op.comb, (CBVConst, BVConst)):
                 node_o[(i,0)] = [ht.SMTBit(1)]
         
         if max_cost is not None:
@@ -82,9 +83,29 @@ class OptimalInstructionSel(InstructionSel):
             inputs_available_cond.append(fc.Implies(tile_used, inputs_available))
 
         f = fc.And([cost_cond, fc.And(output_cond), fc.And(inputs_available_cond)]).to_hwtypes().value
-        with smt.Solver(logic=self.solverops.logic, name=self.solverops.solver_name) as solver:
+        with fe.Solver(name = self.solverops.solver_name, logic = self.solverops.logic) as solver:
             solver.add_assertion(f)
-            return solver.solve()
+            r = solver.solve()
+            if r:
+                return cost.value.substitute(dict(solver.get_model())).simplify().constant_value()
+            return None
+        
+    def find_optimal(self):
+        result = self.run()
+        if result is None: 
+            return None
+
+        min = 0
+        max = result
+        while (min != max):
+            try_cost = (min + max) // 2
+            result = self.run(try_cost)
+            if result is None:
+                min = try_cost + 1
+            else:
+                max = try_cost
+        
+        return max
 
 
             

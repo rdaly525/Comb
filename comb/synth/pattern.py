@@ -14,6 +14,7 @@ from ..frontend.ir import CombProgram, AssignStmt, CombSpecialized
 from ..frontend.stdlib import CBVSynthConst, GlobalModules, is_dont_care
 import itertools as it
 from more_itertools import distinct_combinations as multicomb
+from hwtypes import Bit
 
 #Represnts the raw dag structure of a particular pattern
 #Inputs are encoded as -1
@@ -157,16 +158,22 @@ class CoreIRToPattern(Visitor):
 
     def generic_visit(self, node):
         Visitor.generic_visit(self, node)
+        if type(node) not in self.node_mapping:
+            print(f"No mapping for {type(node)}")
+            assert False
+
+        if "const" in str(node):
+            assert len(node.children()) == 1
+            child = node.children()[0]
+            assert child in self.node_to_opi and isinstance(self.node_to_opi[child], int)
+            self.node_to_opi[node] = self.node_to_opi[child]
+            return
+            
         opi = len(self.ops)
-        assert type(node) in self.node_mapping
         self.ops.append(self.node_mapping[type(node)])
         self.node_to_opi[node] = opi
         for arg,child in enumerate(node.children()):
-            if child in self.select_map:
-                self.edges.append((self.select_map[child], (opi, arg)))
-            else:
-                assert child in self.node_to_opi and isinstance(self.node_to_opi[child], int)
-                self.edges.append(((self.node_to_opi[child],0), (opi, arg)))
+            self.edges.append((self.select_map[child], (opi, arg)))
     
     def visit_Select(self, node):
         Visitor.generic_visit(self, node)
@@ -186,8 +193,12 @@ class CoreIRToPattern(Visitor):
         Visitor.generic_visit(self, node)
         for field,T in node.type.field_dict.items():
             self.input_map[field] = len(self.iT)
-            for f in T._fields_:
-                self.iT.append(nT(f.size, False))
+            if hasattr(T, "_fields_"):
+                for f in T._fields_:
+                    self.iT.append(nT(f.size, False))
+            else:
+                self.iT.append(nT(T.size, False))
+
 
     def visit_Output(self, node):
         Visitor.generic_visit(self, node)
@@ -201,7 +212,10 @@ class CoreIRToPattern(Visitor):
         Visitor.generic_visit(self, node)
         opi = len(self.ops)
         self.node_to_opi[node] = opi
-        op = self.BV.c_const[node.value.num_bits,node.value.value]
+        if isinstance(node.value, Bit):
+            op = self.BV.const[1,int(node.value)]
+        else:
+            op = self.BV.const[node.value.num_bits,node.value.value]
         self.ops.append(op)
 
 
@@ -814,7 +828,7 @@ class PatternMatcher:
             from_output_ops.add(srci)
         
         matches = set()
-        for partial_matches in it.product(*[from_op_matches[opi] for opi in from_output_ops]):
+        for partial_matches in it.product(*[from_op_matches.setdefault(opi, []) for opi in from_output_ops]):
             # store all solutions where the dicts agree on the same mappings
             merged_match = PatternMatch()
             valid_sol = True

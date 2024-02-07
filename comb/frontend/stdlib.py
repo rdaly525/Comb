@@ -190,14 +190,14 @@ class BVMux(CombPrimitive):
     def get_type(self, N: Expr):
         BVCall_1 = TypeCall(BVType(), [IntValue(1)])
         BVCall_N = TypeCall(BVType(), [N])
-        return [BVCall_1, BVCall_N, BVCall_N], [BVCall_N] 
+        return [BVCall_N, BVCall_N, BVCall_1], [BVCall_N] 
 
     def eval(self, *args, pargs):
         assert len(pargs)==1 and len(args)==3
         N = pargs[0]
         if isinstance(N, IntValue) and isinstance(N.value, int):
             if all(isinstance(arg, BVValue) for arg in args):
-                return [BVValue(args[0].value.ite(args[1].value, args[2].value))]
+                return [BVValue(args[2].value.ite(args[1].value, args[0].value))]
         return CallExpr(self, pargs, args)
 
     def partial_eval(self, N):
@@ -377,10 +377,13 @@ def neg(x):
     return -x
 def not_(x):
     return ~x
+def abs(x):
+    return x.bvsge(0).ite(x,-x)
 _unary_ops = dict(
     identity=identity,
     neg=neg,
     not_=not_,
+    abs=abs,
 )
 
 from peak import family_closure, Peak

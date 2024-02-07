@@ -198,6 +198,7 @@ lhs = [
     BV.ashr[DATAWIDTH],
     BV.shl[DATAWIDTH],
 
+    BV.abs[DATAWIDTH],
     BV.add[DATAWIDTH],
     BV.sub[DATAWIDTH],
     BV.mul[DATAWIDTH],
@@ -209,6 +210,7 @@ lhs = [
     BV.mult_middle[DATAWIDTH],
 
     BV.eq[DATAWIDTH],
+    BV.neq[DATAWIDTH],
     BV.slt[DATAWIDTH],
     BV.sgt[DATAWIDTH],
     BV.sle[DATAWIDTH],
