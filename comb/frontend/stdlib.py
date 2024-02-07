@@ -308,6 +308,19 @@ def ashr(x,y):
     return ht.SMTBitVector.bvashr(x,y)
 def shl(x,y):
     return x << y
+def smax(x,y):
+    return x.bvsgt(y).ite(x,y)
+def smin(x,y):
+    return x.bvslt(y).ite(x,y)
+def umax(x,y):
+    return x.bvugt(y).ite(x,y)
+def umin(x,y):
+    return x.bvult(y).ite(x,y)
+def mult_middle(x,y):
+    w = x.num_bits
+    prod = x.sext(w) * y.sext(w)
+    return prod[w//2: w + w//2]
+
 _binops = dict(
     add=(add, True),
     sub=(sub, False),
@@ -318,6 +331,11 @@ _binops = dict(
     lshr=(lshr, False),
     ashr=(ashr, False),
     shl=(shl, False),
+    smax=(smax, True),
+    smin=(smin, True),
+    umax=(umax, True),
+    umin=(umin, True),
+    mult_middle=(mult_middle, True)
 )
 
 def eq(x,y):

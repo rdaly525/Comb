@@ -39,7 +39,7 @@ from time import time
 import os
 import pickle
 
-solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=1000, log=False)
+solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=2000, log=False)
 def parameterize_pe():
     @family_closure
     def ExpandedPE_fc(family):
@@ -201,6 +201,12 @@ lhs = [
     BV.add[DATAWIDTH],
     BV.sub[DATAWIDTH],
     BV.mul[DATAWIDTH],
+    BV.neg[DATAWIDTH],
+    BV.smax[DATAWIDTH],
+    BV.smin[DATAWIDTH],
+    BV.umax[DATAWIDTH],
+    BV.umin[DATAWIDTH],
+    BV.mult_middle[DATAWIDTH],
 
     BV.eq[DATAWIDTH],
     BV.slt[DATAWIDTH],
@@ -220,7 +226,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 2
+maxIR = 1
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -321,5 +327,300 @@ delta = time()-start_time
 print("TOTTIME:", delta)
 c = db.find_all_composites()
 print(c)
+
+from comb.synth.verify import verify
+prog = """\
+Comb coreir.umin
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N]
+cmp = bv.ult[N](a,b)
+o = bv.mux[N](cmp,a,b)
+
+Comb coreir.umax
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N]
+cmp = bv.ugt[N](a,b)
+o = bv.mux[N](cmp,a,b)
+
+Comb coreir.smin
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N]
+cmp = bv.slt[N](a,b)
+o = bv.mux[N](cmp,a,b)
+
+Comb coreir.smax
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+Out o : BV[N]
+cmp = bv.sgt[N](a,b)
+o = bv.mux[N](cmp,a,b)
+
+Comb coreir.abs
+Param N: Int
+In a : BV[N]
+Out o : BV[N]
+t = bv.neg[N](a)
+o = coreir.smax[N](a,t)
+
+Comb coreir.mac
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.muladd_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.muladd_s1
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](b,c)
+o = bv.add[N](t,a)
+
+Comb coreir.mulsub_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](a,b)
+o = bv.sub[N](t,c)
+
+Comb coreir.scrop
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.smin[N](a,b)
+o = bv.smax[N](t,c)
+
+Comb coreir.ucrop
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.umin[N](a,b)
+o = bv.umax[N](t,c)
+
+Comb coreir.smulshr_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](a,b)
+o = bv.ashr[N](t,c)
+
+Comb coreir.staa_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.staa_s1
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](b,c)
+o = bv.add[N](t,a)
+
+Comb coreir.stas_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](a,b)
+o = bv.sub[N](t,c)
+
+Comb coreir.stsa_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.sub[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.stss_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.sub[N](a,b)
+o = bv.sub[N](t,c)
+
+Comb coreir.tadd
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.umulshr_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.mul[N](a,b)
+o = bv.lshr[N](t,c)
+
+Comb coreir.utaa_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.utaa_s1
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](b,c)
+o = bv.add[N](t,a)
+
+Comb coreir.utas_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.add[N](a,b)
+o = bv.sub[N](t,c)
+
+Comb coreir.utsa_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.sub[N](a,b)
+o = bv.add[N](t,c)
+
+Comb coreir.utss_s0
+Param N: Int
+In a : BV[N]
+In b : BV[N]
+In c : BV[N]
+Out o : BV[N]
+t = bv.sub[N](a,b)
+o = bv.sub[N](t,c)
+"""
+
+obj = compile_program(prog, add_comm = False)
+old_rules = [
+        obj.get("coreir", "abs")[DATAWIDTH],
+        BV.add[DATAWIDTH],
+        BV.and_[DATAWIDTH],
+        BV.ashr[DATAWIDTH],
+        BV.and_[1],
+        BV.abs_const[1],
+        BV.not_[1],
+        BV.or_[1],
+        BV.xor[1],
+        BV.abs_const[DATAWIDTH],
+        BV.eq[DATAWIDTH],
+        BV.lshr[DATAWIDTH],
+        obj.get("coreir", "mac")[DATAWIDTH],
+        BV.mul[DATAWIDTH],
+        obj.get("coreir", "muladd_s0")[DATAWIDTH],
+        obj.get("coreir", "muladd_s1")[DATAWIDTH],
+        obj.get("coreir", "mulsub_s0")[DATAWIDTH],
+        BV.mult_middle[DATAWIDTH],
+        BV.mux[DATAWIDTH],
+        BV.neq[DATAWIDTH],
+        BV.or_[DATAWIDTH],
+        obj.get("coreir", "scrop")[DATAWIDTH],
+        BV.sge[DATAWIDTH],
+        BV.sgt[DATAWIDTH],
+        BV.shl[DATAWIDTH],
+        BV.sle[DATAWIDTH],
+        BV.slt[DATAWIDTH],
+        obj.get("coreir", "smin")[DATAWIDTH],
+        obj.get("coreir", "smax")[DATAWIDTH],
+        obj.get("coreir", "smulshr_s0")[DATAWIDTH],
+        obj.get("coreir", "staa_s0")[DATAWIDTH],
+        obj.get("coreir", "staa_s1")[DATAWIDTH],
+        obj.get("coreir", "stas_s0")[DATAWIDTH],
+        obj.get("coreir", "stsa_s0")[DATAWIDTH],
+        obj.get("coreir", "stss_s0")[DATAWIDTH],
+        BV.sub[DATAWIDTH],
+        obj.get("coreir", "tadd")[DATAWIDTH],
+        obj.get("coreir", "scrop")[DATAWIDTH],
+        BV.uge[DATAWIDTH],
+        BV.ugt[DATAWIDTH],
+        BV.ule[DATAWIDTH],
+        BV.ult[DATAWIDTH],
+        obj.get("coreir", "umin")[DATAWIDTH],
+        obj.get("coreir", "umax")[DATAWIDTH],
+        obj.get("coreir", "umulshr_s0")[DATAWIDTH],
+        obj.get("coreir", "utaa_s0")[DATAWIDTH],
+        obj.get("coreir", "utaa_s1")[DATAWIDTH],
+        obj.get("coreir", "utas_s0")[DATAWIDTH],
+        obj.get("coreir", "utsa_s0")[DATAWIDTH],
+        obj.get("coreir", "utss_s0")[DATAWIDTH],
+        ]
+old_rule_matched = [False for _ in old_rules]
+new_rule_matched = [False for _ in range(db.num_rules)]
+rulei = 0
+for k,rules in db.rules.items():
+    for rule in rules:
+        rule = rule.lhs.to_comb()
+        for i,old_rule in enumerate(old_rules):
+            if rule.get_type() == old_rule.get_type():
+                if verify(old_rule, rule, enum_io_order = True) is None:
+                    old_rule_matched[i] = True
+                    new_rule_matched[rulei] = True
+                    #print("Match")
+                    #print(old_rule)
+                    #print(rule)
+                    #print("*"*10)
+        if not new_rule_matched[rulei]:
+            print(rule)
+        rulei += 1
+print(old_rule_matched)
+print(new_rule_matched)
+print("Total existing matched", sum(old_rule_matched))
+print("Total existing unique", sum(not x for x in old_rule_matched))
+print("Total synthesized matched", sum(new_rule_matched))
+print("Total synthesized unique", sum(not x for x in new_rule_matched))
+
+
+
+
 assert c == []
 

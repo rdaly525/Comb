@@ -5,9 +5,9 @@ from pysmt.logics import QF_BV
 from .solver_utils import SolverOpts
 from ..frontend.ast import Comb
 from .utils import _make_list, _to_int
+from itertools import permutations
 
-
-def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts()):
+def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts(), enum_io_order = False):
     #Verify that the two interfaces are identical
     i0Ts, o0Ts = comb0.get_type()
     i1Ts, o1Ts = comb1.get_type()
@@ -17,6 +17,22 @@ def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts()):
         assert o0.type == o1.type
 
     inputs = comb0.create_symbolic_inputs()
+    if enum_io_order:
+        for inputs_perm in permutations(inputs):
+            o0 = _make_list(comb0.evaluate(*inputs_perm))
+            o1 = _make_list(comb1.evaluate(*inputs))
+            for o0_perm in permutations(o0):
+                formula = fc.And([o0_perm_ == o1_ for o0_perm_, o1_ in zip(o0_perm, o1)])
+
+                not_formula = ~(formula.to_hwtypes())
+
+                with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+                    solver.add_assertion(not_formula.value)
+                    res = solver.solve()
+                    if res is False:
+                        return None
+
+
     o0 = _make_list(comb0.evaluate(*inputs))
     o1 = _make_list(comb1.evaluate(*inputs))
 

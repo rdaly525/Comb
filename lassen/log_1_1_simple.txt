@@ -1,0 +1,1024 @@
+Generating excluded pats
+SAT 0.0019518248736858368
+excluded 0
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.and_[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0018027639016509056
+excluded 1
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.or_[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0018936656415462494
+excluded 2
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.xor[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0018241852521896362
+excluded 3
+Comb C.C
+In I0 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.and_[1](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0017398735508322716
+excluded 4
+Comb C.C
+In I0 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.or_[1](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0017071142792701721
+excluded 5
+Comb C.C
+In I0 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.xor[1](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.00564658734947443
+excluded 6
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.lshr[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.005315233953297138
+excluded 7
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.sub[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.0016408655792474747
+excluded 8
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.eq[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004414861090481281
+excluded 9
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.slt[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004529212601482868
+excluded 10
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sgt[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.007377861067652702
+excluded 11
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sle[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004536192864179611
+excluded 12
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sge[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004361763596534729
+excluded 13
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ult[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004645053297281265
+excluded 14
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ugt[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.004511082544922829
+excluded 15
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ule[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.00447620265185833
+excluded 16
+Comb C.C
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.uge[16](I0, I0)
+O0 = t0_0
+********************************************************************************
+SAT 0.006337587721645832
+excluded 17
+Comb C.C
+In I0 : BV[1]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.mux[16](I0, I1, I1)
+O0 = t0_0
+********************************************************************************
+Saving excluded pats to lassen/exclude_1.pkl
+SAT 0.3240048447623849
+SAT 0.35612576454877853
+SAT 0.45598323456943035
+SAT 0.6418100632727146
+SAT 0.5633105039596558
+SAT 1.159844041801989
+RULE 0 3.745811939239502
+Comb C.LHS0
+In I0 : CBV[16]
+Out O0 : BV[16]
+t0_0 = bv.abs_const[16](I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : CBV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 14]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 192]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 0]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, I0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, t22_0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 1 3.7574410438537598
+Comb C.LHS0
+In I0 : CBV[1]
+Out O0 : BV[1]
+t0_0 = bv.abs_const[1](I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : CBV[1]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 0]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 0]()
+t12_0 = bv.c_const[2, 0]()
+t13_0 = bv.c_const[2, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, I0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, I0, t12_0, I0, t13_0, I0, t22_0, t22_0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 2 3.7737693786621094
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.not_[16](I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 192]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 65535]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t21_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 3 3.789458751678467
+Comb C.LHS0
+In I0 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.not_[1](I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[1]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 18]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 21]()
+t2_0 = bv.c_const[5, 14]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, t22_0, t22_0, t23_0, I0, I0, t23_0)
+O0 = t0_1
+********************************************************************************
+SAT 1.8154063848778605
+SAT 1.887748984619975
+SAT 2.2500017592683434
+SAT 0.5529919937252998
+SAT 2.618183957412839
+SAT 1.0439753783866763
+RULE 4 5.820269823074341
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.or_[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 9]()
+t18_0 = bv.c_dont_care[1]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+SAT 1.5338680986315012
+RULE 5 6.832845449447632
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.and_[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 10]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+SAT 2.5415447941049933
+RULE 6 6.847301721572876
+Comb C.LHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.and_[1](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 0]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 32]()
+t2_0 = bv.c_const[5, 14]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, t22_0, t22_0, I0, I0, I1, I1)
+O0 = t0_1
+********************************************************************************
+RULE 7 6.994960308074951
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.add[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 0]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 1]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+SAT 0.5148095497861505
+SAT 0.7860669484362006
+RULE 8 9.00869369506836
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.xor[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 11]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 0]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t18_0 = bv.c_dont_care[1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t18_0, I0, I1, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 9 9.028970003128052
+Comb C.LHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.xor[1](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 14]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 44]()
+t2_0 = bv.c_const[5, 14]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 65535]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, t22_0, t22_0, I1, I0, I1, I0)
+O0 = t0_1
+********************************************************************************
+SAT 1.893102241680026
+SAT 2.5288275787606835
+RULE 10 11.063352584838867
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.sub[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 48]()
+t2_0 = bv.c_const[5, 0]()
+t8_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t9_0 = bv.c_const[2, 2]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t18_0 = bv.c_dont_care[1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t21_0, t9_0, t21_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t18_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 11 11.07439374923706
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.mul[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 12]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 0]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 0]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 12 12.089092493057251
+Comb C.LHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t0_0 = bv.or_[1](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[1]
+In I1 : BV[1]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 18]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 184]()
+t2_0 = bv.c_const[5, 14]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 0]()
+t22_0 = bv.dont_care[16]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, t22_0, t22_0, I0, I0, I1, I0)
+O0 = t0_1
+********************************************************************************
+RULE 13 13.103272676467896
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.ashr[16](I1, I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 7]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 0]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I1, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+SAT 3.7001010039821267
+RULE 14 15.127239227294922
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.lshr[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 19]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 15 16.14001178741455
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.shl[16](I1, I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 8]()
+t3_0 = bv.c_const[1, 1]()
+t19_0 = bv.c_dont_care[8]()
+t2_0 = bv.c_const[5, 18]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 0]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t19_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+********************************************************************************
+RULE 16 17.15377926826477
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.eq[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 0]()
+t2_0 = bv.c_const[5, 0]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+SAT 7.895868874154985
+SAT 6.114004652015865
+SAT 6.505444956943393
+SAT 2.8726905025541782
+SAT 8.191954832524061
+SAT 6.3577444748952985
+RULE 17 30.17484164237976
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ule[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 3]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 18 32.18229937553406
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sle[16](I1, I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 48]()
+t2_0 = bv.c_const[5, 10]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 65535]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t18_0 = bv.c_dont_care[1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t18_0, t13_0, t6_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+SAT 20.294660611078143
+RULE 19 37.19288897514343
+Comb C.LHS0
+In I0 : BV[1]
+In I1 : BV[16]
+In I2 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.mux[16](I0, I1, I2)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[1]
+In I1 : BV[16]
+In I2 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 3]()
+t18_0 = bv.c_dont_care[1]()
+t19_0 = bv.c_dont_care[8]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t9_0 = bv.c_const[2, 2]()
+t10_0 = bv.c_const[2, 2]()
+t11_0 = bv.c_const[2, 2]()
+t12_0 = bv.c_const[2, 2]()
+t13_0 = bv.c_const[2, 2]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t19_0, t2_0, t8_0, t21_0, t9_0, t21_0, t10_0, t21_0, t11_0, t18_0, t12_0, t18_0, t13_0, t18_0, I1, I2, t22_0, I0, t23_0, t23_0, I0)
+O0 = t0_0
+********************************************************************************
+RULE 20 44.20875930786133
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sgt[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 174]()
+t2_0 = bv.c_const[5, 10]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 0]()
+t20_0 = bv.c_dont_care[2]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t20_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 21 44.214215993881226
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.uge[16](I1, I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 9]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 0]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I1, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 22 47.22275424003601
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ugt[16](I1, I0)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 64]()
+t2_0 = bv.c_const[5, 15]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 65535]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 23 49.23059964179993
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.ult[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 119]()
+t2_0 = bv.c_const[5, 8]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 24 56.24235129356384
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.slt[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t18_0 = bv.c_dont_care[1]()
+t7_0 = bv.c_const[8, 192]()
+t2_0 = bv.c_const[5, 10]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 0]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I1, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+RULE 25 78.26937985420227
+Comb C.LHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.sge[16](I0, I1)
+O0 = t0_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+In I1 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 11]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I1, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+********************************************************************************
+Saving rules to lassen/rules_1_1.pkl
+KIND:((0,), (0,), (nT(n=16, const=True),), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=True),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.324, ET: 0.0
+KIND:((1,), (0,), (nT(n=1, const=True),), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=True),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.456, ET: 0.0
+KIND:((2,), (0,), (nT(n=16, const=False),), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.356, ET: 0.0
+KIND:((6,), (0,), (nT(n=1, const=False),), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.563, ET: 0.0
+KIND:((4,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.642, ET: 0.0
+KIND:((3,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.815, ET: 0.0
+KIND:((7,), (0,), (nT(n=1, const=False), nT(n=1, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.16, ET: 0.0
+KIND:((13,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.553, ET: 0.0
+KIND:((5,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 2.25, ET: 0.0
+KIND:((9,), (0,), (nT(n=1, const=False), nT(n=1, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.888, ET: 0.0
+KIND:((14,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.515, ET: 0.0
+KIND:((15,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 0.786, ET: 0.0
+KIND:((8,), (0,), (nT(n=1, const=False), nT(n=1, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 2.618, ET: 0.0
+KIND:((11,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.044, ET: 0.0
+KIND:((10,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 2.542, ET: 0.0
+KIND:((12,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.534, ET: 0.0
+KIND:((16,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 2.529, ET: 0.0
+KIND:((23,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 6.358, ET: 0.0
+KIND:((19,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 7.896, ET: 0.0
+KIND:((25,), (0,), (nT(n=1, const=False), nT(n=16, const=False), nT(n=16, const=False)), (nT(n=16, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=1, const=False), nT(n=16, const=False)), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 2.873, ET: 0.0
+KIND:((18,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 3.7, ET: 0.0
+KIND:((24,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 20.295, ET: 0.0
+KIND:((22,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 6.505, ET: 0.0
+KIND:((21,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 6.114, ET: 0.0
+KIND:((17,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 1.893, ET: 0.0
+KIND:((20,), (0,), (nT(n=16, const=False), nT(n=16, const=False)), (nT(n=1, const=False),), (), (nT(n=5, const=True), nT(n=5, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=True), nT(n=16, const=True)), (nT(n=16, const=False),), (nT(n=5, const=True), nT(n=1, const=True), nT(n=8, const=True), nT(n=2, const=True), nT(n=16, const=True), nT(n=16, const=False), nT(n=1, const=False))), UNIQUE:1, DUP: 0, ST: 8.192, ET: 0.0
+TOTTIME: 78.28687763214111
+[]
