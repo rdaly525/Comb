@@ -194,7 +194,7 @@ class RuleDatabase:
     def find_all_composites(self):
         rules_all = flat(self.rules.values())
 
-        solverops = SolverOpts(solver_name='z3')
+        solverops = SolverOpts(solver_name='bitwuzla')
         symops = SymOpts(True, True, False)
         composites = []
 

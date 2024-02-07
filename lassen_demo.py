@@ -38,6 +38,7 @@ from peak.assembler import AssembledADT, Assembler
 from time import time
 import os
 import pickle
+from multiset import Multiset
 
 solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=2000, log=False)
 def parameterize_pe():
@@ -228,7 +229,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 1
+maxIR = 2
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -241,7 +242,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
-num_proc = 14
+num_proc = 8
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -327,8 +328,6 @@ for k, info in db.time_info.items():
     print(f"KIND:{k}, UNIQUE:{num_unique}, DUP: {extra}, ST: {sat_time}, ET: {extra_time}")
 delta = time()-start_time
 print("TOTTIME:", delta)
-c = db.find_all_composites()
-print(c)
 
 from comb.synth.verify import verify
 prog = """\
@@ -603,7 +602,7 @@ for k,rules in db.rules.items():
     for rule in rules:
         rule = rule.lhs.to_comb()
         for i,old_rule in enumerate(old_rules):
-            if rule.get_type() == old_rule.get_type():
+            if Multiset(rule.get_type()[0]) == Multiset(old_rule.get_type()[0]) and Multiset(rule.get_type()[1]) == Multiset(old_rule.get_type()[1]):
                 if verify(old_rule, rule, enum_io_order = True) is None:
                     old_rule_matched[i] = True
                     new_rule_matched[rulei] = True
@@ -624,5 +623,7 @@ print("Total synthesized unique", sum(not x for x in new_rule_matched))
 
 
 
+c = db.find_all_composites()
+print(c)
 assert c == []
 
