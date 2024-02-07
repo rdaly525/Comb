@@ -9,7 +9,7 @@ from DagVisitor import Visitor
 from ..frontend.ast import Comb, Sym, QSym, InDecl, OutDecl
 import typing as tp
 
-from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set, dicts_agree
+from .utils import type_to_nT, _list_to_dict, nT_to_type, _list_to_counts, flat, add_to_set, dicts_agree, nT
 from ..frontend.ir import CombProgram, AssignStmt, CombSpecialized
 from ..frontend.stdlib import CBVSynthConst, GlobalModules, is_dont_care
 import itertools as it
@@ -140,24 +140,69 @@ def filter_eq(f):
 #        pat =
 
 class CoreIRToPattern(Visitor):
-    def __init__(self, dag, node_mapping):
-        self.node_mapping
+    def __init__(self, node_mapping):
+        self.node_mapping = node_mapping
         self.iT = []
         self.oT = []
         self.ops = []
         self.edges = []
-        self.synth_vals = []
+        self.select_map = {}
+        self.node_to_opi = {}
+        self.input_map = {}
+        self.BV = GlobalModules['bv']
+    
+    def create_pattern(self, dag):
+        self.run(dag)
+        return Pattern(self.iT, self.oT, self.ops, self.edges, [])
 
     def generic_visit(self, node):
         Visitor.generic_visit(self, node)
+        opi = len(self.ops)
+        assert type(node) in self.node_mapping
+        self.ops.append(self.node_mapping[type(node)])
+        self.node_to_opi[node] = opi
+        for arg,child in enumerate(node.children()):
+            if child in self.select_map:
+                self.edges.append((self.select_map[child], (opi, arg)))
+            else:
+                assert child in self.node_to_opi and isinstance(self.node_to_opi[child], int)
+                self.edges.append(((self.node_to_opi[child],0), (opi, arg)))
     
-    def visit_select(self, node):
-        print("In select")
-        print(node)
+    def visit_Select(self, node):
+        Visitor.generic_visit(self, node)
+        assert len(node.children()) == 1
+        child = node.children()[0]
+        if child in self.node_to_opi:
+            self.select_map[node] = (self.node_to_opi[child], tuple(child._selects).index(node.field))
+        elif child in self.select_map:
+            assert isinstance(node.field, int)
+            opi, arg = self.select_map[child]
+            self.select_map[node] = (opi, arg + node.field)
+        else:
+            assert node.field in self.input_map
+            self.select_map[node] = (-1,self.input_map[node.field])
 
-    def visit_constant(self, node):
-        print("In constant")
-        print(node)
+    def visit_Input(self, node):
+        Visitor.generic_visit(self, node)
+        for field,T in node.type.field_dict.items():
+            self.input_map[field] = len(self.iT)
+            for f in T._fields_:
+                self.iT.append(nT(f.size, False))
+
+    def visit_Output(self, node):
+        Visitor.generic_visit(self, node)
+        opi = len(self.ops)
+        for arg,child in enumerate(node.children()):
+            assert child in self.select_map
+            self.edges.append((self.select_map[child], (opi, arg)))
+            self.oT.append(nT(child.type.size, False))
+
+    def visit_Constant(self, node):
+        Visitor.generic_visit(self, node)
+        opi = len(self.ops)
+        self.node_to_opi[node] = opi
+        op = self.BV.c_const[node.value.num_bits,node.value.value]
+        self.ops.append(op)
 
 
 class Pattern:
