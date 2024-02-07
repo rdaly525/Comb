@@ -4,6 +4,8 @@ import hwtypes as ht
 import hwtypes.smt_utils as fc
 from comb.synth.solver_utils import SolverOpts, get_var
 from pysmt import shortcuts as smt
+from comb.frontend.ir import CombSpecialized
+from comb.frontend.stdlib import CBVConst
 
 class InstructionSel:
     def run(self, max_cost = None):
@@ -59,6 +61,11 @@ class OptimalInstructionSel(InstructionSel):
         # inputs to the pat are available
         for i in range(self.pat.NI):
             node_o[(-1,i)] = [ht.SMTBit(1)]
+
+        #constants are available
+        for i,op in enumerate(self.pat.ops):
+            if isinstance(op, CombSpecialized) and isinstance(op.comb, CBVConst):
+                node_o[(i,0)] = [ht.SMTBit(1)]
         
         if max_cost is not None:
             assert max_cost >= 0
