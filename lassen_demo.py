@@ -338,7 +338,7 @@ In a : BV[N]
 In b : BV[N]
 Out o : BV[N]
 cmp = bv.ult[N](a,b)
-o = bv.mux[N](cmp,a,b)
+o = bv.mux[N](b,a,cmp)
 
 Comb coreir.umax
 Param N: Int
@@ -346,7 +346,7 @@ In a : BV[N]
 In b : BV[N]
 Out o : BV[N]
 cmp = bv.ugt[N](a,b)
-o = bv.mux[N](cmp,a,b)
+o = bv.mux[N](b,a,cmp)
 
 Comb coreir.smin
 Param N: Int
@@ -354,7 +354,7 @@ In a : BV[N]
 In b : BV[N]
 Out o : BV[N]
 cmp = bv.slt[N](a,b)
-o = bv.mux[N](cmp,a,b)
+o = bv.mux[N](b,a,cmp)
 
 Comb coreir.smax
 Param N: Int
@@ -362,7 +362,7 @@ In a : BV[N]
 In b : BV[N]
 Out o : BV[N]
 cmp = bv.sgt[N](a,b)
-o = bv.mux[N](cmp,a,b)
+o = bv.mux[N](b,a,cmp)
 
 Comb coreir.abs
 Param N: Int
