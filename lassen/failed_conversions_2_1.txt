@@ -1,0 +1,406 @@
+Failed rule conversion:
+Comb C.LHS1
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.abs[16](t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS1
+In I0 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 8]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 128]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sle[16](t0_0, I0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 11]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, t22_0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sle[16](I0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 19]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 120]()
+t2_0 = bv.c_const[5, 18]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.slt[16](t0_0, I0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t18_0 = bv.c_dont_care[1]()
+t7_0 = bv.c_const[8, 129]()
+t2_0 = bv.c_const[5, 11]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 65535]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 32768]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t18_0, t22_0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.slt[16](I0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 11]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 127]()
+t2_0 = bv.c_const[5, 13]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 2]()
+t15_0 = bv.c_const[16, 32768]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, t22_0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sgt[16](I0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 19]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 17]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sgt[16](t0_0, I0)
+O0 = t1_0
+ ----->
+Comb C.RHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 11]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 128]()
+t2_0 = bv.c_const[5, 13]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t18_0 = bv.c_dont_care[1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 0]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t18_0, t12_0, t5_0, t13_0, t6_0, I0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.add[16](I0, I0)
+t1_0 = bv.mul[16](t0_0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 19]()
+t3_0 = bv.c_const[1, 0]()
+t19_0 = bv.c_dont_care[8]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 0]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t18_0 = bv.c_dont_care[1]()
+t12_0 = bv.c_const[2, 2]()
+t13_0 = bv.c_const[2, 2]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t19_0, t2_0, t8_0, t14_0, t9_0, t21_0, t10_0, t16_0, t11_0, t18_0, t12_0, t18_0, t13_0, t18_0, t22_0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.add[16](I0, I0)
+t1_0 = bv.mult_middle[16](t0_0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 19]()
+t18_0 = bv.c_dont_care[1]()
+t19_0 = bv.c_dont_care[8]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t9_0 = bv.c_const[2, 2]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 0]()
+t11_0 = bv.c_const[2, 2]()
+t12_0 = bv.c_const[2, 2]()
+t13_0 = bv.c_const[2, 2]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t19_0, t2_0, t8_0, t21_0, t9_0, t21_0, t10_0, t16_0, t11_0, t18_0, t12_0, t18_0, t13_0, t18_0, I0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sge[16](I0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 11]()
+t18_0 = bv.c_dont_care[1]()
+t19_0 = bv.c_dont_care[8]()
+t2_0 = bv.c_const[5, 12]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 65535]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 0]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t18_0, t19_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, t22_0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.sge[16](t0_0, I0)
+O0 = t1_0
+ ----->
+Comb C.RHS1
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 1]()
+t3_0 = bv.c_const[1, 1]()
+t7_0 = bv.c_const[8, 255]()
+t2_0 = bv.c_const[5, 11]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 2]()
+t21_0 = bv.c_dont_care[16]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 0]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t13_0 = bv.c_const[2, 2]()
+t6_0 = bv.c_const[1, 1]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t21_0, t11_0, t4_0, t12_0, t5_0, t13_0, t6_0, I0, I0, I0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t0_0 = bv.shl[16](I0, I0)
+t1_0 = bv.ult[16](t0_0, I0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[1]
+t1_0 = bv.c_const[5, 5]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 129]()
+t2_0 = bv.c_const[5, 12]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 1]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 0]()
+t16_0 = bv.c_const[16, 65535]()
+t11_0 = bv.c_const[2, 2]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 2]()
+t5_0 = bv.c_const[1, 1]()
+t20_0 = bv.c_dont_care[2]()
+t6_0 = bv.c_const[1, 1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t20_0, t6_0, I0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_1
+
+Failed rule conversion:
+Comb C.LHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t0_0 = bv.mul[16](I0, I0)
+t1_0 = bv.mul[16](t0_0, t0_0)
+O0 = t1_0
+ ----->
+Comb C.RHS0
+In I0 : BV[16]
+Out O0 : BV[16]
+t1_0 = bv.c_const[5, 10]()
+t3_0 = bv.c_const[1, 0]()
+t7_0 = bv.c_const[8, 128]()
+t2_0 = bv.c_const[5, 19]()
+t8_0 = bv.c_const[2, 2]()
+t14_0 = bv.c_const[16, 32768]()
+t9_0 = bv.c_const[2, 0]()
+t15_0 = bv.c_const[16, 1]()
+t10_0 = bv.c_const[2, 2]()
+t16_0 = bv.c_const[16, 1]()
+t11_0 = bv.c_const[2, 0]()
+t4_0 = bv.c_const[1, 1]()
+t12_0 = bv.c_const[2, 0]()
+t5_0 = bv.c_const[1, 1]()
+t20_0 = bv.c_dont_care[2]()
+t18_0 = bv.c_dont_care[1]()
+t22_0 = bv.dont_care[16]()
+t23_0 = bv.dont_care[1]()
+t0_0, t0_1 = peak.PE(t1_0, t3_0, t7_0, t2_0, t8_0, t14_0, t9_0, t15_0, t10_0, t16_0, t11_0, t4_0, t12_0, t5_0, t20_0, t18_0, I0, I0, t22_0, t23_0, t23_0, t23_0, t23_0)
+O0 = t0_0
+
