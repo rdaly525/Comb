@@ -27,7 +27,7 @@ class SolverOpts:
     logic: Logic = QF_BV
     max_iters: int = 1000
     timeout: int = 20
-    solver_name: str = "z3"
+    solver_name: str = "bitwuzla"
     log: bool = False
     verbose: int = 0
 

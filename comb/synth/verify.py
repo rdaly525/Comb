@@ -6,6 +6,7 @@ from .solver_utils import SolverOpts
 from ..frontend.ast import Comb
 from .utils import _make_list, _to_int
 from itertools import permutations
+import smt_switch.pysmt_frontend as fe
 
 def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts(), enum_io_order = False):
     inputs = comb0.create_symbolic_inputs()
@@ -29,7 +30,7 @@ def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts(), enum_io_orde
 
                 not_formula = ~(formula.to_hwtypes())
 
-                with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+                with fe.Solver(name = opts.solver_name, logic = opts.logic) as solver:
                     solver.add_assertion(not_formula.value)
                     res = solver.solve()
                     if res is False:
@@ -50,7 +51,7 @@ def verify(comb0: Comb, comb1: Comb, opts: SolverOpts=SolverOpts(), enum_io_orde
 
     not_formula = ~(formula.to_hwtypes())
 
-    with smt.Solver(logic=opts.logic, name=opts.solver_name) as solver:
+    with fe.Solver(name = opts.solver_name, logic = opts.logic) as solver:
         solver.add_assertion(not_formula.value)
         res = solver.solve()
         if res is False:

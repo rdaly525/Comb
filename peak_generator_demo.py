@@ -41,9 +41,19 @@ from comb.synth.utils import flat
 from hwtypes import Tuple
 DATAWIDTH = 16
 
-arch = read_arch("conv_3_alu.json")
+peak_gen_name = "h-outputs"
+
+arch = read_arch(f"/aha/{peak_gen_name}/PE.json")
 Inst = inst_arch_closure(arch)(SMTFamily())
-inst_widths = [[i.size if hasattr(i, "size") else SMTFamily().get_adt_t(i)._assembler_.width for i in tp] for tp in Inst.fields]
+def get_width(inst):
+    if hasattr(inst, "size"):
+        return inst.size 
+    elif inst == SMTFamily().Bit:
+        return 1
+    else:
+        return SMTFamily().get_adt_t(inst)._assembler_.width
+    
+inst_widths = [[get_width(i)  for i in tp] for tp in Inst.fields]
 inst_widths_flat = flat(inst_widths)
 assert all(isinstance(i, int) for i in inst_widths_flat)
 
@@ -51,15 +61,18 @@ solver_opts = SolverOpts(verbose=0, solver_name='bitwuzla', timeout=5000, log=Fa
 def parameterize_pe():
     inst_str = "".join((f"inst{i} : family.BitVector[{w}], " for i,w in enumerate(inst_widths_flat)))
     data_str = "".join((f"data{i} : family.BitVector[{arch.input_width}], " for i in range(arch.num_inputs)))
-    output_str = "(" + "".join((f"family.BitVector[{arch.output_width}], " for _ in range(arch.num_outputs))) + ")"
+    data_str += "".join((f"data{i+arch.num_inputs} : family.BitVector[1], " for i in range(arch.num_bit_inputs)))
+    output_str = "(" + "".join((f"family.BitVector[{arch.output_width}], " for _ in range(arch.num_outputs))) 
+    output_str += "".join((f"family.BitVector[1], " for _ in range(arch.num_bit_outputs))) + ")"
     # inst_args = "".join((f"inst{i}, " for i,_ in enumerate(inst_widths_flat)))
     inst_args = ""
     i = 0
-    for ws,name in zip(inst_widths, Inst._field_table_.keys()):
-        inst_args += f"{name} = [" + "".join((f"inst{i+j}, " for j,_ in enumerate(ws))) + "],"
+    for ws,name,types in zip(inst_widths, Inst._field_table_.keys(), Inst.fields):
+        inst_args += f"{name} = [" + "".join((f"inst{i+j}{'[0]' if T == SMTFamily().Bit else ''}, " for j,T in enumerate(types))) + "],"
         i += len(ws)
 
     data_args = "".join((f"data{i}, " for i in range(arch.num_inputs)))
+    data_args += "".join((f"data{i+arch.num_inputs}[0], " for i in range(arch.num_bit_inputs)))
 
     pe_str = """
 @family_closure
@@ -81,7 +94,7 @@ def ExpandedPE_fc(family):
             data = ["""+ data_args + """]
 
             res =  self.PE(inst, data)
-            return res._value_
+            return (res[0], family.BitVector(res[1]))
         
     return ExpandedPE
     """
@@ -110,9 +123,13 @@ class CombPE(CombPeak):
                     #const instructions
                     *inst_widths_flat,
                     #data inputs
-                    *(arch.input_width for _ in range(arch.num_inputs))
+                    *(arch.input_width for _ in range(arch.num_inputs)),
+                    *(1 for _ in range(arch.num_bit_inputs))
                 ),
-                tuple(arch.output_width for _ in range(arch.num_outputs))
+                (
+                    *(arch.output_width for _ in range(arch.num_outputs)),
+                    *(1 for _ in range(arch.num_bit_outputs)),
+                )
             )
 
         consts = (
@@ -120,9 +137,13 @@ class CombPE(CombPeak):
                 #const instructions
                 *(True for _ in inst_widths_flat),
                 #data inputs
-                *(False for _ in range(arch.num_inputs))
+                *(False for _ in range(arch.num_inputs)),
+                *(False for _ in range(arch.num_bit_inputs))
             ),
-            tuple(False for _ in range(arch.num_outputs))
+            (
+                *(False for _ in range(arch.num_outputs)),
+                *(False for _ in range(arch.num_bit_outputs))
+            )
         )
 
         super().__init__(parameterize_pe, 0, type_gen, consts)
@@ -181,7 +202,7 @@ costs = [1]
 
 max_outputs = None
 C,K = 1,1
-maxIR = 1
+maxIR = 2
 maxISA = 1
 opMaxIR = None
 opMaxISA = None
@@ -194,7 +215,7 @@ gen_consts = False, True
 gen_dont_cares = True, True
 simplify_dont_cares = True, True
 simplify_gen_consts = False, True
-num_proc = 14
+num_proc = 15
 
 rd = RuleDiscovery(
     lhss=lhs,
@@ -214,7 +235,7 @@ E_opts = (LC, E, CMP)
 bin_search = [True, False]
 
 #load excluded pats or generate them
-ir_exclude_filename = f"lassen/exclude_{maxIR}_4bit.pkl"
+ir_exclude_filename = f"lassen/exclude_{maxIR}.pkl"
 if os.path.exists(ir_exclude_filename):
     print(f"Found excluded pats file {ir_exclude_filename}")
     with open(ir_exclude_filename, 'rb') as f:
@@ -240,7 +261,7 @@ if not os.path.exists(ir_exclude_filename):
         pickle.dump(excluded_pats, f)
 
 if LC_test:
-    ga = rd.gen_lowcost_rules_mp(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats, num_proc)
+    ga = rd.gen_lowcost_rules_mp(E_opts, ir_opts, narrow_opts, costs, max_outputs, solver_opts, bin_search, excluded_pats, num_proc, f"peak_generator/{peak_gen_name}")
 else:
     ga = rd.gen_all_rules(E_opts, ir_opts, narrow_opts, max_outputs, solver_opts, bin_search, excluded_pats)
 for ri, rule in enumerate(ga):
@@ -249,27 +270,27 @@ for ri, rule in enumerate(ga):
     print("*"*80, flush = True)
 db = rd.rdb
 
-# rule_database_filename = f"lassen/rules_{maxIR}_{maxISA}_4bit.pkl"
-# if not os.path.exists(rule_database_filename):
-#     print(f"Saving rules to {rule_database_filename}")
-#     all_rules = []
-#     for k,rules in db.rules.items():
-#         t = db.time[k]
-#         for rule in rules:
-#             for op in rule.lhs.ops:
-#                 if hasattr(op, "prev_eval"):
-#                     op.eval = op.prev_eval
-#                     delattr(op, "prev_eval")
-#             for i,op in enumerate(rule.rhs.ops):
-#                 if hasattr(op, "prev_eval"):
-#                     op.eval = op.prev_eval
-#                     delattr(op, "prev_eval")
-#                 elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
-#                     rule.rhs.ops[i] = 0
-#         all_rules.append((k, rules, t))
+rule_database_filename = f"peak_generator/{peak_gen_name}/rules_{maxIR}_{maxISA}.pkl"
+if not os.path.exists(rule_database_filename):
+    print(f"Saving rules to {rule_database_filename}")
+    all_rules = []
+    for k,rules in db.rules.items():
+        t = db.time[k]
+        for rule in rules:
+            for op in rule.lhs.ops:
+                if hasattr(op, "prev_eval"):
+                    op.eval = op.prev_eval
+                    delattr(op, "prev_eval")
+            for i,op in enumerate(rule.rhs.ops):
+                if hasattr(op, "prev_eval"):
+                    op.eval = op.prev_eval
+                    delattr(op, "prev_eval")
+                elif isinstance(op, CombSpecialized) and isinstance(op.comb, CombPeak):
+                    rule.rhs.ops[i] = 0
+        all_rules.append((k, rules, t))
 
-#     with open(rule_database_filename, 'wb') as f:
-#         pickle.dump(all_rules, f)
+    with open(rule_database_filename, 'wb') as f:
+        pickle.dump(all_rules, f)
 
 for k, info in db.time_info.items():
     num_unique = info["u"]

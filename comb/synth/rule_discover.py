@@ -28,6 +28,7 @@ import multiprocessing
 import time
 import pickle
 import os
+from lassen.common import DATAWIDTH
 
 
 def _smart_iter(mL: int, mR: int):
@@ -67,7 +68,7 @@ def T_count(ops):
     return iTs, oTs
 
 def simplify_constraint(in_lvars,out_lvars,in_vars,out_vars):
-    return (out_vars[0] == 0) | (out_vars[0] == 1) | (out_vars[0] == 2**15) | (out_vars[0] == 2**16-1)
+    return (out_vars[0] == 0) | (out_vars[0] == 1) | (out_vars[0] == 2**(DATAWIDTH-1)) | (out_vars[0] == 2**(DATAWIDTH)-1)
 
 @dataclass
 class RuleDiscovery:
@@ -384,7 +385,7 @@ class RuleDiscovery:
             assert T.const
             op = BV._synth_const[T.n]
             # #TODO: this is a temporary fix to speed things up for PEs
-            if T.n == 16:
+            if T.n == DATAWIDTH:
                 op.constraints = simplify_constraint
             op_list.append(op)
 
@@ -818,22 +819,23 @@ class RuleDiscovery:
                 
             time.sleep(1)
 
-    def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1):
+    def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1, results_dir = None):
         assert len(costs)==len(self.rhss)
-        found_rules = [os.path.exists(f"lassen/rules_{l}_{self.maxR}.pkl") for l in range(1, self.maxL + 1)]
         start_l = 1
-        if any(found_rules):
-            start_l = max((index + 2) for index,found in enumerate(found_rules) if found)
-            print("Found existing rules file lassen/rules_{start_l-1}_{self.maxR}.pkl")
-            with open(f"lassen/rules_{start_l-1}_{self.maxR}.pkl", 'rb') as f:
-                all_rules = pickle.load(f)
-            for k,rules,time in all_rules:
-                for rule in rules:
-                    for i,op in enumerate(rule.rhs.ops):
-                        if isinstance(op, int):
-                            rule.rhs.ops[i] = self.rhss[op]
-                    yield rule
-                self.rdb.add_rules(k,rules,time)
+        if results_dir is not None:
+            found_rules = [os.path.exists(f"{results_dir}/rules_{l}_{self.maxR}.pkl") for l in range(1, self.maxL + 1)]
+            if any(found_rules):
+                start_l = max((index + 2) for index,found in enumerate(found_rules) if found)
+                print("Found existing rules file lassen/rules_{start_l-1}_{self.maxR}_4bit.pkl")
+                with open(f"{results_dir}/rules_{start_l-1}_{self.maxR}.pkl", 'rb') as f:
+                    all_rules = pickle.load(f)
+                for k,rules,time in all_rules:
+                    for rule in rules:
+                        for i,op in enumerate(rule.rhs.ops):
+                            if isinstance(op, int):
+                                rule.rhs.ops[i] = self.rhss[op]
+                        yield rule
+                    self.rdb.add_rules(k,rules,time)
 
         for lN in range(start_l, self.maxL+1):
             processes = dict()

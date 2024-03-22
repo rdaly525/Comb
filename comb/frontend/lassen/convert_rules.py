@@ -28,12 +28,20 @@ from_file = f"lassen/rules_3_1_4bit.pkl"
 to_file = f"lassen/rules_3_1.pkl"
 from_bits = 4
 to_bits = 16
-
+xx = 0
 rdb = RuleDatabase()
 with open(from_file, 'rb') as f:
     all_rules = pickle.load(f)
     for k,rules,time in all_rules:
         print(len(rules))
+        if len(rules) == 7:
+            xx += 1
+            if xx == 17:
+                breakpoint()
+            else:
+                continue
+        else:
+            continue
         #all rules of the same k will have a handle to the same op list,
         #need to make them different lists
         for rule in rules:

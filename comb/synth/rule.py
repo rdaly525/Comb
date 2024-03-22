@@ -199,8 +199,6 @@ class RuleDatabase:
         composites = []
 
         for i,rule in enumerate(rules_all):
-            if i == 60:
-                pass
             components = rules_all[:i] + rules_all[i+1:]
             instr_sel = OptimalInstructionSel(rule.lhs, components, symops, solverops)
             if instr_sel.run(rule.cost):
