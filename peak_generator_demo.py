@@ -39,11 +39,11 @@ from peak_gen.isa import ALU_t
 from peak_gen.peak_wrapper import exec_source
 from comb.synth.utils import flat
 from hwtypes import Tuple
-DATAWIDTH = 16
 
 peak_gen_name = "h-outputs"
 
 arch = read_arch(f"/aha/{peak_gen_name}/PE.json")
+DATAWIDTH = arch.input_width
 Inst = inst_arch_closure(arch)(SMTFamily())
 def get_width(inst):
     if hasattr(inst, "size"):
@@ -156,9 +156,6 @@ from comb.frontend.stdlib import GlobalModules
 BV = GlobalModules["bv"]
 
 lhs = [
-    #BV.abs_const[DATAWIDTH],
-    #BV.abs_const[1],
-
     BV.not_[DATAWIDTH],
     BV.and_[DATAWIDTH],
     BV.or_[DATAWIDTH],
@@ -193,7 +190,7 @@ lhs = [
     BV.ugt[DATAWIDTH],
     BV.ule[DATAWIDTH],
     BV.uge[DATAWIDTH],
-    BV.mux[DATAWIDTH]
+    BV.mux[DATAWIDTH],
 ]
 rhs = [
     combPE, 
@@ -235,7 +232,7 @@ E_opts = (LC, E, CMP)
 bin_search = [True, False]
 
 #load excluded pats or generate them
-ir_exclude_filename = f"lassen/exclude_{maxIR}.pkl"
+ir_exclude_filename = f"exclude/exclude_{maxIR}_{DATAWIDTH}bit.pkl"
 if os.path.exists(ir_exclude_filename):
     print(f"Found excluded pats file {ir_exclude_filename}")
     with open(ir_exclude_filename, 'rb') as f:
@@ -270,7 +267,7 @@ for ri, rule in enumerate(ga):
     print("*"*80, flush = True)
 db = rd.rdb
 
-rule_database_filename = f"peak_generator/{peak_gen_name}/rules_{maxIR}_{maxISA}.pkl"
+rule_database_filename = f"peak_generator/{peak_gen_name}/rules_{maxIR}_{maxISA}_{DATAWIDTH}bit.pkl"
 if not os.path.exists(rule_database_filename):
     print(f"Saving rules to {rule_database_filename}")
     all_rules = []
@@ -598,5 +595,3 @@ old_rules = [
 
 c = db.find_all_composites()
 print(c)
-assert c == []
-

@@ -15,7 +15,7 @@ from comb.synth.rule import Rule, RuleDatabase
 from comb.synth.rule_synth import RuleSynth
 from comb.synth.spec_synth import SpecSynth
 from comb.synth.solver_utils import SolverOpts, smt_solve_all, get_var
-from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts, _m_subseteq
+from comb.synth.utils import _list_to_counts, flat, _to_int, types_to_nTs, _list_to_dict, ge0_cnts, sub_cnts, _m_subseteq, nT
 import hwtypes.smt_utils as fc
 import hwtypes as ht
 import typing as tp
@@ -28,8 +28,8 @@ import multiprocessing
 import time
 import pickle
 import os
-from lassen.common import DATAWIDTH
 
+DATAWIDTH = 16
 
 def _smart_iter(mL: int, mR: int):
     for s in range(2, mL+mR+1):
@@ -103,6 +103,8 @@ class RuleDiscovery:
         if self.simplify_gen_consts[1]:
             assert self.gen_consts[1]
 
+        self.lhs_abs_const_gen = True
+
     def allT(self, lhs_ops, rhs_ops, l_dont_care_T, r_dont_care_T, max_outputs):
         # generate all possible program input and output type combinations
 
@@ -119,7 +121,26 @@ class RuleDiscovery:
                 assert rop_iTs[T] > 0
                 rop_iTs[T] -= 1
 
-        max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
+        if self.lhs_abs_const_gen:
+            # the lhs_abs_const_gen signifies if the conversions from bv_const inputs to bv will be automatically
+            # added for the lhs. If so, then the constraints are looser for input types which are valid
+
+            # for every const sink on the rhs, there must be a non-const sink on the lhs for that const to 
+            # be a valid input type
+            max_iTs = {}
+            for T in set(lop_iTs.keys()) | set(rop_iTs.keys()):
+                if T.const:
+                    assert T in rop_iTs
+                    assert T not in lop_iTs
+                    non_const_T = nT(T.n, False)
+                    if non_const_T in lop_iTs:
+                        max_iTs[T] = min(lop_iTs[non_const_T], rop_iTs[T])
+                else:
+                    if T not in lop_iTs or T not in rop_iTs:
+                        continue
+                    max_iTs[T] = min(lop_iTs[T], rop_iTs[T])
+        else:
+            max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
         max_oTs = {T:min(lop_oTs[T], rop_oTs[T]) for T in set(lop_oTs.keys()) & set(rop_oTs.keys())}
 
         max_inputs = sum(max_iTs.values())
@@ -145,6 +166,10 @@ class RuleDiscovery:
         
         lop_const_iTs = {k:v for k,v in lop_iTs.items() if k.const}
         rop_const_iTs = {k:v for k,v in rop_iTs.items() if k.const}
+
+        if self.lhs_abs_const_gen:
+            for T in iT:
+                lop_const_iTs[T] = lop_const_iTs.get(T, 0) + 1
 
         # inputs must go somewhere, remove their counts from the 
         # possible number of constants that can be generate
@@ -239,6 +264,12 @@ class RuleDiscovery:
         # hopeless programs make it past this check and slow down the synthesis
 
         lop_iTs, lop_oTs = T_count(lhs_ops)
+        if self.lhs_abs_const_gen:
+            for T in iT:
+                lop_iTs[T] = lop_iTs.get(T, 0) + 1
+                non_const_T = nT(T.n, False)
+                lop_oTs[non_const_T] = lop_oTs.get(non_const_T, 0) + 1
+
         rop_iTs, rop_oTs = T_count(rhs_ops)
 
         lsrcs_no_i = set(lop_oTs.keys()) | set(l_synth_T) | set(l_dont_care_T)
@@ -403,6 +434,15 @@ class RuleDiscovery:
 
         return op_list
 
+    def iT_to_abs_const_ops_list(self, iT):
+        op_list = []
+        BV = GlobalModules['bv']
+        for T in iT:
+            if T.const:
+                op = BV.abs_const[T.n]
+                op_list.append(op)
+        return op_list
+
     def gen_all_rules(self, E_opts, ir_opts, narrow_opts, max_outputs=None, opts=SolverOpts(), bin_search_dont_cares = [False, False]):
         LC, E, comp = E_opts
         assert not LC
@@ -503,13 +543,17 @@ class RuleDiscovery:
                                         assert len(new_rules) == 0
 
     # Finds all combinations of rules that exactly match the lhs and rhs
-    def all_lc_composite_msets(self, lhs_ids, cur_cost, iT, oT, lhs_synth_ops, opts:SolverOpts):
+    def all_lc_composite_msets(self, lhs_ids, cur_cost, iT, oT, lhs_synth_ops, lhs_abs_const_ops, opts:SolverOpts):
         NI = len(iT)
         NO = len(oT)
         lhs_op_cnt = _list_to_counts([self.lhss[lid].qualified_name for lid in lhs_ids])
 
         for op in lhs_synth_ops:
             lhs_op_cnt[op.qualified_name] = lhs_op_cnt.get(op.qualified_name, 0) + 1
+        for op in lhs_abs_const_ops:
+            lhs_op_cnt[op.qualified_name] = lhs_op_cnt.get(op.qualified_name, 0) + 1
+
+
         
         #Prefiltering
         poss_pats = {}
@@ -732,7 +776,9 @@ class RuleDiscovery:
                         rhs_synth_ops = self.synth_T_to_op_list(rhs_synth_T)
                         lhs_dont_care_ops = self.dont_care_T_to_op_list(lhs_dont_care_T)
                         rhs_dont_care_ops = self.dont_care_T_to_op_list(rhs_dont_care_T)
-                        lhs_ops_all = lhs_ops + lhs_synth_ops + lhs_dont_care_ops
+                        lhs_abs_const_ops = self.iT_to_abs_const_ops_list(iT)
+
+                        lhs_ops_all = lhs_ops + lhs_synth_ops + lhs_abs_const_ops + lhs_dont_care_ops
                         rhs_ops_all = rhs_ops + rhs_synth_ops + rhs_dont_care_ops
 
                         new_rules = []
@@ -763,7 +809,7 @@ class RuleDiscovery:
                         existing_pats = []
                         op_mappings = []
                         start = timeit.default_timer()
-                        for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, oT, lhs_synth_ops, opts):
+                        for mset in self.all_lc_composite_msets(lhs_ids, cur_cost, iT, oT, lhs_synth_ops, lhs_abs_const_ops, opts):
                             lhs_pats = flat([[pat for _ in range(cnt)] for pat, cnt in mset])
                             dags = enum_dags(iT, oT, lhs_pats)
                             for dag in dags:
@@ -823,11 +869,11 @@ class RuleDiscovery:
         assert len(costs)==len(self.rhss)
         start_l = 1
         if results_dir is not None:
-            found_rules = [os.path.exists(f"{results_dir}/rules_{l}_{self.maxR}.pkl") for l in range(1, self.maxL + 1)]
+            found_rules = [os.path.exists(f"{results_dir}/rules_{l}_{self.maxR}_{DATAWIDTH}bit.pkl") for l in range(1, self.maxL + 1)]
             if any(found_rules):
                 start_l = max((index + 2) for index,found in enumerate(found_rules) if found)
-                print("Found existing rules file lassen/rules_{start_l-1}_{self.maxR}_4bit.pkl")
-                with open(f"{results_dir}/rules_{start_l-1}_{self.maxR}.pkl", 'rb') as f:
+                print(f"Found existing rules file {results_dir}/rules_{start_l-1}_{self.maxR}_{DATAWIDTH}bit.pkl")
+                with open(f"{results_dir}/rules_{start_l-1}_{self.maxR}_{DATAWIDTH}bit.pkl", 'rb') as f:
                     all_rules = pickle.load(f)
                 for k,rules,time in all_rules:
                     for rule in rules:

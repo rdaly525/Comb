@@ -87,6 +87,9 @@ class OptimalInstructionSel(InstructionSel):
             solver.add_assertion(f)
             r = solver.solve()
             if r:
+                # m = solver.get_model()
+                # tiles = [int(k.symbol_name()[5:].split(",")[0]) for k,v in m if v.constant_value()]
+                # return tiles
                 return cost.value.substitute(dict(solver.get_model())).simplify().constant_value()
             return None
         

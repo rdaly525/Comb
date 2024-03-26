@@ -558,7 +558,8 @@ def enum_dags(iT, oT, pats: tp.List[Pattern]):
         else:
             snkT = pats[snk[0]].iT[snk[1]]
 
-        return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, Npat) or (srcT != snkT))
+        # return ((src[0] == snk[0])) or ((src[0], snk[0]) == (-1, Npat) or (srcT != snkT))
+        return ((src[0], snk[0]) == (-1, Npat) or (srcT != snkT))
     def valid_dag(edges):
         if not set(snk for _,snk in edges) == set(snks):
             return False
@@ -571,8 +572,9 @@ def enum_dags(iT, oT, pats: tp.List[Pattern]):
     for src_list in it.product(*src_poss):
         edges = list(zip(src_list, snks))
         if valid_dag(edges):
-            if is_dag(edges):
-                graphs.append(edges)
+            # check for whether a graph is a dag in the composite_pat function
+            # if is_dag(edges):
+            graphs.append(edges)
     return graphs
 
 def is_dag(edges):
@@ -664,6 +666,9 @@ def composite_pat(iT, oT, dag, pats:tp.List[Pattern], ops) -> Pattern:
                     i_edges, _ = pat_edges[snki]
                     for snk in i_edges[snka]:
                         edges.append((srcs[srca], snk))
+
+            if not is_dag(edges):
+                continue
         yield Pattern(iT, oT, curr_ops, edges, synth_vals),pat_to_enc_map
 
 
