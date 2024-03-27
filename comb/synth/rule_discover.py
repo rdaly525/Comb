@@ -126,22 +126,35 @@ class RuleDiscovery:
             # added for the lhs. If so, then the constraints are looser for input types which are valid
 
             # for every const sink on the rhs, there must be a non-const sink on the lhs for that const to 
-            # be a valid input type
+            # be a valid input type. It is also possible for a const input to be converted to a non-const value
+            # and be passed directly to the output on the lhs
+
             max_iTs = {}
+            max_oTs = {}
             for T in set(lop_iTs.keys()) | set(rop_iTs.keys()):
                 if T.const:
                     assert T in rop_iTs
                     assert T not in lop_iTs
                     non_const_T = nT(T.n, False)
-                    if non_const_T in lop_iTs:
-                        max_iTs[T] = min(lop_iTs[non_const_T], rop_iTs[T])
-                else:
-                    if T not in lop_iTs or T not in rop_iTs:
-                        continue
+                    num_T = min(lop_iTs.get(non_const_T,0) + rop_oTs.get(non_const_T,0), rop_iTs[T]) 
+                    if num_T > 0:
+                        max_iTs[T] = num_T
+                elif T in lop_iTs and T in rop_iTs:
                     max_iTs[T] = min(lop_iTs[T], rop_iTs[T])
+
+            for T in set(lop_oTs.keys()) | set(rop_oTs.keys()):
+                assert not T.const
+                const_T = nT(T.n, True)
+                if const_T in rop_iTs:
+                    assert const_T not in lop_iTs
+                    num_T = min(lop_oTs.get(T,0) + rop_iTs.get(const_T,0), rop_oTs.get(T,0))
+                    if num_T > 0:
+                        max_oTs[T] = num_T
+                elif T in lop_oTs and T in rop_oTs:
+                    max_oTs[T] = min(lop_oTs[T], rop_oTs[T])
         else:
             max_iTs = {T:min(lop_iTs[T], rop_iTs[T]) for T in set(lop_iTs.keys()) & set(rop_iTs.keys())}
-        max_oTs = {T:min(lop_oTs[T], rop_oTs[T]) for T in set(lop_oTs.keys()) & set(rop_oTs.keys())}
+            max_oTs = {T:min(lop_oTs[T], rop_oTs[T]) for T in set(lop_oTs.keys()) & set(rop_oTs.keys())}
 
         max_inputs = sum(max_iTs.values())
         if max_outputs is None:
@@ -169,7 +182,8 @@ class RuleDiscovery:
 
         if self.lhs_abs_const_gen:
             for T in iT:
-                lop_const_iTs[T] = lop_const_iTs.get(T, 0) + 1
+                if T.const:
+                    lop_const_iTs[T] = lop_const_iTs.get(T, 0) + 1
 
         # inputs must go somewhere, remove their counts from the 
         # possible number of constants that can be generate
@@ -266,9 +280,10 @@ class RuleDiscovery:
         lop_iTs, lop_oTs = T_count(lhs_ops)
         if self.lhs_abs_const_gen:
             for T in iT:
-                lop_iTs[T] = lop_iTs.get(T, 0) + 1
-                non_const_T = nT(T.n, False)
-                lop_oTs[non_const_T] = lop_oTs.get(non_const_T, 0) + 1
+                if T.const:
+                    lop_iTs[T] = lop_iTs.get(T, 0) + 1
+                    non_const_T = nT(T.n, False)
+                    lop_oTs[non_const_T] = lop_oTs.get(non_const_T, 0) + 1
 
         rop_iTs, rop_oTs = T_count(rhs_ops)
 
@@ -284,6 +299,21 @@ class RuleDiscovery:
         #all outputs must have a non-input src
         if not set(oT) <= lsrcs_no_i or not set(oT) <= rsrcs_no_i:
             return False
+        
+        #at least one output of every op must have a sink
+        for op in lhs_ops:
+            if not any(T in (set(oT) | lsncs_no_o) for T in types_to_nTs(op.get_type()[1]).keys()):
+                return False
+        for op in rhs_ops:
+            if not any(T in (set(oT) | rsncs_no_o) for T in types_to_nTs(op.get_type()[1]).keys()):
+                return False
+
+        if self.lhs_abs_const_gen:
+            for T in iT:
+                if T.const:
+                    non_const_T = nT(T.n, False)
+                    if non_const_T not in (set(oT) | lsncs_no_o):
+                        return False
 
         return True
 
@@ -867,7 +897,7 @@ class RuleDiscovery:
 
     def gen_lowcost_rules_mp(self, E_opts, ir_opts, narrow_opts, costs, max_outputs = None, opts=SolverOpts(), bin_search_dont_cares = False, excluded_pats = [], num_proc = 1, results_dir = None):
         assert len(costs)==len(self.rhss)
-        start_l = 1
+        start_l = 0
         if results_dir is not None:
             found_rules = [os.path.exists(f"{results_dir}/rules_{l}_{self.maxR}_{DATAWIDTH}bit.pkl") for l in range(1, self.maxL + 1)]
             if any(found_rules):
